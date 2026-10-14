@@ -1,0 +1,110 @@
+# Cafe POS App - AI Context & Documentation
+
+## Loyiha Haqida (About Project)
+Bu loyiha React va Vite yordamida yozilgan, kichik va o'rta biznes (kafe, restoran, choyxona) uchun mo'ljallangan POS (Point of Sale) tizimi. 
+Ma'lumotlar bazasi sifatida brauzerning `localStorage` xotirasidan foydalaniladi (maxsus `useSticky` hook orqali).
+Loyiha 100% modulli (modular) arxitekturaga ega bo'lib, rollarga asoslangan (RBAC).
+
+## Texnologiyalar (Tech Stack)
+- Frontend: React.js (Vite)
+- Styling: Tailwind CSS
+- Database: LocalStorage (Offline-first approach)
+- Deployment: Web, Telegram Mini App, PWA uchun moslashgan.
+
+## Loyiha Strukturasi (Project Structure)
+Loyiha `src/` papkasiga jamlangan.
+
+src/
+├── App.jsx                 # Asosiy birlashtiruvchi fayl (Root component). Barcha global state'lar va LocalStorage bazasi shu yerda.
+├── main.jsx                # React DOM render fayli.
+└── components/
+    ├── useSticky.js        # LocalStorage va React state'ni sinxronlovchi maxsus hook.
+    ├── Modals.jsx          # Chek (Receipt) printer uchun va QR kod chiqarish modallari.
+    ├── LockScreen.jsx      # Xodimlar tizimga PIN kod bilan kirish ekrani.
+    ├── CustomerQRView.jsx  # Mijozlar uchun QR-Menyu (Porsiya/Dona tanlash imkoniyati bilan).
+    ├── WaiterMode.jsx      # Ofitsiant bo'limi (Buyurtma olish, stol ko'chirish, split bill, chaqiruvlarni ko'rish).
+    ├── KitchenMode.jsx     # Oshxona bo'limi (Buyurtmalarni tayyorlash, Stop-list, Rolga doir taomlarni ko'rish).
+    ├── CashierMode.jsx     # Kassa bo'limi (To'lov qilish, Qarz daftari, Cashback, Kassa chiqimlari).
+    ├── WarehouseMode.jsx   # Ombor bo'limi (Xomashyo kirim qilish, Zagatovka tayyorlash, Reviziya tarixi).
+    ├── StatsMode.jsx       # Hisobotlar (Z-Otchyot yopish, Foyda-zarar (Margin/COGS) hisobi, Telegram hisobot).
+    └── AdminPanel.jsx      # Boshqaruv (Taomlar va Retseptlar qo'shish, Xodimlar, Stollar, CRM).
+
+## Asosiy Mantiqlar (Core Business Logic) - Kelajakdagi o'zgarishlar uchun muhim!
+1. Baza (Database): Hamma ma'lumotlar `App.jsx` ichida `useSticky` orqali e'lon qilingan va komponentlarga Props orqali uzatilgan (Prop drilling). Backend yo'q, hamma narsa LocalStorage'da.
+2. Taom Variantlari: Taomlar oddiy emas, "Variant"li (masalan: 1 Porsiya, 1 Dona, 1 Litr). Savatchaga tushganda `cartItemId = id_variantId` tarzida tushadi.
+3. Retsept va Ombor (Recipe & Deduction): Taom sotilganda yoki Omborchi "Zagatovka" tayyorlaganda, retseptda ko'rsatilgan xomashyolar ombordan (`warehouse` state) avtomatik yechiladi.
+4. Split Bill (Hisobni bo'lish): Ofitsiant yoki Kassir bitta stoldagi buyurtmani taomlar bo'yicha qismlarga ajratib, alohida chek ko'rinishida yechib olishi mumkin.
+5. Z-Otchyot (Yopish): Smena yopilganda joriy kassa tushumlari, xarajatlar va COGS (tannarx) hisoblanib, Sof Foyda (Net Profit) chiqariladi va `shiftHistory` ga arxivlanadi. O'sha onning o'zida Telegram bot orqali rahbarga xabar ketadi.
+6. Qarz va Cashback: Kassir to'lovni qarzga yozishi mumkin. Qarz uzilganda, u joriy kun tushumiga hisoblanadi. Mijoz ro'yxatdan o'tsa (telefon raqami bilan) unga avtomat bonus yoziladi va CRM'da ko'rinadi.
+
+## AI Assistant (Cursor) uchun qat'iy ko'rsatmalar (Directives)
+- Hech qachon bir fayldagi mantiqni ikkinchi fayl bilan buzib qo'ymang. Tahrir qilinayotgan fayl faqat o'ziga tegishli Props'larni qabul qiladi.
+- Global State'larga o'zgartirish kiritish kerak bo'lsa, uni albatta `App.jsx` dan kelayotgan `setXYZ` funksiyalari orqali bajaring.
+- Styling uchun faqat Tailwind CSS ishlating.
+- Agar foydalanuvchi biror yangi modul qo'shishni so'rasa, uni `src/components/` ichida alohida yaratib, so'ng `App.jsx` ga import qilib ulab qo'ying.
+
+
+
+
+======================================================
+LOYIHA: CAFE POS SYSTEM (Premium Cafe)
+BOSQICH: MVP (Frontend va LocalStorage orqali lokal tarmoqda test qilish)
+TEXNOLOGIYALAR (TECH STACK): React (Vite), Tailwind CSS
+SANA: Oktabr 2026
+======================================================
+
+1. LOYIHANING UMUMIY TAVSIFI
+Ushbu loyiha restoran va kafelar uchun moslashuvchan (responsive), ko'p rolli POS (sotuv nuqtasi) tizimidir. Tizim mahalliy Wi-Fi tarmog'ida bir nechta qurilmalarda (planshet, kompyuter, mobil telefon) sinxron ishlaydi. Hozirda barcha ma'lumotlar (state) markazlashtirilgan holda `App.jsx` da joylashgan va brauzerning `localStorage` xotirasida saqlanadi. Keyingi bosqichda ma'lumotlar bazasi Django/PostgreSQL backendiga o'tkaziladi.
+
+2. ROLLAR VA AVTORIZATSIYA (Qulflangan Ekran - LockScreen)
+- Tizimga xavfsiz va tezkor kirish uchun raqamli klaviatura (Numpad) UI qilingan.
+- Foydalanuvchilar va PIN-kodlar:
+  * Admin (Boshliq)   -> PIN: 7777 (Kutish jarayonida)
+  * Cashier (Kassir)  -> PIN: 1111 
+  * Waiter (Ofitsiant)-> PIN: 2222 (Sozlamaga ko'ra savdoni ko'ra oladi)
+  * Kitchen (Oshpaz)  -> PIN: 3333 
+  * Guest (Mijoz)     -> PIN: qr-[stol_nomi] (Masalan: qr-1)
+
+3. ASOSIY ARXITEKTURA (App.jsx - Markaziy Kontroller)
+- `App.jsx` butun tizimning "miyasi" hisoblanadi. Barcha muhim holatlar (`orders`, `waiterCalls`, `menuItems`, `isDarkMode`) shu yerda saqlanadi.
+- Xavfsiz Xotira (Defensive Storage): `localStorage` xotirasi buzilgan taqdirda ham dastur qulab tushmasligi uchun `safeJSONParse` funksiyasi ishlatilgan.
+- O'zgarmaslik (State Immutability): UI da "qotib qolish" yoki noto'g'ri yangilanish xatolarini (stale state bugs) oldini olish uchun obyekt/massivlardan chuqur nusxa olish (deep clone) va xavfsiz o'zgartirish qoidalari qat'iy joriy qilingan.
+
+4. KOMPONENTLAR VA BIZNES MANTIQ
+
+A) WaiterMode.jsx (Ofitsiant Moduli)
+- Buyurtma olish, savatchaga taom qo'shish, oshxonaga yuborish.
+- Stol amallari: Stolni boshqasiga ko'chirish (band stollar to'qnashuvidan himoyalangan).
+- Buyurtmalarni birlashtirish (Order Merging): Agar ofitsiant faol stolga yangi taom qo'shsa, u mustaqil yangi chek bo'lmasdan, mavjud buyurtmaga xatosiz birlashadi (status "Kutilmoqda" ga qaytadi).
+- Chaqiruvlar (Waiter Calls): Mijozlar chaqiruvini ko'rish va tozalash imkoniyati.
+
+B) CashierMode.jsx (Kassir / Moliya Moduli)
+- Chap tomonda faol stollar (Grid UI), o'ng tomonda hisob-kitob paneli.
+- Hisobni bo'lish (Split Order): Asosiy chekdan tanlangan taomlarni xavfsiz ajratib oladi (filter mantiqi orqali) va noyob ID raqami bilan mustaqil yangi chek yaratadi.
+- Xavfsiz Matematika (Safe Math): Kiritilgan noto'g'ri yoki bo'sh ma'lumotlarda hisob-kitob NaN yoki manfiy (-) bo'lib ketmasligi uchun qat'iy `Number()` va `Math.max()` himoyasi o'rnatilgan.
+- Xizmat haqi (Service Fee): Avtomatik hisoblanadi (masalan 10%), lekin "Olib ketish" (Takeaway) stollari uchun mutlaqo olinmaydi.
+- To'lov turlari: Naqd, Plastik, Qarz (qarzda mijoz ismini yozish majburiy), O'tkazma.
+
+C) KitchenMode.jsx (Oshxona Moduli)
+- Oshpazlar uzoqdan ko'rishi va yog'li qo'l bilan xatosiz bosishi uchun katta (Fat-finger friendly) va yorqin interfeys.
+- Tablar (Bo'limlar): 
+  1. Faol (Kutilmoqda -> Tayyorlanmoqda).
+  2. Tarix (Tayyor) - adashib "Tayyor" qilib yuborilgan buyurtmalarni ortga qaytarish funksiyasi.
+  3. Stop-List (🚫) - taom tugagach, uning `is_available` holatini bir bosishda o'zgartiradi.
+- Dinamiklik: Stop-List faollashtirilganda, taom darhol ofitsiant va mijoz menyusidan yo'qoladi.
+
+D) CustomerQRView.jsx (Mijoz QR Menyusi)
+- Mobil qurilmalarga to'liq moslashtirilgan katalog.
+- Mijozlar savatchaga taom qo'shishi, to'g'ridan-to'g'ri buyurtma yuborishi va ofitsiantni stolga chaqirishi mumkin.
+
+5. HIMOYAVIY DASTURLASH (CRUSH-TESTED)
+- Stollar to'qnashuvi himoyasi: Ofitsiant buyurtmani allaqachon odam o'tirgan (band) stolga ko'chira olmaydi.
+- Bo'sh chek himoyasi: Kassir ichida taomi yo'q quruq chek uchun to'lovni yopa almaydi.
+- Chegirma himoyasi: Kassir chegirmani faqat 0% dan 100% gacha (mantiqiy chegarada) kirita oladi.
+- Sinxronizatsiya himoyasi: Kassir tanlab turgan stoldagi ma'lumotlar ID orqali real vaqtda bazaga bog'langan. Ofitsiant taom qo'shishi bilan kassir ekranida o'z-o'zidan paydo bo'ladi.
+
+6. KEYINGI QADAMLAR (TODO)
+- 1-qadam: `AdminPanel.jsx` ni yaratish (Menyu taomlari, xodimlar, toifalar va moliyaviy hisobotlarni boshqarish uchun to'liq CRUD amallari).
+- 2-qadam: Backend Integration (Django REST Framework + PostgreSQL) - `localStorage` dan markaziy server ma'lumotlar bazasiga o'tish.
+- 3-qadam: WebSockets (Soketlar) ulash - sahifani umuman yangilamasdan qurilmalar orasida jonli ma'lumotlar almashinuvini ta'minlash.
+======================================================

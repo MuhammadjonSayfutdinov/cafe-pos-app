@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cafe POS — ofitsiant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      body { margin: 0; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; background: #F6F1EA; color: #1c1917; }
+    </style>
+  </head>
+  <body>
+    <main class="relative mx-auto flex min-h-screen w-full max-w-[430px] flex-col px-5 py-5">
+      <div id="app"></div>
+    </main>
+    <script>
+      const MENU = [
+        { id: "osh", name: "Osh", price: 28000 },
+        { id: "manti", name: "Manti", price: 22000 },
+        { id: "salat", name: "Salat", price: 15000 },
+      ];
+      const state = {
+        screen: "home",
+        table: null,
+        cart: {},
+        occupied: new Set(),
+        notice: "",
+      };
+
+      function som(n) { return n.toLocaleString("uz-UZ") + " so‘m"; }
+
+      function render() {
+        const el = document.getElementById("app");
+        if (state.screen === "home") {
+          el.innerHTML = `
+            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-400">Cafe POS</p>
+            <h1 class="mt-2 text-[1.85rem] font-semibold">Rejimni tanlang</h1>
+            <p class="mt-1.5 text-sm text-stone-500">Kafelar uchun Telegram Mini App</p>
+            <div class="mt-8 flex flex-col gap-3">
+              <button id="waiter-mode" class="rounded-3xl border border-stone-200 bg-white p-4 text-left shadow-lg">
+                <span class="block text-[15px] font-semibold">Ofitsiant rejimi</span>
+                <span class="text-sm text-stone-500">Stollar va buyurtmalar</span>
+              </button>
+            </div>`;
+          document.getElementById("waiter-mode").onclick = () => { state.screen = "tables"; render(); };
+          return;
+        }
+
+        if (state.screen === "tables") {
+          el.innerHTML = `
+            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-400">Ofitsiant</p>
+            <h1 class="mt-2 text-[1.85rem] font-semibold">Stollarni tanlang</h1>
+            <p class="mt-1.5 text-sm text-stone-500">Xizmat qilinadigan stolni bosing</p>
+            ${state.notice ? `<p class="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">${state.notice}</p>` : ""}
+            <section class="mt-6 grid grid-cols-3 gap-3">
+              ${[1,2,3].map((t) => `
+                <button data-table="${t}" class="table-btn flex aspect-square flex-col items-center justify-center rounded-3xl border border-stone-200 bg-white shadow-lg">
+                  <span class="text-lg font-semibold">Stol ${t}</span>
+                  <span class="mt-1 text-[11px] ${state.occupied.has(t) ? "text-amber-700" : "text-stone-400"}">${state.occupied.has(t) ? "Band" : "Bo‘sh"}</span>
+                </button>`).join("")}
+            </section>
+            <button id="home-btn" class="mt-8 w-full rounded-2xl border border-stone-200 bg-white py-3.5 text-sm font-semibold">Bosh sahifaga</button>`;
+          el.querySelectorAll(".table-btn").forEach((btn) => {
+            btn.onclick = () => { state.table = Number(btn.dataset.table); state.cart = {}; state.screen = "menu"; render(); };
+          });
+          document.getElementById("home-btn").onclick = () => { state.screen = "home"; render(); };
+          return;
+        }
+
+        const total = MENU.reduce((s, i) => s + (state.cart[i.id] || 0) * i.price, 0);
+        const can = MENU.some((i) => (state.cart[i.id] || 0) > 0);
+        el.innerHTML = `
+          <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-400">Ofitsiant</p>
+          <h1 class="mt-2 text-[1.85rem] font-semibold">Stol ${state.table}</h1>
+          <p class="mt-1.5 text-sm text-stone-500">Menyudan taom qo‘shing va buyurtma bering</p>
+          <section class="mt-6 flex flex-col gap-3">
+            ${MENU.map((item) => {
+              const q = state.cart[item.id] || 0;
+              return `<div class="flex items-center gap-3 rounded-3xl border border-stone-200 bg-white p-4">
+                <div class="flex-1"><p class="font-semibold">${item.name}</p><p class="text-sm text-stone-500">${som(item.price)}</p></div>
+                <button data-minus="${item.id}" class="h-9 w-9 rounded-full border">−</button>
+                <span class="w-5 text-center text-sm font-semibold">${q}</span>
+                <button data-plus="${item.id}" class="h-9 w-9 rounded-full bg-stone-900 text-white">+</button>
+              </div>`;
+            }).join("")}
+          </section>
+          <div class="mt-6 flex justify-between text-sm"><span class="text-stone-500">Jami</span><span class="font-semibold">${som(total)}</span></div>
+          <button id="submit" ${can ? "" : "disabled"} class="mt-3 w-full rounded-2xl bg-stone-900 py-3.5 text-sm font-semibold text-white disabled:bg-stone-300">Buyurtma berish</button>
+          <button id="back-tables" class="mt-3 w-full rounded-2xl border border-stone-200 bg-white py-3.5 text-sm font-semibold">Stollarga qaytish</button>`;
+        el.querySelectorAll("[data-plus]").forEach((b) => b.onclick = () => { state.cart[b.dataset.plus] = (state.cart[b.dataset.plus] || 0) + 1; render(); });
+        el.querySelectorAll("[data-minus]").forEach((b) => b.onclick = () => { state.cart[b.dataset.minus] = Math.max(0, (state.cart[b.dataset.minus] || 0) - 1); render(); });
+        document.getElementById("submit").onclick = () => {
+          if (!can) return;
+          state.occupied.add(state.table);
+          state.notice = `Stol ${state.table} uchun buyurtma qabul qilindi`;
+          state.screen = "tables";
+          state.table = null;
+          render();
+        };
+        document.getElementById("back-tables").onclick = () => { state.screen = "tables"; state.table = null; render(); };
+      }
+      render();
+    </script>
+  </body>
+</html>
