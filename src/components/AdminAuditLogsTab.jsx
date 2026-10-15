@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 export default function AdminAuditLogsTab({ auditLogs = [] }) {
   const [searchTerm, setSearchTerm] = useState('');
-  // bratLoglarni qidirish (ism yoki harakat bo'yicha)
+  // bratishka Loglarni qidirish (ism yoki harakat bo'yicha)
   const filteredLogs = auditLogs.filter(log => {
     const searchLower = searchTerm.toLowerCase();
     return (
