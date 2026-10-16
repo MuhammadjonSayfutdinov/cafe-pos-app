@@ -7,31 +7,63 @@ import StatsPopularItems from './StatsPopularItems';
 export default function StatsMode({ 
   orders, 
   setOrders, 
+  menuItems,
+  inventory,
   currentUser,
   auditLogs,
   setAuditLogs,
   addAuditLog
 }) {
-  // ===============================================
-  // 1. ZAXIRA XOTIRA VA STATE'LAR (FALLBACK SYNC)
-  // ===============================================
-  // Agar App.jsx dan setOrders uzatilmagan bo'lsa, bevosita useSticky orqali bazani boshqaramiz
+  // Zaxira xotira (App.jsx dan prop kelmasa ham 100% ishlaydi)
   const [stickyOrders, setStickyOrders] = useSticky('pos_orders', []);
+  const [stickyMenu] = useSticky('pos_menu', []);
+  const [stickyInventory] = useSticky('pos_inventory', []);
   const [, setStickyAuditLogs] = useSticky('pos_audit_logs', []);
 
-  // Ko'rish rejimi: 'current' (Joriy smena) | 'archived' (Arxiv) | 'all' (Barcha vaqt)
-  const [viewScope, setViewScope] = useState('current');
+  const [viewScope, setViewScope] = useState('current'); // 'current' | 'archived' | 'all'
 
   const safeOrders = useMemo(() => {
     if (Array.isArray(orders) && orders.length > 0) return orders;
     return Array.isArray(stickyOrders) ? stickyOrders : [];
   }, [orders, stickyOrders]);
 
+  const safeMenu = useMemo(() => {
+    if (Array.isArray(menuItems) && menuItems.length > 0) return menuItems;
+    return Array.isArray(stickyMenu) ? stickyMenu : [];
+  }, [menuItems, stickyMenu]);
+
+  const safeInventory = useMemo(() => {
+    if (Array.isArray(inventory) && inventory.length > 0) return inventory;
+    return Array.isArray(stickyInventory) ? stickyInventory : [];
+  }, [inventory, stickyInventory]);
+
   const updateOrdersState = typeof setOrders === 'function' ? setOrders : setStickyOrders;
 
-  // ===============================================
-  // 2. XAVFSIZ HISOBLASH YORDAMCHILARI
-  // ===============================================
+  // Bitta taomning 1 porsiya tannarxini (Food Cost) hisoblash
+  const getDishUnitCost = (cartItem) => {
+    if (!cartItem) return 0;
+    const matchedMenu = safeMenu.find(
+      m => m && (String(m.id) === String(cartItem.id) || m.name === cartItem.baseName || m.name === cartItem.name)
+    );
+
+    if (!matchedMenu) return 0;
+
+    if ( Array.isArray(matchedMenu.recipe) && matchedMenu.recipe.length > 0 && safeInventory.length > 0) {
+      let recipeCost = 0;
+      matchedMenu.recipe.forEach(r => {
+        const invItem = safeInventory.find(i => i && String(i.id) === String(r.inventoryId ?? r.productId));
+        if (invItem) {
+          const usedQtyInBase = Number(r.qty ?? r.amount ?? 0) || 0;
+          const unitCost = Number(invItem.costPrice ?? invItem.price ?? 0) || 0;
+          recipeCost += usedQtyInBase * unitCost;
+        }
+      });
+      if (recipeCost > 0) return Math.round(recipeCost);
+    }
+
+    return Number(matchedMenu.costPrice || 0) || 0;
+  };
+
   const getOrderFinalAmount = (order) => {
     if (!order) return 0;
     if (order.finalTotal !== undefined) return Number(order.finalTotal) || 0;
@@ -49,6 +81,14 @@ export default function StatsMode({
     return 0;
   };
 
+  const getOrderFoodCost = (order) => {
+    if (!order || !Array.isArray(order.items)) return 0;
+    return order.items.reduce((sum, it) => {
+      const qty = Number(it?.quantity ?? it?.qty ?? 1) || 0;
+      return sum + (getDishUnitCost(it) * qty);
+    }, 0);
+  };
+
   const getOrderServiceFee = (order) => {
     if (!order) return 0;
     if (order.serviceFeeAmount !== undefined) return Number(order.serviceFeeAmount) || 0;
@@ -63,44 +103,43 @@ export default function StatsMode({
     return Number(order.discountAmount ?? order.discount ?? 0) || 0;
   };
 
-  // ===============================================
-  // 3. CHEKLARNI SMENA REJIMIGA QARAB AJRATISH
-  // ===============================================
-  // Joriy smenadagi "To'langan" cheklar
+  // Cheklarni smena rejimiga qarab ajratish
   const currentShiftPaidOrders = useMemo(() => {
     return safeOrders.filter(o => o && o.status === "To'langan");
   }, [safeOrders]);
 
-  // Arxivlangan ("Arxiv") cheklar
   const archivedPaidOrders = useMemo(() => {
     return safeOrders.filter(o => o && o.status === 'Arxiv');
   }, [safeOrders]);
 
-  // Qarz daftaridagi ("Qarz") cheklar
   const debtOrders = useMemo(() => {
     return safeOrders.filter(o => o && o.status === 'Qarz');
   }, [safeOrders]);
 
-  // Zalda hali yopilmagan faol cheklar
   const openActiveOrders = useMemo(() => {
     return safeOrders.filter(
       o => o && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
     );
   }, [safeOrders]);
 
-  // Tanlangan tabga ('current' | 'archived' | 'all') mos to'langan cheklar
   const completedOrders = useMemo(() => {
     if (viewScope === 'archived') return archivedPaidOrders;
     if (viewScope === 'all') return [...currentShiftPaidOrders, ...archivedPaidOrders];
     return currentShiftPaidOrders;
   }, [viewScope, currentShiftPaidOrders, archivedPaidOrders]);
 
-  // ===============================================
-  // 4. ASOSIY MOLIYAVIY HISOB-KITOBLAR (KPI)
-  // ===============================================
+  // Asosiy moliyaviy ko'rsatkichlar (Tushum, Tannarx va Haqiqiy Sof Foyda)
   const totalRevenue = useMemo(() => {
     return completedOrders.reduce((sum, order) => sum + getOrderFinalAmount(order), 0);
   }, [completedOrders]);
+
+  const totalFoodCost = useMemo(() => {
+    return completedOrders.reduce((sum, order) => sum + getOrderFoodCost(order), 0);
+  }, [completedOrders, safeMenu, safeInventory]);
+
+  const totalNetProfit = useMemo(() => {
+    return totalRevenue - totalFoodCost;
+  }, [totalRevenue, totalFoodCost]);
 
   const totalDebtAmount = useMemo(() => {
     return debtOrders.reduce((sum, order) => sum + getOrderFinalAmount(order), 0);
@@ -119,14 +158,8 @@ export default function StatsMode({
   }, [completedOrders]);
 
   const totalOrdersCount = completedOrders.length;
+  const averageReceipt = totalOrdersCount > 0 ? Math.round(totalRevenue / totalOrdersCount) : 0;
   
-  const averageReceipt = totalOrdersCount > 0 
-    ? Math.round(totalRevenue / totalOrdersCount) 
-    : 0;
-  
-  // ===============================================
-  // 5. TO'LOV TURLARI BO'YICHA HISOB-KITOB (6 XIL USUL)
-  // ===============================================
   const paymentStats = useMemo(() => {
     const baseStats = {
       Naqd: 0,
@@ -140,7 +173,6 @@ export default function StatsMode({
     completedOrders.forEach(order => {
       const method = order?.paymentMethod || 'Naqd';
       const amount = getOrderFinalAmount(order);
-      
       if (baseStats[method] !== undefined) {
         baseStats[method] += amount;
       } else {
@@ -151,9 +183,6 @@ export default function StatsMode({
     return baseStats;
   }, [completedOrders, totalDebtAmount, viewScope]);
 
-  // ===============================================
-  // 6. TAOMLAR BO'YICHA STATISTIKA (TOP-5)
-  // ===============================================
   const popularItems = useMemo(() => {
     const itemsStats = {};
     const ordersToCount = viewScope === 'archived' 
@@ -183,53 +212,39 @@ export default function StatsMode({
       .slice(0, 5);
   }, [completedOrders, debtOrders, archivedPaidOrders, viewScope]);
 
-  // ===============================================
-  // 7. Z-OTCHYOT (SMENANI YOPISH MANTIG'I)
-  // ===============================================
   const handleCloseShift = () => {
     if (currentShiftPaidOrders.length === 0) {
       alert("ℹ️ Hozirgi smenada yopilishi kerak bo'lgan yangi 'To'langan' cheklar yo'q!");
       return;
     }
 
-    const shiftRevenue = currentShiftPaidOrders.reduce(
-      (sum, o) => sum + getOrderFinalAmount(o), 
-      0
-    );
-
-    const openWarning = openActiveOrders.length > 0
-      ? `\n\n⚠️ Eslatma: Zalda hali yopilmagan ${openActiveOrders.length} ta faol stol (${openTablesAmount.toLocaleString()} so'm) mavjud. Ular keyingi smenada ochiq qoladi.`
-      : '';
+    const shiftRevenue = currentShiftPaidOrders.reduce((sum, o) => sum + getOrderFinalAmount(o), 0);
+    const shiftCost = currentShiftPaidOrders.reduce((sum, o) => sum + getOrderFoodCost(o), 0);
+    const shiftNetProfit = shiftRevenue - shiftCost;
 
     const confirmMsg = 
       `⚠️ Diqqat! Z-Otchyotni (Smenani) yopmoqchimisiz?\n\n` +
       `• Yopilgan cheklar: ${currentShiftPaidOrders.length} ta\n` +
-      `• Smena tushumi: ${shiftRevenue.toLocaleString()} so'm\n\n` +
-      `Tasdiqlasangiz, ushbu cheklar Arxivga o'tkaziladi va joriy smena kassasi nollanadi.${openWarning}`;
+      `• Smena tushumi: ${shiftRevenue.toLocaleString()} so'm\n` +
+      `• Xomashyo tannarxi: -${shiftCost.toLocaleString()} so'm\n` +
+      `• Haqiqiy Sof Foyda: +${shiftNetProfit.toLocaleString()} so'm\n\n` +
+      `Tasdiqlasangiz, cheklar Arxivga o'tkaziladi va kassa nollanadi.`;
 
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
+    if (!window.confirm(confirmMsg)) return;
 
     const archiveDateStr = new Date().toLocaleString();
 
-    // Cheklarni 'Arxiv' statusiga o'tkazish (setOrders yoki useSticky orqali)
     updateOrdersState(prev => {
       const list = Array.isArray(prev) && prev.length > 0 ? prev : safeOrders;
       return list.map(order => {
         if (order && order.status === "To'langan") {
-          return { 
-            ...order, 
-            status: 'Arxiv', 
-            archiveDate: archiveDateStr 
-          };
+          return { ...order, status: 'Arxiv', archiveDate: archiveDateStr };
         }
         return order;
       });
     });
 
-    // Audit Log'ga yozish
-    const logDetails = `Smena yopildi: ${currentShiftPaidOrders.length} ta chek, Jami tushum: ${shiftRevenue.toLocaleString()} so'm`;
+    const logDetails = `Smena yopildi: Tushum ${shiftRevenue.toLocaleString()} s | Tannarx: ${shiftCost.toLocaleString()} s | Sof foyda: ${shiftNetProfit.toLocaleString()} s`;
     if (typeof addAuditLog === 'function') {
       addAuditLog("Z-Otchyot (Smena Yopildi)", logDetails);
     } else {
@@ -247,12 +262,9 @@ export default function StatsMode({
       ]);
     }
 
-    alert(`✅ Smena muvaffaqiyatli yopildi!\n${currentShiftPaidOrders.length} ta chek (${shiftRevenue.toLocaleString()} so'm) arxivga o'tkazildi.`);
+    alert(`✅ Smena muvaffaqiyatli yopildi!\nSof foyda: ${shiftNetProfit.toLocaleString()} so'm`);
   };
 
-  // ===============================================
-  // 8. RENDER (UI KOMPONENTLAR)
-  // ===============================================
   return (
     <div className="animate-fade-in max-w-7xl mx-auto pb-12 space-y-6">
       
@@ -260,14 +272,13 @@ export default function StatsMode({
       <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-            <span className="text-3xl md:text-4xl">📈</span> Boshqaruv Paneli va Z-Otchyot
+            <span className="text-3xl md:text-4xl">📈</span> Boshqaruv Paneli, Tannarx va Z-Otchyot
           </h2>
           <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">
-            Hozirgi smena tushumlari, sof foyda, qarzlar va to'liq moliyaviy nazorat markazi.
+            Smena tushumi, xomashyo tannarxi (Food Cost), haqiqiy sof foyda va moliyaviy nazorat.
           </p>
         </div>
 
-        {/* Smena / Arxiv / Barchasi Switcher */}
         <div className="flex flex-wrap items-center gap-2 bg-gray-100 dark:bg-gray-900 p-1.5 rounded-2xl w-full lg:w-auto">
           <button
             type="button"
@@ -307,58 +318,17 @@ export default function StatsMode({
         </div>
       </div>
 
-      {/* ZALDAGI OCHIQ STOLLAR VA NASIYALAR HAQIDA JONLI MA'LUMOT SATRI */}
-      {(openActiveOrders.length > 0 || debtOrders.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {openActiveOrders.length > 0 && (
-            <div className="bg-indigo-50/80 dark:bg-indigo-900/20 px-5 py-3.5 rounded-2xl border border-indigo-200 dark:border-indigo-800/50 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🍽️</span>
-                <div>
-                  <p className="text-xs font-black uppercase text-indigo-600 dark:text-indigo-400">
-                    Hozir zalda faol (ochiq) stollar
-                  </p>
-                  <p className="text-xs font-bold text-gray-500">
-                    Kassada hali yopilmagan {openActiveOrders.length} ta chek
-                  </p>
-                </div>
-              </div>
-              <span className="text-lg font-black text-indigo-700 dark:text-indigo-300">
-                {openTablesAmount.toLocaleString()} s
-              </span>
-            </div>
-          )}
-
-          {debtOrders.length > 0 && (
-            <div className="bg-red-50/80 dark:bg-red-900/20 px-5 py-3.5 rounded-2xl border border-red-200 dark:border-red-800/50 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">📓</span>
-                <div>
-                  <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">
-                    Qarz daftaridagi cheklar (Nasiya)
-                  </p>
-                  <p className="text-xs font-bold text-gray-500">
-                    To'lanishi kutilayotgan {debtOrders.length} ta qarz
-                  </p>
-                </div>
-              </div>
-              <span className="text-lg font-black text-red-600 dark:text-red-400">
-                {totalDebtAmount.toLocaleString()} s
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 1. KPI Kartochkalar (Tushum, Cheklar, Foyda, Chegirma) */}
+      {/* 1. KPI Kartochkalar (Tushum, Tannarx, Haqiqiy Sof Foyda, Chegirma) */}
       <StatsOverviewCards 
         totalRevenue={totalRevenue}
+        totalFoodCost={totalFoodCost}
+        totalNetProfit={totalNetProfit}
         totalOrdersCount={totalOrdersCount}
         totalServiceFee={totalServiceFee}
         totalDiscount={totalDiscount}
       />
 
-      {/* 2. To'lov Turlari (Naqd, Plastik, Payme, Click, Aralash, Qarz) va O'rtacha Chek */}
+      {/* 2. To'lov Turlari va O'rtacha Chek */}
       <StatsPaymentBreakdown 
         paymentStats={paymentStats}
         averageReceipt={averageReceipt}
