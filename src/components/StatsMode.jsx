@@ -414,7 +414,7 @@ export default function StatsMode({
         ...(Array.isArray(prev) ? prev : [])
       ]);
     }
-
+    
     alert(
       `✅ Smena muvaffaqiyatli yopildi!\n\n` +
       `• Arxivga o'tkazildi: ${currentShiftPaidOrders.length} ta chek\n` +
