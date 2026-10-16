@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import CashierOrderList from './CashierOrderList';
 import CashierReceipt from './CashierReceipt';
 import CashierPaymentControls from './CashierPaymentControls';
+import { notifyOrderClosedTelegram } from '../utils/telegramNotifier';
 
 export default function CashierMode({ 
   orders = [], 
