@@ -65,7 +65,19 @@ const convertValueBetweenUnits = (val, fromUnit, toUnit) => {
   return Number((inBase / toMeta.factorToBase).toFixed(6));
 };
 
-// Og'irlik yoki hajmni barcha birliklarda (gr, kg, tonna) hisoblab berish
+// Birlik narxini bir birlikdan ikkinchi birlikka o'girish (Masalan: 1 kg = 100,000 s -> 1 gr = 100 s)
+const convertUnitPriceBetweenUnits = (pricePerFromUnit, fromUnit, toUnit) => {
+  const numPrice = Number(pricePerFromUnit) || 0;
+  const fromMeta = getUnitMeta(fromUnit);
+  const toMeta = getUnitMeta(toUnit);
+
+  if (fromMeta.value === toMeta.value) return numPrice;
+  if (fromMeta.family !== toMeta.family) return numPrice;
+
+  const pricePerBase = numPrice / fromMeta.factorToBase;
+  return Number((pricePerBase * toMeta.factorToBase).toFixed(4));
+};
+
 const getMultiScaleBreakdown = (qty, unit) => {
   const num = Number(qty) || 0;
   const meta = getUnitMeta(unit);
@@ -120,8 +132,19 @@ export default function WarehouseStockTab({
     category: inventoryCategories[0], 
     unit: 'kg', 
     quantity: '', 
-    minLimit: '' 
+    minLimit: '',
+    costPrice: '' // YANGI: 1 birlik xarid narxi (so'mda)
   });
+
+  // Ombordagi barcha mahsulotlarning umumiy puldagi qiymati
+  const totalWarehouseValuation = useMemo(() => {
+    return safeInventory.reduce((sum, item) => {
+      if (!item) return sum;
+      const qty = Number(item.quantity ?? item.qty ?? 0) || 0;
+      const cost = Number(item.costPrice ?? item.price ?? 0) || 0;
+      return sum + Math.round(qty * cost);
+    }, 0);
+  }, [safeInventory]);
 
   const handleOpenItemModal = (item = null) => {
     if (item) {
@@ -131,7 +154,8 @@ export default function WarehouseStockTab({
         category: item.category || inventoryCategories[7], 
         unit: normalizeUnitCode(item.unit || 'kg'), 
         quantity: item.quantity !== undefined ? String(item.quantity) : '0', 
-        minLimit: item.minLimit !== undefined ? String(item.minLimit) : '0'
+        minLimit: item.minLimit !== undefined ? String(item.minLimit) : '0',
+        costPrice: item.costPrice !== undefined ? String(item.costPrice) : (item.price ? String(item.price) : '')
       });
     } else {
       setEditingItem(null);
@@ -140,13 +164,14 @@ export default function WarehouseStockTab({
         category: inventoryCategories[0],
         unit: 'kg', 
         quantity: '', 
-        minLimit: '' 
+        minLimit: '',
+        costPrice: ''
       });
     }
     setIsItemModalOpen(true);
   };
 
-  // Tahrirlash vaqtida birlik o'zgartirilsa (masalan kg -> gr), qoldiq va limitni avtomatik konvertatsiya qilish
+  // Birlik o'zgartirilsa (masalan kg -> gr), qoldiq, limit va birlik narxini avtomatik konvertatsiya qilish
   const handleModalUnitChange = (nextUnitRaw) => {
     const nextUnit = normalizeUnitCode(nextUnitRaw);
     const prevUnit = normalizeUnitCode(itemData.unit);
@@ -160,12 +185,16 @@ export default function WarehouseStockTab({
       const convertedMin = itemData.minLimit !== '' 
         ? String(convertValueBetweenUnits(itemData.minLimit, prevUnit, nextUnit)) 
         : '';
+      const convertedCost = itemData.costPrice !== ''
+        ? String(convertUnitPriceBetweenUnits(itemData.costPrice, prevUnit, nextUnit))
+        : '';
 
       setItemData(prev => ({
         ...prev,
         unit: nextUnit,
         quantity: convertedQty,
-        minLimit: convertedMin
+        minLimit: convertedMin,
+        costPrice: convertedCost
       }));
     } else {
       setItemData(prev => ({ ...prev, unit: nextUnit }));
@@ -179,13 +208,13 @@ export default function WarehouseStockTab({
     const normUnit = normalizeUnitCode(itemData.unit);
     const min = Number(itemData.minLimit);
     const qty = Number(itemData.quantity);
+    const cost = Number(itemData.costPrice || 0);
 
-    if (!name || isNaN(min) || isNaN(qty) || min < 0 || qty < 0) {
+    if (!name || isNaN(min) || isNaN(qty) || min < 0 || qty < 0 || isNaN(cost) || cost < 0) {
       alert("Iltimos, ma'lumotlarni to'g'ri (manfiy bo'lmagan) raqamlarda kiriting!"); 
       return;
     }
 
-    // Bir xil nomli mahsulotdan himoya
     const isDuplicate = safeInventory.some(
       i => i && String(i.name || '').trim().toLowerCase() === name.toLowerCase() && i.id !== editingItem?.id
     );
@@ -196,6 +225,7 @@ export default function WarehouseStockTab({
 
     const cleanQty = Number(qty.toFixed(6));
     const cleanMin = Number(min.toFixed(6));
+    const cleanCost = Number(cost.toFixed(2));
 
     if (editingItem) {
       if (typeof setInventory === 'function') {
@@ -209,13 +239,17 @@ export default function WarehouseStockTab({
                 quantity: cleanQty, 
                 qty: cleanQty,
                 minLimit: cleanMin,
+                costPrice: cleanCost,
                 lastUpdated: new Date().toLocaleString()
               } 
             : i
         ));
       }
       if (typeof addAuditLog === 'function') {
-        addAuditLog("Ombor mahsuloti tahrirlandi", `${name} (${cleanQty} ${normUnit})`);
+        addAuditLog(
+          "Ombor mahsuloti tahrirlandi", 
+          `${name} (${cleanQty} ${normUnit} • Tannarxi: ${cleanCost.toLocaleString()} s/${normUnit})`
+        );
       }
     } else {
       const newItemObj = { 
@@ -226,6 +260,7 @@ export default function WarehouseStockTab({
         quantity: cleanQty, 
         qty: cleanQty,
         minLimit: cleanMin, 
+        costPrice: cleanCost,
         lastUpdated: new Date().toLocaleString() 
       };
 
@@ -244,8 +279,8 @@ export default function WarehouseStockTab({
             diffAmount: `+${cleanQty}`,
             amount: cleanQty,
             unit: normUnit,
-            note: "Yangi mahsulot boshlang'ich qoldig'i",
-            reason: "Yangi mahsulot boshlang'ich qoldig'i",
+            note: `Boshlang'ich qoldiq (Narxi: ${cleanCost.toLocaleString()} s/${normUnit})`,
+            reason: `Boshlang'ich qoldiq`,
             user: currentUser?.name || 'Omborchi'
           },
           ...(Array.isArray(prev) ? prev : [])
@@ -253,7 +288,10 @@ export default function WarehouseStockTab({
       }
 
       if (typeof addAuditLog === 'function') {
-        addAuditLog("Omborga yangi mahsulot qo'shildi", `${name} (${cleanQty} ${normUnit})`);
+        addAuditLog(
+          "Omborga yangi mahsulot qo'shildi", 
+          `${name} (${cleanQty} ${normUnit} • ${cleanCost.toLocaleString()} s/${normUnit})`
+        );
       }
     }
     setIsItemModalOpen(false);
@@ -271,13 +309,14 @@ export default function WarehouseStockTab({
   };
 
   // ==========================================
-  // 3. KIRIM, CHIQIM VA REVIZIYA MODALI (GR / KG / TONNA KONVERTATSIYASI BILAN)
+  // 3. KIRIM, CHIQIM VA REVIZIYA MODALI (XARID NARXI BILAN)
   // ==========================================
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [updateType, setUpdateType] = useState('kirim'); // 'kirim' | 'chiqim' | 'reviziya'
   const [selectedStockItem, setSelectedStockItem] = useState(null);
   const [updateAmount, setUpdateAmount] = useState('');
-  const [updateInputUnit, setUpdateInputUnit] = useState('kg'); // Foydalanuvchi qaysi birlikda kiritayotgani
+  const [updateInputUnit, setUpdateInputUnit] = useState('kg');
+  const [updateUnitPrice, setUpdateUnitPrice] = useState(''); // Kirim qilinayotgan birlik narxi
   const [updateNote, setUpdateNote] = useState(''); 
 
   const handleOpenUpdateModal = (item, type) => {
@@ -286,15 +325,19 @@ export default function WarehouseStockTab({
     setUpdateType(type);
     setUpdateInputUnit(baseUnit);
     setUpdateAmount(type === 'reviziya' ? String(item.quantity ?? 0) : ''); 
+    setUpdateUnitPrice(item.costPrice ? String(item.costPrice) : '');
     setUpdateNote('');
     setIsUpdateModalOpen(true);
   };
 
-  // Kirim/Reviziya oynasida birlik o'zgartirilganda
   const handleUpdateUnitSwitch = (newUnit) => {
     if (updateType === 'reviziya' && updateAmount !== '') {
       const converted = convertValueBetweenUnits(updateAmount, updateInputUnit, newUnit);
       setUpdateAmount(String(converted));
+    }
+    if (updateUnitPrice !== '') {
+      const convertedPrice = convertUnitPriceBetweenUnits(updateUnitPrice, updateInputUnit, newUnit);
+      setUpdateUnitPrice(String(convertedPrice));
     }
     setUpdateInputUnit(newUnit);
   };
@@ -311,17 +354,27 @@ export default function WarehouseStockTab({
 
     const itemBaseUnit = normalizeUnitCode(selectedStockItem.unit || 'kg');
     const currentStockQty = Number(selectedStockItem.quantity ?? selectedStockItem.qty ?? 0) || 0;
+    const currentCostPrice = Number(selectedStockItem.costPrice ?? 0) || 0;
 
-    // Foydalanuvchi kiritgan miqdorni (masalan: gr yoki tonna) mahsulotning asosiy birligiga (masalan: kg) o'tkazamiz
     const amountInBaseUnit = convertValueBetweenUnits(rawEnteredAmount, updateInputUnit, itemBaseUnit);
 
     let diffInBase = 0;
     let newQtyInBase = 0;
+    let nextCostPriceInBase = currentCostPrice;
 
     if (updateType === 'kirim') {
       if (amountInBaseUnit <= 0) return;
       newQtyInBase = Number((currentStockQty + amountInBaseUnit).toFixed(6));
       diffInBase = Number(amountInBaseUnit.toFixed(6));
+
+      // Agar yangi xarid narxi kiritilgan bo'lsa, asosiy birlikka o'girib yangilaymiz
+      if (updateUnitPrice !== '' && Number(updateUnitPrice) > 0) {
+        nextCostPriceInBase = convertUnitPriceBetweenUnits(
+          Number(updateUnitPrice),
+          updateInputUnit,
+          itemBaseUnit
+        );
+      }
     } else if (updateType === 'chiqim') {
       if (amountInBaseUnit <= 0) return;
       if (amountInBaseUnit > currentStockQty) {
@@ -331,7 +384,6 @@ export default function WarehouseStockTab({
       newQtyInBase = Number(Math.max(0, currentStockQty - amountInBaseUnit).toFixed(6));
       diffInBase = -Number(amountInBaseUnit.toFixed(6));
     } else {
-      // 'reviziya'
       newQtyInBase = Number(amountInBaseUnit.toFixed(6));
       diffInBase = Number((newQtyInBase - currentStockQty).toFixed(6));
     }
@@ -343,6 +395,7 @@ export default function WarehouseStockTab({
               ...i, 
               quantity: newQtyInBase, 
               qty: newQtyInBase,
+              costPrice: nextCostPriceInBase,
               lastUpdated: new Date().toLocaleString() 
             } 
           : i
@@ -353,13 +406,16 @@ export default function WarehouseStockTab({
       const enteredLabel = updateInputUnit !== itemBaseUnit 
         ? ` (Kiritildi: ${rawEnteredAmount} ${updateInputUnit})` 
         : '';
+      const priceLabel = updateType === 'kirim' && nextCostPriceInBase > 0
+        ? ` • Xarid narxi: ${nextCostPriceInBase.toLocaleString()} s/${itemBaseUnit}`
+        : '';
 
       const logTypeLabel = 
         updateType === 'kirim' ? 'Kirim' : 
         updateType === 'chiqim' ? 'Chiqim' : 'Reviziya';
 
       const defaultNote = 
-        updateType === 'kirim' ? `Ombor kirimi${enteredLabel}` : 
+        updateType === 'kirim' ? `Ombor kirimi${enteredLabel}${priceLabel}` : 
         updateType === 'chiqim' ? `Ombor chiqimi / Spisaniya${enteredLabel}` : 
         `Qoldiq reviziya qilindi${enteredLabel}`;
 
@@ -372,8 +428,8 @@ export default function WarehouseStockTab({
         diffAmount: diffInBase > 0 ? `+${diffInBase}` : `${diffInBase}`,
         amount: Math.abs(diffInBase),
         unit: itemBaseUnit,
-        note: updateNote ? `${updateNote}${enteredLabel}` : defaultNote,
-        reason: updateNote ? `${updateNote}${enteredLabel}` : defaultNote,
+        note: updateNote ? `${updateNote}${enteredLabel}${priceLabel}` : defaultNote,
+        reason: updateNote ? `${updateNote}${enteredLabel}${priceLabel}` : defaultNote,
         user: currentUser?.name || 'Omborchi'
       };
       setInventoryLogs(prev => [logEntry, ...(Array.isArray(prev) ? prev : [])]);
@@ -414,7 +470,6 @@ export default function WarehouseStockTab({
     });
   }, [safeInventory, selectedCategory, stockFilter, searchQuery]);
 
-  // Mahsulotning gr / kg / tonna ko'rinishini chizib beruvchi funksiya
   const renderMultiUnitBadges = (item) => {
     const qty = Number(item.quantity ?? item.qty ?? 0) || 0;
     const unit = normalizeUnitCode(item.unit || 'kg');
@@ -443,7 +498,6 @@ export default function WarehouseStockTab({
         );
       }
 
-      // 'all' yoki 'auto' rejimda uchala o'lchovni (t / kg / gr) birgalikda ko'rsatadi
       return (
         <div className="space-y-1">
           <div className="font-black text-lg">
@@ -489,7 +543,6 @@ export default function WarehouseStockTab({
     );
   };
 
-  // Modal ichidagi jonli konvertatsiya preview'si
   const itemModalBreakdown = getMultiScaleBreakdown(itemData.quantity, itemData.unit);
   const selectedItemFamily = selectedStockItem ? getUnitMeta(selectedStockItem.unit).family : 'count';
   const compatibleUpdateUnits = UNIT_OPTIONS.filter(u => u.family === selectedItemFamily);
@@ -500,6 +553,24 @@ export default function WarehouseStockTab({
   return (
     <div className="animate-fade-in space-y-4">
       
+      {/* OMBOR MOLIYAVIY QIYMATI BANNERI */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-2xl shadow-sm flex flex-wrap justify-between items-center gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">💰</span>
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-wider text-indigo-100">
+              Ombordagi Jami Xomashyolar Qiymati (Aktivlar)
+            </p>
+            <p className="text-xl sm:text-2xl font-black">
+              {totalWarehouseValuation.toLocaleString()} so'm
+            </p>
+          </div>
+        </div>
+        <span className="text-xs font-bold bg-white/20 px-3.5 py-1.5 rounded-xl">
+          🧮 Taomlar tannarxi shu narxlardan avtomatik hisoblanadi
+        </span>
+      </div>
+
       {/* YUQORI BOSHQARUV PANELI: QIDIRUV, FILTR VA YANGI QO'SHISH */}
       <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 bg-gray-50 dark:bg-gray-900/50 p-3.5 rounded-2xl border border-gray-100 dark:border-gray-700">
         
@@ -575,23 +646,28 @@ export default function WarehouseStockTab({
         </div>
       ) : (
         <>
-          {/* MOBILE UCHUN KARTOCHKALAR (Card View) */}
+          {/* MOBILE UCHUN KARTOCHKALAR */}
           <div className="grid grid-cols-1 gap-4 md:hidden">
             {filteredInventory.map(item => {
               const qty = Number(item.quantity ?? item.qty ?? 0) || 0;
               const min = Number(item.minLimit ?? 0) || 0;
+              const cost = Number(item.costPrice ?? item.price ?? 0) || 0;
+              const totalVal = Math.round(qty * cost);
               const isLow = qty <= min;
 
               return (
                 <div key={item.id} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                  <div className="flex justify-between items-start mb-4 gap-2">
+                  <div className="flex justify-between items-start mb-3 gap-2">
                     <div>
                       <h3 className="font-black text-gray-900 dark:text-white text-lg">{item.name}</h3>
                       <span className="block text-[11px] text-gray-400 font-bold mb-1 uppercase tracking-wider">
                         {item.category || 'Boshqa'}
                       </span>
+                      <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 block">
+                        1 {item.unit} narxi: {cost.toLocaleString()} s (Jami: {totalVal.toLocaleString()} s)
+                      </span>
                       {isLow && (
-                        <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded uppercase font-black animate-pulse inline-block">
+                        <span className="mt-1 bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded uppercase font-black animate-pulse inline-block">
                           {qty <= 0 ? 'Tugagan!' : 'Kam qoldi!'}
                         </span>
                       )}
@@ -638,13 +714,14 @@ export default function WarehouseStockTab({
             })}
           </div>
 
-          {/* PLANSHET VA KOMPYUTER UCHUN JADVAL (Table View) */}
+          {/* PLANSHET VA KOMPYUTER UCHUN JADVAL */}
           <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-900/50 border-b dark:border-gray-700">
-                  <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Mahsulot Nomi va Toifasi</th>
+                  <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Mahsulot va Toifasi</th>
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Qoldiq (t / kg / gr)</th>
+                  <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Xarid Narxi va Qiymati</th>
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Tezkor Amallar</th>
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Tahrirlash</th>
                 </tr>
@@ -653,6 +730,8 @@ export default function WarehouseStockTab({
                 {filteredInventory.map(item => {
                   const qty = Number(item.quantity ?? item.qty ?? 0) || 0;
                   const min = Number(item.minLimit ?? 0) || 0;
+                  const cost = Number(item.costPrice ?? item.price ?? 0) || 0;
+                  const totalValue = Math.round(qty * cost);
                   const isLow = qty <= min;
 
                   return (
@@ -673,6 +752,24 @@ export default function WarehouseStockTab({
 
                       <td className={`p-4 ${isLow ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                         {renderMultiUnitBadges(item)}
+                      </td>
+
+                      {/* Xarid narxi va Jami qiymati */}
+                      <td className="p-4">
+                        {cost > 0 ? (
+                          <div>
+                            <span className="font-black text-sm text-gray-900 dark:text-white block">
+                              {cost.toLocaleString()} s <span className="text-xs font-bold text-gray-400">/ 1 {item.unit}</span>
+                            </span>
+                            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                              Jami: {totalValue.toLocaleString()} so'm
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-bold text-amber-500">
+                            Narx kiritilmagan
+                          </span>
+                        )}
                       </td>
 
                       <td className="p-4 text-center">
@@ -723,11 +820,11 @@ export default function WarehouseStockTab({
           ======================================================= */}
       {isItemModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in">
-          <div className="bg-white dark:bg-gray-800 w-full md:max-w-xl rounded-t-3xl md:rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 w-full md:max-w-xl rounded-t-3xl md:rounded-3xl p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
             
             <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700">
               <h3 className="font-black text-lg text-gray-900 dark:text-white">
-                {editingItem ? '✏️ Mahsulotni Tahrirlash' : '📦 Yangi Mahsulot Qo\'shish'}
+                {editingItem ? '✏️ Mahsulot va Tannarxni Tahrirlash' : "📦 Yangi Mahsulot Qo'shish"}
               </h3>
               <button 
                 type="button"
@@ -739,44 +836,46 @@ export default function WarehouseStockTab({
             </div>
             
             <form onSubmit={handleSaveItem} className="space-y-4 pt-2">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">
-                  Mahsulot Nomi *
-                </label>
-                <input 
-                  type="text" 
-                  required 
-                  value={itemData.name} 
-                  onChange={e => setItemData({ ...itemData, name: e.target.value })} 
-                  className="w-full p-4 md:p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-purple-500 text-gray-900 dark:text-white transition font-bold" 
-                  placeholder="Masalan: Go'sht (Lahm)" 
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">
-                  Mahsulot Toifasi *
-                </label>
-                <select 
-                  value={itemData.category} 
-                  onChange={e => setItemData({ ...itemData, category: e.target.value })} 
-                  className="w-full p-4 md:p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none text-gray-900 dark:text-white cursor-pointer transition font-bold"
-                >
-                  {inventoryCategories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">
-                    Asosiy O'lchov Birligi *
+                    Mahsulot Nomi *
+                  </label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={itemData.name} 
+                    onChange={e => setItemData({ ...itemData, name: e.target.value })} 
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-purple-500 text-gray-900 dark:text-white transition font-bold" 
+                    placeholder="Masalan: Go'sht (Lahm)" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                    Mahsulot Toifasi *
+                  </label>
+                  <select 
+                    value={itemData.category} 
+                    onChange={e => setItemData({ ...itemData, category: e.target.value })} 
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none text-gray-900 dark:text-white cursor-pointer transition font-bold"
+                  >
+                    {inventoryCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                    O'lchov Birligi *
                   </label>
                   <select 
                     value={itemData.unit} 
                     onChange={e => handleModalUnitChange(e.target.value)} 
-                    className="w-full p-4 md:p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none text-gray-900 dark:text-white cursor-pointer transition font-bold"
+                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none text-gray-900 dark:text-white cursor-pointer transition font-bold text-xs"
                   >
                     {UNIT_OPTIONS.map(u => (
                       <option key={u.value} value={u.value}>{u.label}</option>
@@ -785,7 +884,7 @@ export default function WarehouseStockTab({
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
                     Hozirgi Qoldiq ({itemData.unit}) *
                   </label>
                   <input 
@@ -795,13 +894,13 @@ export default function WarehouseStockTab({
                     step="any" 
                     value={itemData.quantity} 
                     onChange={e => setItemData({ ...itemData, quantity: e.target.value })} 
-                    className="w-full p-4 md:p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-purple-500 text-gray-900 dark:text-white transition font-bold" 
+                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-purple-500 text-gray-900 dark:text-white transition font-bold text-xs" 
                     placeholder="Masalan: 10" 
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
                     Qizil chegara ({itemData.unit}) *
                   </label>
                   <input 
@@ -811,47 +910,63 @@ export default function WarehouseStockTab({
                     step="any" 
                     value={itemData.minLimit} 
                     onChange={e => setItemData({ ...itemData, minLimit: e.target.value })} 
-                    className="w-full p-4 md:p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-purple-500 text-gray-900 dark:text-white transition font-bold" 
+                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-purple-500 text-gray-900 dark:text-white transition font-bold text-xs" 
                     placeholder="Masalan: 5" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-emerald-600 dark:text-emerald-400 mb-1 uppercase tracking-wider">
+                    1 {itemData.unit} Xarid Narxi (s) *
+                  </label>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    step="any" 
+                    value={itemData.costPrice} 
+                    onChange={e => setItemData({ ...itemData, costPrice: e.target.value })} 
+                    className="w-full p-3 rounded-xl bg-emerald-50 dark:bg-gray-700 border border-emerald-300 dark:border-emerald-600 outline-none focus:border-emerald-500 text-gray-900 dark:text-white transition font-black text-xs" 
+                    placeholder="Masalan: 95000" 
                   />
                 </div>
               </div>
 
-              {/* JONLI KONVERTATSIYA JADVALI (GR / KG / TONNA) */}
-              {itemModalBreakdown.isConvertible && Number(itemData.quantity) > 0 && (
-                <div className="bg-purple-50 dark:bg-purple-900/20 p-3.5 rounded-2xl border border-purple-200 dark:border-purple-800/50">
-                  <p className="text-[10px] font-black uppercase text-purple-600 dark:text-purple-300 mb-2">
-                    ⚖️ Avtomatik Birliklar Konvertatsiyasi:
-                  </p>
-                  {itemModalBreakdown.family === 'weight' ? (
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs font-black">
+              {/* JONLI KONVERTATSIYA VA TANNARX JADVALI */}
+              {(itemModalBreakdown.isConvertible && Number(itemData.quantity) > 0) || Number(itemData.costPrice) > 0 ? (
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-3.5 rounded-2xl border border-purple-200 dark:border-purple-800/50 space-y-2">
+                  <div className="flex justify-between items-center text-xs font-black">
+                    <span className="text-purple-700 dark:text-purple-300 uppercase">
+                      💰 Jami qoldiq summasi:
+                    </span>
+                    <span className="text-emerald-600 dark:text-emerald-400 text-sm">
+                      {Math.round((Number(itemData.quantity) || 0) * (Number(itemData.costPrice) || 0)).toLocaleString()} so'm
+                    </span>
+                  </div>
+
+                  {itemModalBreakdown.family === 'weight' && Number(itemData.costPrice) > 0 && (
+                    <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-black pt-1">
                       <div className="bg-white dark:bg-gray-800 p-2 rounded-xl">
-                        <span className="block text-[10px] text-gray-400">TONNA</span>
-                        <span className="text-amber-600">{itemModalBreakdown.tonna} t</span>
+                        <span className="block text-[9px] text-gray-400">1 GRAMM NARXI</span>
+                        <span className="text-indigo-600">
+                          {convertUnitPriceBetweenUnits(itemData.costPrice, itemData.unit, 'gr').toLocaleString()} s
+                        </span>
                       </div>
                       <div className="bg-white dark:bg-gray-800 p-2 rounded-xl">
-                        <span className="block text-[10px] text-gray-400">KILOGRAMM</span>
-                        <span className="text-emerald-600">{itemModalBreakdown.kg.toLocaleString()} kg</span>
+                        <span className="block text-[9px] text-gray-400">1 KG NARXI</span>
+                        <span className="text-emerald-600">
+                          {convertUnitPriceBetweenUnits(itemData.costPrice, itemData.unit, 'kg').toLocaleString()} s
+                        </span>
                       </div>
                       <div className="bg-white dark:bg-gray-800 p-2 rounded-xl">
-                        <span className="block text-[10px] text-gray-400">GRAMM</span>
-                        <span className="text-indigo-600">{itemModalBreakdown.gr.toLocaleString()} gr</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2 text-center text-xs font-black">
-                      <div className="bg-white dark:bg-gray-800 p-2 rounded-xl">
-                        <span className="block text-[10px] text-gray-400">LITR</span>
-                        <span className="text-emerald-600">{itemModalBreakdown.litr.toLocaleString()} l</span>
-                      </div>
-                      <div className="bg-white dark:bg-gray-800 p-2 rounded-xl">
-                        <span className="block text-[10px] text-gray-400">MILLILITR</span>
-                        <span className="text-indigo-600">{itemModalBreakdown.ml.toLocaleString()} ml</span>
+                        <span className="block text-[9px] text-gray-400">1 TONNA NARXI</span>
+                        <span className="text-amber-600">
+                          {convertUnitPriceBetweenUnits(itemData.costPrice, itemData.unit, 'tonna').toLocaleString()} s
+                        </span>
                       </div>
                     </div>
                   )}
                 </div>
-              )}
+              ) : null}
               
               <div className="flex gap-3 pt-4">
                 <button 
@@ -875,7 +990,7 @@ export default function WarehouseStockTab({
       )}
 
       {/* =======================================================
-          MODAL 2: KIRIM, CHIQIM VA REVIZIYA (ISTALGAN BIRLIKDA!)
+          MODAL 2: KIRIM, CHIQIM VA REVIZIYA
           ======================================================= */}
       {isUpdateModalOpen && selectedStockItem && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in">
@@ -904,7 +1019,6 @@ export default function WarehouseStockTab({
 
             <form onSubmit={handleSaveUpdate} className="space-y-4 pt-1">
               
-              {/* QAYSI BIRLIKDA KIRITISHNI TANLASH (GR / KG / TONNA) */}
               {compatibleUpdateUnits.length > 1 && (
                 <div>
                   <label className="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
@@ -954,14 +1068,30 @@ export default function WarehouseStockTab({
                   }`} 
                   placeholder="0" 
                 />
-
-                {/* Agar boshqa birlikda kiritilgan bo'lsa, asosiy birlikda qancha bo'lishini ko'rsatadi */}
-                {updateAmount !== '' && Number(updateAmount) > 0 && updateInputUnit !== normalizeUnitCode(selectedStockItem.unit) && (
-                  <p className="text-xs font-black text-indigo-600 dark:text-indigo-400 text-center mt-2 bg-indigo-50 dark:bg-indigo-900/30 py-1.5 rounded-lg">
-                    🔄 Asosiy birlikda: {convertValueBetweenUnits(updateAmount, updateInputUnit, selectedStockItem.unit).toLocaleString()} {selectedStockItem.unit}
-                  </p>
-                )}
               </div>
+
+              {/* Kirim vaqtida xarid narxini yangilash */}
+              {updateType === 'kirim' && (
+                <div>
+                  <label className="block text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-1 uppercase tracking-wider">
+                    1 {updateInputUnit} xarid narxi (so'mda)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={updateUnitPrice}
+                    onChange={e => setUpdateUnitPrice(e.target.value)}
+                    placeholder="Masalan: 95000"
+                    className="w-full p-3.5 rounded-xl bg-emerald-50/60 dark:bg-gray-700 border border-emerald-200 dark:border-gray-600 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-emerald-500"
+                  />
+                  {Number(updateAmount) > 0 && Number(updateUnitPrice) > 0 && (
+                    <p className="text-[11px] font-black text-emerald-600 mt-1">
+                      💰 Ushbu kirim summasi: {Math.round(Number(updateAmount) * Number(updateUnitPrice)).toLocaleString()} so'm
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">
