@@ -327,4 +327,88 @@ export default function WarehouseHistoryTab({
                   <span className="font-black text-gray-900 dark:text-white text-base">
                     {log.itemName}
                   </span>
-                  <div class
+                  <div className="text-right shrink-0">
+                    <span className={`font-black text-base ${
+                      log.isPositive ? 'text-emerald-500' : log.isNegative ? 'text-red-500' : 'text-orange-500'
+                    }`}>
+                      {log.diffStr} <span className="text-xs">{log.unit}</span>
+                    </span>
+                    {log.convertedSubtext && (
+                      <p className="text-[10px] font-bold text-gray-400">
+                        {log.convertedSubtext}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="mt-2 pt-2 border-t dark:border-gray-700 pl-2">
+                  <p className="text-xs font-bold text-gray-600 dark:text-gray-300 break-words">
+                    {log.note}
+                  </p>
+                  <p className="text-xs font-black text-indigo-500 mt-1.5">
+                    👤 {log.user}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* PLANSHET VA KOMPYUTER UCHUN JADVAL (History) */}
+          <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-900/50 border-b dark:border-gray-700">
+                  <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Sana / Vaqt</th>
+                  <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Harakat Turi</th>
+                  <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Mahsulot / Miqdor (t/kg/gr)</th>
+                  <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Izoh / Tarkib</th>
+                  <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Foydalanuvchi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {filteredLogs.map(log => (
+                  <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                    <td className="p-4 text-xs font-bold text-gray-500 whitespace-nowrap">
+                      {log.date}
+                    </td>
+
+                    <td className="p-4 whitespace-nowrap">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] uppercase font-black tracking-wider ${log.badgeStyle}`}>
+                        {log.badgeLabel}
+                      </span>
+                    </td>
+
+                    <td className="p-4">
+                      <p className="font-black text-gray-900 dark:text-gray-100">
+                        {log.itemName}
+                      </p>
+                      <p className={`font-black text-sm mt-0.5 ${
+                        log.isPositive ? 'text-emerald-600 dark:text-emerald-400' : log.isNegative ? 'text-red-500' : 'text-orange-500'
+                      }`}>
+                        {log.diffStr} {log.unit}
+                      </p>
+                      {log.convertedSubtext && (
+                        <p className="text-[10px] font-bold text-gray-400 mt-0.5">
+                          ⚖️ {log.convertedSubtext}
+                        </p>
+                      )}
+                    </td>
+
+                    <td className="p-4 text-xs text-gray-600 dark:text-gray-300 font-bold max-w-md break-words">
+                      {log.note}
+                    </td>
+
+                    <td className="p-4 text-xs font-black text-indigo-500 text-right whitespace-nowrap">
+                      👤 {log.user}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      
+    </div>
+  );
+}
