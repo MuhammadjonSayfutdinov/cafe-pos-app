@@ -414,7 +414,23 @@ export default function StatsMode({
         ...(Array.isArray(prev) ? prev : [])
       ]);
     }
-    
+    sendZReportTelegram({
+  cafeName: window.localStorage.getItem('pos_cafe_name') ? JSON.parse(window.localStorage.getItem('pos_cafe_name')) : 'Premium Cafe',
+  userName: currentUser?.name || 'Admin',
+  scopeLabel: 'Smena Yopildi (Z-Otchyot)',
+  totalOrdersCount: currentShiftPaidOrders.length,
+  totalRevenue: shiftRevenue,
+  totalFoodCost: shiftCost,
+  totalNetProfit: shiftNetProfit,
+  totalServiceFee,
+  totalDiscount,
+  averageReceipt,
+  paymentStats,
+  popularItems,
+  openTablesCount: openActiveOrders.length,
+  openTablesAmount,
+  totalDebtAmount
+});
     alert(
       `✅ Smena muvaffaqiyatli yopildi!\n\n` +
       `• Arxivga o'tkazildi: ${currentShiftPaidOrders.length} ta chek\n` +
