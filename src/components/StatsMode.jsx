@@ -3,6 +3,7 @@ import useSticky from '../hooks/useSticky';
 import StatsOverviewCards from './StatsOverviewCards';
 import StatsPaymentBreakdown from './StatsPaymentBreakdown';
 import StatsPopularItems from './StatsPopularItems';
+import { sendZReportTelegram } from '../utils/telegramNotifier';
 
 // ===============================================
 // O'LCHOV BIRLIKLARI KONVERTORI (TANNARX UCHUN)
