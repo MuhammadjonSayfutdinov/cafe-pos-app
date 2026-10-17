@@ -3,7 +3,6 @@ import useSticky from '../hooks/useSticky';
 import StatsOverviewCards from './StatsOverviewCards';
 import StatsPaymentBreakdown from './StatsPaymentBreakdown';
 import StatsPopularItems from './StatsPopularItems';
-import { sendZReportTelegram } from '../utils/telegramNotifier';
 
 // ===============================================
 // O'LCHOV BIRLIKLARI KONVERTORI (TANNARX UCHUN)
@@ -43,11 +42,19 @@ const convertToInventoryUnit = (amount, fromUnit, toInvUnit) => {
   return num;
 };
 
+const escapeHtml = (str) =>
+  String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
 export default function StatsMode({ 
   orders, 
   setOrders, 
   menuItems,
   inventory,
+  expenses,
+  setExpenses,
   currentUser,
   auditLogs,
   setAuditLogs,
@@ -59,10 +66,13 @@ export default function StatsMode({
   const [stickyOrders, setStickyOrders] = useSticky('pos_orders', []);
   const [stickyMenu] = useSticky('pos_menu', []);
   const [stickyInventory] = useSticky('pos_inventory', []);
+  const [stickyExpenses, setStickyExpenses] = useSticky('pos_expenses', []);
+  const [stickyCafeName] = useSticky('pos_cafe_name', 'Premium Cafe');
   const [, setStickyAuditLogs] = useSticky('pos_audit_logs', []);
 
   // Ko'rish rejimi: 'current' (Joriy smena) | 'archived' (Arxiv) | 'all' (Barcha vaqt)
   const [viewScope, setViewScope] = useState('current');
+  const [tgSending, setTgSending] = useState(false);
 
   const safeOrders = useMemo(() => {
     if (Array.isArray(orders) && orders.length > 0) return orders;
@@ -79,12 +89,17 @@ export default function StatsMode({
     return Array.isArray(stickyInventory) ? stickyInventory : [];
   }, [inventory, stickyInventory]);
 
+  const safeExpenses = useMemo(() => {
+    if (Array.isArray(expenses)) return expenses;
+    return Array.isArray(stickyExpenses) ? stickyExpenses : [];
+  }, [expenses, stickyExpenses]);
+
   const updateOrdersState = typeof setOrders === 'function' ? setOrders : setStickyOrders;
+  const updateExpensesState = typeof setExpenses === 'function' ? setExpenses : setStickyExpenses;
 
   // ===============================================
   // 2. XAVFSIZ MOLIYAVIY VA TANNARX HISOBLAGICHLARI
   // ===============================================
-  // Bitta sotilgan taomning 1 porsiya tannarxini (Food Cost) hisoblash
   const getDishUnitCost = (cartItem) => {
     if (!cartItem) return 0;
 
@@ -100,7 +115,6 @@ export default function StatsMode({
       return Number(cartItem.costPrice || 0) || 0;
     }
 
-    // Agar mijoz 0.5 porsiya yoki boshqa variant olgan bo'lsa, narx proporsiyasini aniqlaymiz
     const mainMenuPrice = Number(matchedMenu.variants?.[0]?.price ?? matchedMenu.price ?? 0) || 0;
     const soldItemPrice = Number(cartItem.price ?? mainMenuPrice) || 0;
     const portionRatio = (mainMenuPrice > 0 && soldItemPrice > 0)
@@ -120,7 +134,6 @@ export default function StatsMode({
           const invCostPrice = Number(invItem.costPrice ?? invItem.price ?? 0) || 0;
           const invUnit = normalizeUnit(invItem.unit || 'kg');
 
-          // Agar rawQty va recipeUnit bo'lsa konvertatsiya qilamiz, aks holda tayyor qty ni olamiz
           let usedQtyInInvUnit = Number(r.qty ?? r.amount ?? 0) || 0;
           if (r.rawQty !== undefined && r.recipeUnit) {
             usedQtyInInvUnit = convertToInventoryUnit(r.rawQty, r.recipeUnit, invUnit);
@@ -139,7 +152,6 @@ export default function StatsMode({
     return Math.round(fallbackCost * portionRatio);
   };
 
-  // Chekning yakuniy summasi
   const getOrderFinalAmount = (order) => {
     if (!order) return 0;
     if (order.finalTotal !== undefined) return Number(order.finalTotal) || 0;
@@ -157,7 +169,6 @@ export default function StatsMode({
     return 0;
   };
 
-  // Chekdagi barcha taomlarning xomashyo tannarxi (COGS)
   const getOrderFoodCost = (order) => {
     if (!order || !Array.isArray(order.items)) return 0;
     return order.items.reduce((sum, it) => {
@@ -166,7 +177,6 @@ export default function StatsMode({
     }, 0);
   };
 
-  // Chekning xizmat haqi summasi
   const getOrderServiceFee = (order) => {
     if (!order) return 0;
     if (order.serviceFeeAmount !== undefined) return Number(order.serviceFeeAmount) || 0;
@@ -176,14 +186,13 @@ export default function StatsMode({
     return Math.round((sub * pct) / 100);
   };
 
-  // Chekning chegirma summasi
   const getOrderDiscount = (order) => {
     if (!order) return 0;
     return Number(order.discountAmount ?? order.discount ?? 0) || 0;
   };
 
   // ===============================================
-  // 3. CHEKLARNI SMENA REJIMIGA QARAB AJRATISH
+  // 3. CHEKLAR VA XARAJATLARNI SMENAGA QARAB AJRATISH
   // ===============================================
   const currentShiftPaidOrders = useMemo(() => {
     return safeOrders.filter(o => o && o.status === "To'langan");
@@ -209,8 +218,19 @@ export default function StatsMode({
     return currentShiftPaidOrders;
   }, [viewScope, currentShiftPaidOrders, archivedPaidOrders]);
 
+  // Xarajatlarni ham tanlangan smena ('current' | 'archived' | 'all') bo'yicha ajratish
+  const scopedExpenses = useMemo(() => {
+    if (viewScope === 'archived') {
+      return safeExpenses.filter(e => e && e.status === 'Arxiv');
+    }
+    if (viewScope === 'all') {
+      return safeExpenses.filter(Boolean);
+    }
+    return safeExpenses.filter(e => e && e.status !== 'Arxiv');
+  }, [safeExpenses, viewScope]);
+
   // ===============================================
-  // 4. ASOSIY MOLIYAVIY HISOB-KITOBLAR (KPI)
+  // 4. ASOSIY MOLIYAVIY HISOB-KITOBLAR (KPI + XARAJATLAR)
   // ===============================================
   const totalRevenue = useMemo(() => {
     return completedOrders.reduce((sum, order) => sum + getOrderFinalAmount(order), 0);
@@ -220,9 +240,43 @@ export default function StatsMode({
     return completedOrders.reduce((sum, order) => sum + getOrderFoodCost(order), 0);
   }, [completedOrders, safeMenu, safeInventory]);
 
+  // Operatsion xarajatlar (Sof foydadan ayriladi) va Inkassatsiya (Sof foydadan ayrilmaydi, faqat seyfdan ayriladi)
+  const expenseMetrics = useMemo(() => {
+    let operationalExpenses = 0;
+    let inkassatsiyaAmount = 0;
+    let cashOutTotal = 0;
+    let cardOutTotal = 0;
+
+    scopedExpenses.forEach(exp => {
+      const amt = Number(exp.amount) || 0;
+      const isInkass = Boolean(exp.isInkassatsiya || exp.category === 'Inkassatsiya');
+
+      if (isInkass) {
+        inkassatsiyaAmount += amt;
+      } else {
+        operationalExpenses += amt;
+      }
+
+      if (exp.paymentSource === 'Plastik') {
+        cardOutTotal += amt;
+      } else {
+        cashOutTotal += amt;
+      }
+    });
+
+    return {
+      operationalExpenses,
+      inkassatsiyaAmount,
+      cashOutTotal,
+      cardOutTotal,
+      totalAllOutflows: operationalExpenses + inkassatsiyaAmount
+    };
+  }, [scopedExpenses]);
+
+  // Haqiqiy Sof Foyda = Savdo Tushumi - Xomashyo Tannarxi (COGS) - Operatsion Xarajatlar
   const totalNetProfit = useMemo(() => {
-    return totalRevenue - totalFoodCost;
-  }, [totalRevenue, totalFoodCost]);
+    return totalRevenue - totalFoodCost - expenseMetrics.operationalExpenses;
+  }, [totalRevenue, totalFoodCost, expenseMetrics.operationalExpenses]);
 
   const totalDebtAmount = useMemo(() => {
     return debtOrders.reduce((sum, order) => sum + getOrderFinalAmount(order), 0);
@@ -241,13 +295,12 @@ export default function StatsMode({
   }, [completedOrders]);
 
   const totalOrdersCount = completedOrders.length;
-  
   const averageReceipt = totalOrdersCount > 0 
     ? Math.round(totalRevenue / totalOrdersCount) 
     : 0;
   
   // ===============================================
-  // 5. TO'LOV TURLARI BO'YICHA HISOB-KITOB
+  // 5. TO'LOV TURLARI VA SEYFDAGI ANIQ NAQD PUL
   // ===============================================
   const paymentStats = useMemo(() => {
     const baseStats = {
@@ -273,8 +326,22 @@ export default function StatsMode({
     return baseStats;
   }, [completedOrders, totalDebtAmount, viewScope]);
 
+  // Seyfda bo'lishi shart bo'lgan aniq naqd pul (Naqd cheklar + Aralashning naqd qismi - Naqd chiqimlar)
+  const expectedCashInDrawer = useMemo(() => {
+    let rawCashIn = 0;
+    completedOrders.forEach(o => {
+      const amt = getOrderFinalAmount(o);
+      if (o.paymentMethod === 'Naqd') {
+        rawCashIn += amt;
+      } else if (o.paymentMethod === 'Aralash') {
+        rawCashIn += Number(o.paymentDetails?.cashAmount ?? o.mixedDetails?.cash ?? 0) || 0;
+      }
+    });
+    return rawCashIn - expenseMetrics.cashOutTotal;
+  }, [completedOrders, expenseMetrics.cashOutTotal]);
+
   // ===============================================
-  // 6. TAOMLAR BO'YICHA STATISTIKA (TOP-5 + TANNARX)
+  // 6. TAOMLAR BO'YICHA STATISTIKA (TOP-5)
   // ===============================================
   const popularItems = useMemo(() => {
     const itemsStats = {};
@@ -312,8 +379,69 @@ export default function StatsMode({
   }, [completedOrders, debtOrders, archivedPaidOrders, viewScope, safeMenu, safeInventory]);
 
   // ===============================================
-  // 7. Z-OTCHYOTNI (.TXT) YUKLAB OLISH VA SMENANI YOPISH
+  // 7. TELEGRAMGA Z-OTCHYOT YUBORISH VA .TXT YUKLASH
   // ===============================================
+  const sendReportToTelegram = async (customLabel = null) => {
+    try {
+      const raw = window.localStorage.getItem('pos_telegram_config');
+      if (!raw) return { ok: false, error: 'Telegram Bot sozlanmagan!' };
+      const cfg = JSON.parse(raw);
+      const token = String(cfg?.botToken || '').trim();
+      const rawIds = String(cfg?.chatId || '').trim();
+
+      if (!token || !rawIds) {
+        return { ok: false, error: 'Admin Sozlamalarida Bot Token va Chat ID kiritilmagan!' };
+      }
+
+      const htmlMsg = [
+        `📊 <b>Z-OTCHYOT VA KASSA BALANSI</b>`,
+        `🏪 <b>Kafe:</b> ${escapeHtml(stickyCafeName)}`,
+        `📌 <b>Hisobot:</b> ${escapeHtml(customLabel || (viewScope === 'current' ? 'Joriy Smena' : 'Umumiy Hisobot'))}`,
+        `📅 <b>Sana:</b> ${escapeHtml(new Date().toLocaleString())}`,
+        `━━━━━━━━━━━━━━━━━━`,
+        `💰 <b>JAMI SAVDO TUSHUMI:</b> ${totalRevenue.toLocaleString()} so'm (${totalOrdersCount} ta chek)`,
+        `🥩 <b>Xomashyo Tannarxi (COGS):</b> -${totalFoodCost.toLocaleString()} so'm`,
+        `💸 <b>Kunlik Xarajatlar:</b> -${expenseMetrics.operationalExpenses.toLocaleString()} so'm`,
+        `💎 <b>HAQIQIY SOF FOYDA:</b> <b>+${totalNetProfit.toLocaleString()} so'm</b>`,
+        `━━━━━━━━━━━━━━━━━━`,
+        `🏦 <b>Inkassatsiya (Topshirildi):</b> ${expenseMetrics.inkassatsiyaAmount.toLocaleString()} so'm`,
+        `🗄 <b>SEYFDA QOLGAN SOF NAQD PUL:</b> <b>${expectedCashInDrawer.toLocaleString()} so'm</b>`,
+        `━━━━━━━━━━━━━━━━━━`,
+        `💳 <b>TO'LOV TURLARI:</b>`,
+        ...Object.entries(paymentStats).map(([k, v]) => `  • ${escapeHtml(k)}: ${Number(v || 0).toLocaleString()} so'm`)
+      ].join('\n');
+
+      const chatIds = rawIds.split(',').map(s => s.trim()).filter(Boolean);
+      await Promise.all(
+        chatIds.map(id =>
+          fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: id,
+              text: htmlMsg,
+              parse_mode: 'HTML'
+            })
+          })
+        )
+      );
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'Internet xatosi!' };
+    }
+  };
+
+  const handleManualTelegramShare = async () => {
+    setTgSending(true);
+    const res = await sendReportToTelegram();
+    setTgSending(false);
+    if (res.ok) {
+      alert('✅ Z-Otchyot hisoboti Telegramga muvaffaqiyatli yuborildi!');
+    } else {
+      alert(`❌ ${res.error}`);
+    }
+  };
+
   const handleExportZReport = () => {
     const scopeTitle = 
       viewScope === 'current' ? 'JORIY SMENA HISOBOTI' :
@@ -330,16 +458,20 @@ export default function StatsMode({
       `• Yopilgan cheklar soni: ${totalOrdersCount} ta`,
       `• Jami Savdo Tushumi: ${totalRevenue.toLocaleString()} so'm`,
       `• Xomashyo Tannarxi (Food Cost): -${totalFoodCost.toLocaleString()} so'm`,
+      `• Kunlik Operatsion Xarajatlar: -${expenseMetrics.operationalExpenses.toLocaleString()} so'm`,
       `• HAQIQIY SOF FOYDA: +${totalNetProfit.toLocaleString()} so'm`,
-      `• Xizmat haqi (+Foyda): ${totalServiceFee.toLocaleString()} so'm`,
-      `• Berilgan chegirmalar: ${totalDiscount.toLocaleString()} so'm`,
-      `• O'rtacha chek summasi: ${averageReceipt.toLocaleString()} so'm\n`,
+      `• Inkassatsiya (Rahbarga topshirilgan): ${expenseMetrics.inkassatsiyaAmount.toLocaleString()} so'm`,
+      `• SEYFDA QOLISHI SHART BO'LGAN NAQD PUL: ${expectedCashInDrawer.toLocaleString()} so'm\n`,
       `2. TO'LOV TURLARI BO'YICHA:`,
       ...Object.entries(paymentStats).map(([k, v]) => `• ${k}: ${Number(v || 0).toLocaleString()} so'm`),
-      `\n3. TOP-5 XARIDORGIR TAOMLAR:`,
+      `\n3. KASSA CHIQIMLARI VA XARAJATLAR (${scopedExpenses.length} ta):`,
+      ...(scopedExpenses.length > 0
+        ? scopedExpenses.map((e, i) => `${i + 1}. [${e.date}] ${e.category}: -${Number(e.amount).toLocaleString()} s (${e.paymentSource}) — ${e.note}`)
+        : ['Xarajatlar kiritilmagan']),
+      `\n4. TOP-5 XARIDORGIR TAOMLAR:`,
       ...(popularItems.length > 0
         ? popularItems.map(([name, st], idx) => 
-            `${idx + 1}. ${name} — ${st.count} pors | Tushum: ${st.revenue.toLocaleString()} s | Sof foyda: +${st.profit.toLocaleString()} s`
+            `${idx + 1}. ${name} — ${st.count} pors | Tushum: ${st.revenue.toLocaleString()} s`
           )
         : ['Sotuvlar mavjud emas'])
     ].join('\n');
@@ -355,15 +487,16 @@ export default function StatsMode({
     URL.revokeObjectURL(url);
   };
 
+  // ===============================================
+  // 8. Z-OTCHYOT (SMENANI YOPISH MANTIG'I)
+  // ===============================================
   const handleCloseShift = () => {
-    if (currentShiftPaidOrders.length === 0) {
-      alert("ℹ️ Hozirgi smenada yopilishi kerak bo'lgan yangi 'To'langan' cheklar yo'q!");
+    const activeShiftExpenses = safeExpenses.filter(e => e && e.status !== 'Arxiv');
+
+    if (currentShiftPaidOrders.length === 0 && activeShiftExpenses.length === 0) {
+      alert("ℹ️ Hozirgi smenada yopilishi kerak bo'lgan yangi cheklar yoki xarajatlar yo'q!");
       return;
     }
-
-    const shiftRevenue = currentShiftPaidOrders.reduce((sum, o) => sum + getOrderFinalAmount(o), 0);
-    const shiftCost = currentShiftPaidOrders.reduce((sum, o) => sum + getOrderFoodCost(o), 0);
-    const shiftNetProfit = shiftRevenue - shiftCost;
 
     const openWarning = openActiveOrders.length > 0
       ? `\n\n⚠️ Eslatma: Zalda hali yopilmagan ${openActiveOrders.length} ta faol stol (${openTablesAmount.toLocaleString()} so'm) mavjud. Ular keyingi smenada ochiq qoladi.`
@@ -372,10 +505,12 @@ export default function StatsMode({
     const confirmMsg = 
       `⚠️ Diqqat! Z-Otchyotni (Smenani) yopmoqchimisiz?\n\n` +
       `• Yopilgan cheklar: ${currentShiftPaidOrders.length} ta\n` +
-      `• Smena tushumi: ${shiftRevenue.toLocaleString()} so'm\n` +
-      `• Xomashyo tannarxi (COGS): -${shiftCost.toLocaleString()} so'm\n` +
-      `• Haqiqiy Sof Foyda: +${shiftNetProfit.toLocaleString()} so'm\n\n` +
-      `Tasdiqlasangiz, ushbu cheklar Arxivga o'tkaziladi va joriy smena kassasi nollanadi.${openWarning}`;
+      `• Smena tushumi: ${totalRevenue.toLocaleString()} so'm\n` +
+      `• Xomashyo tannarxi (COGS): -${totalFoodCost.toLocaleString()} so'm\n` +
+      `• Kunlik xarajatlar: -${expenseMetrics.operationalExpenses.toLocaleString()} so'm\n` +
+      `• Haqiqiy Sof Foyda: +${totalNetProfit.toLocaleString()} so'm\n` +
+      `• Seyfdagi sof naqd pul: ${expectedCashInDrawer.toLocaleString()} so'm\n\n` +
+      `Tasdiqlasangiz, barcha cheklar va xarajatlar Arxivga o'tkaziladi hamda joriy kassa nollanadi.${openWarning}`;
 
     if (!window.confirm(confirmMsg)) {
       return;
@@ -383,21 +518,33 @@ export default function StatsMode({
 
     const archiveDateStr = new Date().toLocaleString();
 
+    // 1. Cheklarni arxivga o'tkazish
     updateOrdersState(prev => {
       const list = Array.isArray(prev) && prev.length > 0 ? prev : safeOrders;
       return list.map(order => {
         if (order && order.status === "To'langan") {
-          return { 
-            ...order, 
-            status: 'Arxiv', 
-            archiveDate: archiveDateStr 
-          };
+          return { ...order, status: 'Arxiv', archiveDate: archiveDateStr };
         }
         return order;
       });
     });
 
-    const logDetails = `Smena yopildi: ${currentShiftPaidOrders.length} ta chek | Tushum: ${shiftRevenue.toLocaleString()} s | Tannarx: ${shiftCost.toLocaleString()} s | Sof foyda: +${shiftNetProfit.toLocaleString()} s`;
+    // 2. Smena xarajatlarini ham arxivga o'tkazish
+    updateExpensesState(prev => {
+      const list = Array.isArray(prev) ? prev : safeExpenses;
+      return list.map(exp => {
+        if (exp && exp.status !== 'Arxiv') {
+          return { ...exp, status: 'Arxiv', archiveDate: archiveDateStr };
+        }
+        return exp;
+      });
+    });
+
+    // 3. Telegramga avtomatik Z-Otchyot yuborish
+    sendReportToTelegram('Smena Yopildi (Z-Otchyot)');
+
+    // 4. Audit Log
+    const logDetails = `Smena yopildi: Tushum ${totalRevenue.toLocaleString()} s | Xarajat: -${expenseMetrics.operationalExpenses.toLocaleString()} s | Sof foyda: +${totalNetProfit.toLocaleString()} s`;
     if (typeof addAuditLog === 'function') {
       addAuditLog("Z-Otchyot (Smena Yopildi)", logDetails);
     } else {
@@ -414,59 +561,50 @@ export default function StatsMode({
         ...(Array.isArray(prev) ? prev : [])
       ]);
     }
-    sendZReportTelegram({
-  cafeName: window.localStorage.getItem('pos_cafe_name') ? JSON.parse(window.localStorage.getItem('pos_cafe_name')) : 'Premium Cafe',
-  userName: currentUser?.name || 'Admin',
-  scopeLabel: 'Smena Yopildi (Z-Otchyot)',
-  totalOrdersCount: currentShiftPaidOrders.length,
-  totalRevenue: shiftRevenue,
-  totalFoodCost: shiftCost,
-  totalNetProfit: shiftNetProfit,
-  totalServiceFee,
-  totalDiscount,
-  averageReceipt,
-  paymentStats,
-  popularItems,
-  openTablesCount: openActiveOrders.length,
-  openTablesAmount,
-  totalDebtAmount
-});
+
     alert(
       `✅ Smena muvaffaqiyatli yopildi!\n\n` +
-      `• Arxivga o'tkazildi: ${currentShiftPaidOrders.length} ta chek\n` +
-      `• Jami tushum: ${shiftRevenue.toLocaleString()} so'm\n` +
-      `• Sof foyda: +${shiftNetProfit.toLocaleString()} so'm`
+      `• Jami tushum: ${totalRevenue.toLocaleString()} so'm\n` +
+      `• Kunlik xarajatlar: -${expenseMetrics.operationalExpenses.toLocaleString()} so'm\n` +
+      `• Haqiqiy Sof Foyda: +${totalNetProfit.toLocaleString()} so'm`
     );
   };
 
   // ===============================================
-  // 8. RENDER (UI KOMPONENTLAR)
+  // 9. RENDER (UI KOMPONENTLAR)
   // ===============================================
   return (
     <div className="animate-fade-in max-w-7xl mx-auto pb-12 space-y-6">
       
-      {/* YUQORI SARLAVHA, EKSPORT VA SMENA FILTRI */}
+      {/* YUQORI SARLAVHA, TELEGRAM, EKSPORT VA SMENA FILTRI */}
       <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-            <span className="text-3xl md:text-4xl">📈</span> Boshqaruv Paneli, Tannarx va Z-Otchyot
+            <span className="text-3xl md:text-4xl">📈</span> Moliya, Xarajatlar va Z-Otchyot Markazi
           </h2>
           <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">
-            Smena tushumi, xomashyo tannarxi (Food Cost), haqiqiy sof foyda, qarzlar va moliyaviy nazorat markazi.
+            Savdo tushumi, xomashyo tannarxi (COGS), kassa chiqimlari va haqiqiy sof foyda nazorati.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
-          {/* Hisobotni yuklab olish tugmasi */}
+          <button
+            type="button"
+            onClick={handleManualTelegramShare}
+            disabled={tgSending}
+            className="px-4 py-2.5 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-black text-xs shadow-md shadow-sky-500/20 transition active:scale-95 whitespace-nowrap disabled:opacity-50"
+          >
+            {tgSending ? '⏳ Yuborilmoqda...' : '✈️ Telegramga yuborish'}
+          </button>
+
           <button
             type="button"
             onClick={handleExportZReport}
             className="px-4 py-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-black text-xs border border-emerald-200 dark:border-emerald-800/50 transition active:scale-95 whitespace-nowrap"
           >
-            📥 Hisobotni yuklash (.txt)
+            📥 Yuklash (.txt)
           </button>
 
-          {/* Smena / Arxiv / Barchasi Switcher */}
           <div className="flex flex-wrap items-center gap-1.5 bg-gray-100 dark:bg-gray-900 p-1.5 rounded-2xl flex-1 sm:flex-initial">
             <button
               type="button"
@@ -507,66 +645,144 @@ export default function StatsMode({
         </div>
       </div>
 
-      {/* ZALDAGI OCHIQ STOLLAR VA NASIYALAR HAQIDA JONLI MA'LUMOT SATRI (TIKLANDI) */}
-      {(openActiveOrders.length > 0 || debtOrders.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {openActiveOrders.length > 0 && (
-            <div className="bg-indigo-50/80 dark:bg-indigo-900/20 px-5 py-3.5 rounded-2xl border border-indigo-200 dark:border-indigo-800/50 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🍽️</span>
-                <div>
-                  <p className="text-xs font-black uppercase text-indigo-600 dark:text-indigo-400">
-                    Hozir zalda faol (ochiq) stollar
-                  </p>
-                  <p className="text-xs font-bold text-gray-500">
-                    Kassada hali yopilmagan {openActiveOrders.length} ta chek
-                  </p>
-                </div>
-              </div>
-              <span className="text-lg font-black text-indigo-700 dark:text-indigo-300">
-                {openTablesAmount.toLocaleString()} s
-              </span>
+      {/* ZALDAGI OCHIQ STOLLAR, NASIYALAR VA SEYF NAQD PUL BALANSI SATRI */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-indigo-50/80 dark:bg-indigo-900/20 px-5 py-4 rounded-2xl border border-indigo-200 dark:border-indigo-800/50 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🔒</span>
+            <div>
+              <p className="text-xs font-black uppercase text-indigo-600 dark:text-indigo-400">
+                Seyfda Qolishi Shart Naqd Pul
+              </p>
+              <p className="text-[11px] font-bold text-gray-500">
+                Naqd savdo minus Naqd chiqim/inkassatsiya
+              </p>
             </div>
-          )}
-
-          {debtOrders.length > 0 && (
-            <div className="bg-red-50/80 dark:bg-red-900/20 px-5 py-3.5 rounded-2xl border border-red-200 dark:border-red-800/50 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">📓</span>
-                <div>
-                  <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">
-                    Qarz daftaridagi cheklar (Nasiya)
-                  </p>
-                  <p className="text-xs font-bold text-gray-500">
-                    To'lanishi kutilayotgan {debtOrders.length} ta qarz
-                  </p>
-                </div>
-              </div>
-              <span className="text-lg font-black text-red-600 dark:text-red-400">
-                {totalDebtAmount.toLocaleString()} s
-              </span>
-            </div>
-          )}
+          </div>
+          <span className="text-lg font-black text-indigo-700 dark:text-indigo-300">
+            {expectedCashInDrawer.toLocaleString()} s
+          </span>
         </div>
-      )}
 
-      {/* 1. KPI Kartochkalar (6 ta to'liq moliyaviy ko'rsatkich) */}
+        <div className="bg-amber-50/80 dark:bg-amber-900/20 px-5 py-4 rounded-2xl border border-amber-200 dark:border-amber-800/50 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🍽️</span>
+            <div>
+              <p className="text-xs font-black uppercase text-amber-700 dark:text-amber-400">
+                Hozir zalda ochiq stollar
+              </p>
+              <p className="text-[11px] font-bold text-gray-500">
+                Yopilmagan {openActiveOrders.length} ta faol buyurtma
+              </p>
+            </div>
+          </div>
+          <span className="text-lg font-black text-amber-700 dark:text-amber-300">
+            {openTablesAmount.toLocaleString()} s
+          </span>
+        </div>
+
+        <div className="bg-red-50/80 dark:bg-red-900/20 px-5 py-4 rounded-2xl border border-red-200 dark:border-red-800/50 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">📓</span>
+            <div>
+              <p className="text-xs font-black uppercase text-red-600 dark:text-red-400">
+                Qarz Daftari (Nasiya)
+              </p>
+              <p className="text-[11px] font-bold text-gray-500">
+                Kutilayotgan {debtOrders.length} ta qarz cheki
+              </p>
+            </div>
+          </div>
+          <span className="text-lg font-black text-red-600 dark:text-red-400">
+            {totalDebtAmount.toLocaleString()} s
+          </span>
+        </div>
+      </div>
+
+      {/* 1. KPI Kartochkalar (6 ta to'liq moliyaviy ko'rsatkich + Xarajatlar) */}
       <StatsOverviewCards 
         totalRevenue={totalRevenue}
         totalFoodCost={totalFoodCost}
+        totalExpenses={expenseMetrics.operationalExpenses}
+        totalInkassatsiya={expenseMetrics.inkassatsiyaAmount}
         totalNetProfit={totalNetProfit}
         totalOrdersCount={totalOrdersCount}
         totalServiceFee={totalServiceFee}
         totalDiscount={totalDiscount}
       />
 
-      {/* 2. To'lov Turlari (Naqd, Plastik, Payme, Click, Aralash, Qarz) va O'rtacha Chek */}
+      {/* 2. To'lov Turlari va O'rtacha Chek */}
       <StatsPaymentBreakdown 
         paymentStats={paymentStats}
         averageReceipt={averageReceipt}
       />
 
-      {/* 3. Top Taomlar va Smenani Yopish tugmasi */}
+      {/* 3. SMENA XARAJATLARI VA INKASSATSIYA TAFSILOTLARI JADVALI */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div>
+            <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white">
+              💸 Kassa Xarajatlari va Inkassatsiya Hisoboti ({scopedExpenses.length} ta)
+            </h3>
+            <p className="text-xs font-bold text-gray-500 mt-0.5">
+              Kassir tomonidan smena davomida kiritilgan barcha chiqimlar va rahbarga topshirilgan pullar
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs font-black">
+            <span className="px-3 py-1.5 rounded-xl bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300">
+              📉 Xarajatlar: -{expenseMetrics.operationalExpenses.toLocaleString()} s
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300">
+              🏦 Inkassatsiya: {expenseMetrics.inkassatsiyaAmount.toLocaleString()} s
+            </span>
+          </div>
+        </div>
+
+        {scopedExpenses.length === 0 ? (
+          <div className="text-center py-8 bg-gray-50 dark:bg-gray-900/40 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 text-gray-400 font-bold text-sm">
+            Ushbu davrda kassadan chiqim yoki xarajat qilinmagan.
+          </div>
+        ) : (
+          <div className="overflow-x-auto bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-100 dark:bg-gray-800 border-b dark:border-gray-700 text-xs font-black text-gray-500 uppercase">
+                  <th className="p-3.5">Vaqt</th>
+                  <th className="p-3.5">Toifa</th>
+                  <th className="p-3.5">Sababi / Izoh</th>
+                  <th className="p-3.5">Olgan shaxs / Kassir</th>
+                  <th className="p-3.5 text-right">Summa</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200/70 dark:divide-gray-700 text-xs sm:text-sm font-bold">
+                {scopedExpenses.map(exp => (
+                  <tr key={exp.id} className="hover:bg-white dark:hover:bg-gray-800 transition">
+                    <td className="p-3.5 text-gray-500 whitespace-nowrap">{exp.date}</td>
+                    <td className="p-3.5">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
+                        exp.isInkassatsiya || exp.category === 'Inkassatsiya'
+                          ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                      }`}>
+                        {exp.categoryLabel || exp.category}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-gray-900 dark:text-white font-black">{exp.note}</td>
+                    <td className="p-3.5 text-gray-500">
+                      {exp.recipient && exp.recipient !== '-' ? `${exp.recipient} • ` : ''}{exp.cashierName} ({exp.paymentSource})
+                    </td>
+                    <td className="p-3.5 text-right font-black text-red-600 dark:text-red-400 whitespace-nowrap">
+                      -{Number(exp.amount || 0).toLocaleString()} so'm
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* 4. Top Taomlar va Smenani Yopish tugmasi */}
       <StatsPopularItems 
         popularItems={popularItems}
         onCloseShift={handleCloseShift}
