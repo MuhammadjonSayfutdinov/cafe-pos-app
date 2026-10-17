@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import useSticky from '../hooks/useSticky';
 import WaiterTableGrid from './WaiterTableGrid';
 import WaiterMenu from './WaiterMenu';
@@ -33,7 +33,9 @@ export default function WaiterMode({
   orders: ordersProp,
   setOrders: setOrdersProp,
   menuItems: menuProp,
+  menu: altMenuProp,
   menuCategories: categoriesProp,
+  categories: altCategoriesProp,
   cafeName: cafeNameProp,
   serviceFee = 10,
   currentUser,
@@ -51,19 +53,45 @@ export default function WaiterMode({
   const [stickyCategories] = useSticky('pos_categories', ['Asosiy', 'Ichimlik', 'Shirinlik']);
   const [stickyCafeName] = useSticky('pos_cafe_name', 'Premium Cafe');
 
-  // YANGI: Stol Bronlari va Soatbay VIP-Taymerlar xotirasi
+  // Stol Bronlari va Soatbay VIP-Taymerlar xotirasi
   const [reservations, setReservations] = useSticky('pos_reservations', {});
   const [tableTimers, setTableTimers] = useSticky('pos_table_timers', {});
 
-  const safeTables = Array.isArray(tablesProp) && tablesProp.length > 0 ? tablesProp : stickyTables;
-  const safeOrders = Array.isArray(ordersProp) ? ordersProp : stickyOrders;
-  const safeMenu = Array.isArray(menuProp) && menuProp.length > 0 ? menuProp : stickyMenu;
-  const safeCategories = Array.isArray(categoriesProp) && categoriesProp.length > 0
-    ? categoriesProp
-    : stickyCategories;
+  const safeTables = useMemo(() => {
+    if (Array.isArray(tablesProp) && tablesProp.length > 0) return tablesProp;
+    return Array.isArray(stickyTables) && stickyTables.length > 0
+      ? stickyTables
+      : Array.from({ length: 15 }, (_, i) => `${i + 1}-Stol`);
+  }, [tablesProp, stickyTables]);
+
+  const safeOrders = useMemo(() => {
+    if (Array.isArray(ordersProp)) return ordersProp;
+    return Array.isArray(stickyOrders) ? stickyOrders : [];
+  }, [ordersProp, stickyOrders]);
+
+  const safeMenu = useMemo(() => {
+    if (Array.isArray(menuProp) && menuProp.length > 0) return menuProp;
+    if (Array.isArray(altMenuProp) && altMenuProp.length > 0) return altMenuProp;
+    return Array.isArray(stickyMenu) ? stickyMenu : [];
+  }, [menuProp, altMenuProp, stickyMenu]);
+
+  const safeCategories = useMemo(() => {
+    if (Array.isArray(categoriesProp) && categoriesProp.length > 0) return categoriesProp;
+    if (Array.isArray(altCategoriesProp) && altCategoriesProp.length > 0) return altCategoriesProp;
+    if (Array.isArray(stickyCategories) && stickyCategories.length > 0) return stickyCategories;
+    const extracted = Array.from(new Set(safeMenu.map(m => m?.category).filter(Boolean)));
+    return extracted.length > 0 ? extracted : ['Asosiy'];
+  }, [categoriesProp, altCategoriesProp, stickyCategories, safeMenu]);
+
   const resolvedCafeName = cafeNameProp || stickyCafeName || 'Premium Cafe';
 
-  const updateOrders = typeof setOrdersProp === 'function' ? setOrdersProp : setStickyOrders;
+  // Buyurtmalarni ham App.jsx state'iga, ham localStorage'ga bir vaqtda yozish
+  const updateOrders = useCallback((updater) => {
+    if (typeof setOrdersProp === 'function') {
+      setOrdersProp(updater);
+    }
+    setStickyOrders(updater);
+  }, [setOrdersProp, setStickyOrders]);
 
   // =========================================================
   // 2. OFITSIANT ISHCHI STATE'LARI
@@ -113,81 +141,168 @@ export default function WaiterMode({
   // =========================================================
   const handleSelectTable = (tableName) => {
     setSelectedTable(tableName);
+    setSelectedCategory('Barchasi');
+    setSearchQuery('');
+
     const existing = safeOrders.find(
       o =>
         o &&
         o.table === tableName &&
         !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
     );
-    setCart(existing && Array.isArray(existing.items) ? [...existing.items] : []);
+
+    if (existing && Array.isArray(existing.items)) {
+      setCart(
+        existing.items.map((item, idx) => ({
+          ...item,
+          cartItemId: item.cartItemId || `${item.id || idx}_${idx}`,
+          quantity: Number(item.quantity ?? item.qty ?? 1) || 1,
+          qty: Number(item.quantity ?? item.qty ?? 1) || 1,
+          price: Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0
+        }))
+      );
+    } else {
+      setCart([]);
+    }
   };
 
-  const handleAddToCart = (dishItem) => {
+  // Taomni savatchaga qo'shish (Variant/Porsiya bilan yoki oddiy)
+  const handleAddToCart = useCallback((dishItem, chosenVariant = null, customNote = '') => {
     if (!dishItem || dishItem.is_available === false) return;
 
-    const itemPrice = Number(dishItem.price ?? dishItem.variants?.[0]?.price ?? 0) || 0;
-    const itemName = dishItem.name;
-    const itemNote = (dishItem.note || '').trim();
+    const variants = Array.isArray(dishItem.variants) ? dishItem.variants : [];
+    const activeVariant = chosenVariant || (variants.length > 0 ? variants[0] : null);
+
+    const itemPrice = Number(
+      activeVariant?.price ?? dishItem.price ?? variants[0]?.price ?? 0
+    ) || 0;
+
+    const showVariantSuffix =
+      activeVariant &&
+      activeVariant.name &&
+      (variants.length > 1 || activeVariant.name.toLowerCase() !== '1 porsiya');
+
+    const fullDisplayName = showVariantSuffix
+      ? `${dishItem.name} (${activeVariant.name})`
+      : dishItem.name;
+
+    const itemNote = String(customNote || dishItem.note || '').trim();
 
     setCart(prev => {
       const existingIndex = prev.findIndex(
-        c => c.name === itemName && Number(c.price) === itemPrice && (c.note || '') === itemNote
+        c =>
+          c &&
+          c.name === fullDisplayName &&
+          Number(c.price) === itemPrice &&
+          String(c.note || '').trim() === itemNote
       );
 
       if (existingIndex > -1) {
-        return prev.map((c, idx) =>
-          idx === existingIndex
-            ? { ...c, quantity: (Number(c.quantity ?? c.qty ?? 1) || 1) + 1 }
-            : c
-        );
+        return prev.map((c, idx) => {
+          if (idx !== existingIndex) return c;
+          const nextQty = (Number(c.quantity ?? c.qty ?? 1) || 1) + 1;
+          return { ...c, quantity: nextQty, qty: nextQty };
+        });
       }
 
       return [
         ...prev,
         {
           ...dishItem,
-          cartItemId: `${dishItem.id}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          id: dishItem.id,
+          baseName: dishItem.name,
+          name: fullDisplayName,
+          variantName: activeVariant?.name || '1 porsiya',
+          cartItemId: `ci_${dishItem.id}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           price: itemPrice,
           quantity: 1,
+          qty: 1,
           note: itemNote
         }
       ];
     });
-  };
+  }, []);
 
-  const handleUpdateQuantity = (cartItemId, delta) => {
+  // Savatchada taom miqdorini o'zgartirish (+1 / -1)
+  const handleUpdateQuantity = useCallback((targetIdentifier, delta = 0) => {
     setCart(prev =>
       prev
-        .map(item => {
-          const key = item.cartItemId || item.id || item.name;
-          if (key !== cartItemId) return item;
-          const nextQty = (Number(item.quantity ?? item.qty ?? 1) || 1) + delta;
-          return nextQty > 0 ? { ...item, quantity: nextQty, qty: nextQty } : null;
+        .map((item, idx) => {
+          if (!item) return null;
+          const isMatch =
+            item.cartItemId === targetIdentifier ||
+            String(item.id) === String(targetIdentifier) ||
+            item.name === targetIdentifier ||
+            idx === targetIdentifier;
+
+          if (!isMatch) return item;
+
+          const currentQty = Number(item.quantity ?? item.qty ?? 1) || 1;
+          const nextQty = currentQty + Number(delta);
+          return nextQty > 0
+            ? { ...item, quantity: nextQty, qty: nextQty }
+            : null;
         })
         .filter(Boolean)
     );
-  };
+  }, []);
 
-  const handleUpdateNote = (cartItemId, nextNote) => {
+  // Savatchadan taomni butunlay o'chirish
+  const handleRemoveFromCart = useCallback((targetIdentifier) => {
     setCart(prev =>
-      prev.map(item => {
-        const key = item.cartItemId || item.id || item.name;
-        return key === cartItemId ? { ...item, note: nextNote } : item;
+      prev.filter((item, idx) => {
+        if (!item) return false;
+        const isMatch =
+          item.cartItemId === targetIdentifier ||
+          String(item.id) === String(targetIdentifier) ||
+          item.name === targetIdentifier ||
+          idx === targetIdentifier;
+        return !isMatch;
       })
     );
-  };
+  }, []);
+
+  // Savatchadagi taomga oshpaz uchun izoh yozish
+  const handleUpdateNote = useCallback((targetIdentifier, nextNote) => {
+    setCart(prev =>
+      prev.map((item, idx) => {
+        if (!item) return item;
+        const isMatch =
+          item.cartItemId === targetIdentifier ||
+          String(item.id) === String(targetIdentifier) ||
+          item.name === targetIdentifier ||
+          idx === targetIdentifier;
+        return isMatch ? { ...item, note: nextNote } : item;
+      })
+    );
+  }, []);
 
   // =========================================================
   // 4. BUYURTMANI OSHXONAGA YUBORISH VA YETKAZILDI BELGISI
   // =========================================================
   const handleSubmitOrder = () => {
-    if (!selectedTable || cart.length === 0) return;
+    if (!selectedTable) {
+      alert("Iltimos, avval stolni tanlang!");
+      return;
+    }
+    if (!Array.isArray(cart) || cart.length === 0) {
+      alert("Savatcha bo'sh! Iltimos, menyudan kamida 1 ta taom tanlang.");
+      return;
+    }
 
-    const subTotal = cart.reduce((sum, item) => {
-      const p = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;
-      const q = Number(item.quantity ?? item.qty ?? 1) || 0;
-      return sum + p * q;
-    }, 0);
+    const normalizedCart = cart.map((item, idx) => {
+      const price = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;
+      const qty = Number(item.quantity ?? item.qty ?? 1) || 1;
+      return {
+        ...item,
+        cartItemId: item.cartItemId || `ci_${item.id || idx}_${Date.now()}`,
+        price,
+        quantity: qty,
+        qty
+      };
+    });
+
+    const subTotal = normalizedCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
     const isTakeaway = selectedTable === 'Olib ketish';
     const feePct = isTakeaway ? 0 : Number(serviceFee) || 0;
@@ -197,7 +312,6 @@ export default function WaiterMode({
     const nowDate = new Date().toLocaleDateString();
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Agar shu stolda bron bo'lsa, mehmon ma'lumotlarini buyurtmaga biriktiramiz
     const activeBooking = reservations?.[selectedTable];
 
     if (currentTableOrder) {
@@ -206,10 +320,11 @@ export default function WaiterMode({
           o && String(o.id) === String(currentTableOrder.id)
             ? {
                 ...o,
-                items: cart,
+                items: normalizedCart,
                 subTotal,
                 subtotal: subTotal,
                 serviceFee: feePct,
+                serviceFeePercent: feePct,
                 serviceFeeAmount,
                 total: totalAmount,
                 finalTotal: totalAmount,
@@ -218,6 +333,13 @@ export default function WaiterMode({
             : o
         )
       );
+
+      if (typeof addAuditLog === 'function') {
+        addAuditLog(
+          'Buyurtma yangilandi',
+          `${selectedTable}: Jami ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
+        );
+      }
     } else {
       const newOrder = {
         id: Date.now().toString(),
@@ -228,10 +350,11 @@ export default function WaiterMode({
         date: nowDate,
         time: nowTime,
         status: 'Yangi',
-        items: cart,
+        items: normalizedCart,
         subTotal,
         subtotal: subTotal,
         serviceFee: feePct,
+        serviceFeePercent: feePct,
         serviceFeeAmount,
         total: totalAmount,
         finalTotal: totalAmount,
@@ -241,9 +364,15 @@ export default function WaiterMode({
       };
 
       updateOrders(prev => [newOrder, ...(Array.isArray(prev) ? prev : [])]);
+
+      if (typeof addAuditLog === 'function') {
+        addAuditLog(
+          'Yangi buyurtma ochildi',
+          `${selectedTable}: ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
+        );
+      }
     }
 
-    // Agar stolda bron bo'lgan bo'lsa, buyurtma ochilishi bilan bronni yopamiz
     if (activeBooking) {
       setReservations(prev => {
         const next = { ...(prev || {}) };
@@ -303,8 +432,7 @@ export default function WaiterMode({
     });
   };
 
-  const handleConvertReservationToOrder = (tableName, bookingData) => {
-    // Mijoz keldi deb bosilganda stolni darhol ochib beramiz
+  const handleConvertReservationToOrder = (tableName) => {
     setReservations(prev => {
       const next = { ...(prev || {}) };
       delete next[tableName];
@@ -374,7 +502,6 @@ export default function WaiterMode({
     });
   };
 
-  // Vaqtni to'xtatib, hisoblangan summani stolning chekiga qo'shish
   const handleFinishTimerAndAddToOrder = (tableName, timerStats) => {
     if (!timerStats) return;
 
@@ -456,7 +583,6 @@ export default function WaiterMode({
       updateOrders(prev => [newOrder, ...(Array.isArray(prev) ? prev : [])]);
     }
 
-    // Taymerni o'chirish
     setTableTimers(prev => {
       const next = { ...(prev || {}) };
       delete next[tableName];
@@ -496,7 +622,7 @@ export default function WaiterMode({
     );
 
     if (typeof addAuditLog === 'function') {
-      addAuditLog('Stol ko\'chirildi', `${transferOrder.table} -> ${targetTransferTable}`);
+      addAuditLog("Stol ko'chirildi", `${transferOrder.table} -> ${targetTransferTable}`);
     }
 
     setTransferOrder(null);
@@ -606,7 +732,7 @@ export default function WaiterMode({
           onCancelTableTimer={handleCancelTableTimer}
         />
       ) : (
-        /* 2-EKRAN: TANLANGAN STOL MENYUSI VA SAVATCHASI */
+        /* 2-EKRAN: TANLANGAN STOL MENYUSI VA SAVATCHASI (BARCHA PROP ALIASLARI BILAN) */
         <div className="space-y-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex justify-between items-center">
             <button
@@ -628,25 +754,51 @@ export default function WaiterMode({
             </div>
           </div>
 
-          <div className="h-[calc(100vh-190px)] min-h-[540px] flex flex-col lg:flex-row gap-6">
+          <div className="h-[calc(100vh-190px)] min-h-[560px] flex flex-col lg:flex-row gap-6">
             <WaiterMenu
               menuItems={safeMenu}
+              menu={safeMenu}
               menuCategories={safeCategories}
+              categories={safeCategories}
               selectedCategory={selectedCategory}
               setSelectedCategory={setSelectedCategory}
+              activeCategory={selectedCategory}
+              setActiveCategory={setSelectedCategory}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
+              searchTerm={searchQuery}
+              setSearchTerm={setSearchQuery}
+              cart={cart}
               onAddToCart={handleAddToCart}
+              addToCart={handleAddToCart}
+              onUpdateQuantity={handleUpdateQuantity}
             />
 
             <WaiterCart
               selectedTable={selectedTable}
+              table={selectedTable}
               cart={cart}
+              setCart={setCart}
               currentTableOrder={currentTableOrder}
+              activeOrder={currentTableOrder}
+              existingOrder={currentTableOrder}
+              serviceFee={serviceFee}
               onUpdateQuantity={handleUpdateQuantity}
+              updateQuantity={handleUpdateQuantity}
+              updateQty={handleUpdateQuantity}
+              onRemoveItem={handleRemoveFromCart}
+              removeFromCart={handleRemoveFromCart}
               onUpdateNote={handleUpdateNote}
+              updateItemNote={handleUpdateNote}
               onSubmitOrder={handleSubmitOrder}
+              submitOrder={handleSubmitOrder}
+              handleSendOrder={handleSubmitOrder}
               onMarkAsDelivered={handleMarkAsDelivered}
+              markAsServed={handleMarkAsDelivered}
+              onBack={() => {
+                setSelectedTable(null);
+                setCart([]);
+              }}
             />
           </div>
         </div>
