@@ -1,10 +1,26 @@
-import React, { useState } from 'react';
-import useSticky from '../hooks/useSticky';
-import {
-  DEFAULT_TELEGRAM_CONFIG,
-  detectTelegramChatId,
-  sendTelegramMessage
-} from '../utils/telegramNotifier';
+import React, { useState, useEffect } from 'react';
+
+const DEFAULT_TELEGRAM_CONFIG = {
+  enabled: false,
+  botToken: '',
+  chatId: '',
+  notifyOnZReport: true,
+  notifyOnDebt: true,
+  notifyOnDiscount: true,
+  notifyOnLowStock: true,
+  notifyOnEverySale: false,
+  notifyOnSecurity: true
+};
+
+const readTelegramConfig = () => {
+  try {
+    const raw = window.localStorage.getItem('pos_telegram_config');
+    if (!raw) return DEFAULT_TELEGRAM_CONFIG;
+    return { ...DEFAULT_TELEGRAM_CONFIG, ...(JSON.parse(raw) || {}) };
+  } catch {
+    return DEFAULT_TELEGRAM_CONFIG;
+  }
+};
 
 export default function AdminSettingsTab({ 
   cafeName = 'Premium Cafe', 
@@ -31,9 +47,6 @@ export default function AdminSettingsTab({
   requireAdminOverride,
   addAuditLog 
 }) {
-  // ==========================================
-  // 1. STATE'LAR
-  // ==========================================
   const [tempCafeName, setTempCafeName] = useState(cafeName || '');
   const [tempServiceFee, setTempServiceFee] = useState(
     serviceFee !== undefined ? String(serviceFee) : '10'
@@ -41,13 +54,18 @@ export default function AdminSettingsTab({
   const [newTableName, setNewTableName] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // TELEGRAM BOT SOZLAMALARI STATE'I
-  const [telegramConfig, setTelegramConfig] = useSticky(
-    'pos_telegram_config',
-    DEFAULT_TELEGRAM_CONFIG
-  );
+  // Telegram Bot sozlamalari (Bevoista localStorage bilan ishlaydi)
+  const [telegramConfig, setTelegramConfig] = useState(readTelegramConfig);
   const [showBotToken, setShowBotToken] = useState(false);
   const [tgStatus, setTgStatus] = useState({ loading: false, message: '', isError: false });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('pos_telegram_config', JSON.stringify(telegramConfig));
+    } catch {
+      // ignore storage error
+    }
+  }, [telegramConfig]);
 
   const safeTables = Array.isArray(tables) ? tables : [];
   const safeOrders = Array.isArray(orders) ? orders : [];
@@ -56,9 +74,6 @@ export default function AdminSettingsTab({
     .filter(o => o && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status))
     .map(o => o.table);
 
-  // ==========================================
-  // 2. ASOSIY SOZLAMALARNI SAQLASH
-  // ==========================================
   const handleSaveSettings = (e) => {
     e.preventDefault();
     const cleanedName = tempCafeName.trim();
@@ -89,7 +104,7 @@ export default function AdminSettingsTab({
   };
 
   // ==========================================
-  // 3. TELEGRAM BOT FUNKSIYALARI
+  // TELEGRAM ICHKI FUNKSIYALARI
   // ==========================================
   const updateTgField = (field, value) => {
     setTelegramConfig(prev => ({
@@ -99,33 +114,66 @@ export default function AdminSettingsTab({
     }));
   };
 
-  // Chat ID ni avtomatik topish (/getUpdates orqali)
   const handleAutoDetectChatId = async () => {
-    setTgStatus({ loading: true, message: 'Telegram bot tekshirilmoqda...', isError: false });
-    const res = await detectTelegramChatId(telegramConfig?.botToken);
+    const cleanToken = String(telegramConfig?.botToken || '').trim();
+    if (!cleanToken) {
+      setTgStatus({ loading: false, message: '❌ Avval Bot Tokenni kiriting!', isError: true });
+      return;
+    }
 
-    if (res.ok) {
-      updateTgField('chatId', res.chatId);
-      updateTgField('enabled', true);
-      setTgStatus({
-        loading: false,
-        message: `✅ Topildi! "${res.chatName}" (ID: ${res.chatId}) avtomatik ulandi.`,
-        isError: false
-      });
-      if (typeof addAuditLog === 'function') {
-        addAuditLog('Telegram Bot ulandi', `Chat ID: ${res.chatId} (${res.chatName})`);
+    setTgStatus({ loading: true, message: 'Telegram bot tekshirilmoqda...', isError: false });
+
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${cleanToken}/getUpdates`);
+      const data = await res.json();
+
+      if (!data.ok) {
+        setTgStatus({ loading: false, message: `❌ ${data.description || "Bot Token noto'g'ri!"}`, isError: true });
+        return;
       }
-    } else {
-      setTgStatus({
-        loading: false,
-        message: `❌ ${res.error}`,
-        isError: true
-      });
+
+      const updates = Array.isArray(data.result) ? data.result : [];
+      let foundId = '';
+      let foundName = '';
+
+      for (let i = updates.length - 1; i >= 0; i--) {
+        const msg = updates[i].message || updates[i].my_chat_member || updates[i].channel_post;
+        if (msg && msg.chat && msg.chat.id) {
+          foundId = String(msg.chat.id);
+          foundName = msg.chat.title || `${msg.chat.first_name || ''} ${msg.chat.last_name || ''}`.trim() || msg.chat.username || 'Foydalanuvchi';
+          break;
+        }
+      }
+
+      if (foundId) {
+        updateTgField('chatId', foundId);
+        updateTgField('enabled', true);
+        setTgStatus({
+          loading: false,
+          message: `✅ Topildi! "${foundName}" (ID: ${foundId}) avtomatik ulandi.`,
+          isError: false
+        });
+      } else {
+        setTgStatus({
+          loading: false,
+          message: "❌ Xabarlar topilmadi! Telegramda botingizga kirib '/start' bosing va qayta urinib ko'ring.",
+          isError: true
+        });
+      }
+    } catch {
+      setTgStatus({ loading: false, message: '❌ Internet aloqasini tekshiring!', isError: true });
     }
   };
 
-  // Sinov xabarini yuborish
   const handleSendTestTelegram = async () => {
+    const cleanToken = String(telegramConfig?.botToken || '').trim();
+    const rawChatIds = String(telegramConfig?.chatId || '').trim();
+
+    if (!cleanToken || !rawChatIds) {
+      setTgStatus({ loading: false, message: '❌ Bot Token va Chat ID ni kiriting!', isError: true });
+      return;
+    }
+
     setTgStatus({ loading: true, message: 'Sinov xabari yuborilmoqda...', isError: false });
 
     const testHtml = [
@@ -138,28 +186,35 @@ export default function AdminSettingsTab({
       `✅ Endi smena hisobotlari (Z-Otchyot), qarzlar, chegirmalar va ombor ogohlantirishlari shu yerga jonli kelib tushadi!`
     ].join('\n');
 
-    const res = await sendTelegramMessage(testHtml, 'test', {
-      ...telegramConfig,
-      enabled: true
-    });
+    try {
+      const chatIds = rawChatIds.split(',').map(s => s.trim()).filter(Boolean);
+      const responses = await Promise.all(
+        chatIds.map(id =>
+          fetch(`https://api.telegram.org/bot${cleanToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: id,
+              text: testHtml,
+              parse_mode: 'HTML'
+            })
+          }).then(r => r.json())
+        )
+      );
 
-    if (res.ok) {
-      setTgStatus({
-        loading: false,
-        message: '✅ Sinov xabari Telegramingizga muvaffaqiyatli yuborildi!',
-        isError: false
-      });
-    } else {
-      setTgStatus({
-        loading: false,
-        message: `❌ Xatolik: ${res.error}`,
-        isError: true
-      });
+      const errObj = responses.find(r => !r.ok);
+      if (errObj) {
+        setTgStatus({ loading: false, message: `❌ Xatolik: ${errObj.description}`, isError: true });
+      } else {
+        setTgStatus({ loading: false, message: '✅ Sinov xabari Telegramingizga muvaffaqiyatli yuborildi!', isError: false });
+      }
+    } catch {
+      setTgStatus({ loading: false, message: '❌ Internet aloqasi yo\'q!', isError: true });
     }
   };
 
   // ==========================================
-  // 4. ZAL STOLLARINI BOSHQARISH
+  // STOLLAR VA ZAXIRA BOSHQARUVI
   // ==========================================
   const handleAddTable = (e) => {
     e.preventDefault();
@@ -196,9 +251,6 @@ export default function AdminSettingsTab({
     }
   };
 
-  // ==========================================
-  // 5. ZAXIRA NUSXA (BACKUP & RESTORE) VA TOZALASH
-  // ==========================================
   const handleExportBackup = () => {
     const backupPayload = {
       version: '2.0',
@@ -227,10 +279,6 @@ export default function AdminSettingsTab({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-
-    if (typeof addAuditLog === 'function') {
-      addAuditLog("Baza eksport qilindi", "To'liq zaxira nusxa (.json) yuklab olindi");
-    }
   };
 
   const handleImportBackup = (e) => {
@@ -241,9 +289,7 @@ export default function AdminSettingsTab({
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result);
-        if (!parsed || typeof parsed !== 'object') {
-          throw new Error("Noto'g'ri fayl formati");
-        }
+        if (!parsed || typeof parsed !== 'object') throw new Error("Noto'g'ri fayl");
 
         if (!window.confirm("⚠️ Diqqat! Tanlangan zaxira faylidagi ma'lumotlar hozirgi baza ustiga yoziladi. Tasdiqlaysizmi?")) {
           return;
@@ -260,10 +306,6 @@ export default function AdminSettingsTab({
         if (Array.isArray(parsed.orders) && typeof setOrders === 'function') setOrders(parsed.orders);
         if (parsed.telegramConfig) setTelegramConfig(parsed.telegramConfig);
 
-        if (typeof addAuditLog === 'function') {
-          addAuditLog("Baza tiklandi (Restore)", `Zaxira fayldan (${file.name}) ma'lumotlar tiklandi`);
-        }
-
         alert("✅ Zaxira nusxa muvaffaqiyatli tiklandi!");
       } catch {
         alert("❌ Xatolik! Tanlangan fayl yaroqsiz yoki buzilgan.");
@@ -275,11 +317,8 @@ export default function AdminSettingsTab({
 
   const handleClearOrdersOnly = () => {
     const performClear = () => {
-      if (window.confirm("⚠️ Barcha yopilgan va ochiq cheklar tarixi o'chiriladi (Menyu, Xodimlar va Ombor saqlanib qoladi). Tasdiqlaysizmi?")) {
+      if (window.confirm("⚠️ Barcha yopilgan va ochiq cheklar tarixi o'chiriladi. Tasdiqlaysizmi?")) {
         if (typeof setOrders === 'function') setOrders([]);
-        if (typeof addAuditLog === 'function') {
-          addAuditLog("Cheklar tozalandi", "Barcha buyurtmalar va cheklar tarixi o'chirildi");
-        }
         alert("✅ Cheklar tarixi tozalandi!");
       }
     };
@@ -293,26 +332,23 @@ export default function AdminSettingsTab({
 
   const handleFactoryReset = () => {
     const performReset = () => {
-      if (window.confirm("🛑 OXIRGI OGOHLANTIRISH!\nBarcha ma'lumotlar o'chirilib, dastur zavod holatiga qaytadi. Davom etamizmi?")) {
+      if (window.confirm("🛑 Barcha ma'lumotlar o'chirilib, dastur zavod holatiga qaytadi. Davom etamizmi?")) {
         window.localStorage.clear();
         window.location.reload();
       }
     };
 
     if (typeof requireAdminOverride === 'function') {
-      requireAdminOverride("Tizimni zavod holatiga qaytarish (Factory Reset)", performReset);
+      requireAdminOverride("Tizimni zavod holatiga qaytarish", performReset);
     } else {
       performReset();
     }
   };
 
-  // ==========================================
-  // 6. RENDER (UI DIZAYN)
-  // ==========================================
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
       
-      {/* 1-BLOK: ASOSIY KAFE VA XIZMAT HAQI SOZLAMALARI */}
+      {/* 1-BLOK: ASOSIY SOZLAMALAR */}
       <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
           <div>
@@ -390,9 +426,7 @@ export default function AdminSettingsTab({
         </form>
       </div>
 
-      {/* =================================================================
-          2-BLOK: ✈️ TELEGRAM BOT XABARNOMA MARKAZI (YANGI PRO MODUL)
-          ================================================================= */}
+      {/* 2-BLOK: TELEGRAM BOT XABARNOMA MARKAZI */}
       <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border-2 border-sky-100 dark:border-sky-900/40 space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 dark:border-gray-700 pb-4">
           <div className="flex items-center gap-3">
@@ -409,7 +443,6 @@ export default function AdminSettingsTab({
             </div>
           </div>
 
-          {/* Yoqish / O'chirish Switch */}
           <button
             type="button"
             onClick={() => updateTgField('enabled', !telegramConfig?.enabled)}
@@ -423,7 +456,6 @@ export default function AdminSettingsTab({
           </button>
         </div>
 
-        {/* Bot Token va Chat ID kiritish */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
@@ -441,7 +473,6 @@ export default function AdminSettingsTab({
                 type="button"
                 onClick={() => setShowBotToken(prev => !prev)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-white text-sm"
-                title="Tokenni ko'rsatish / yashirish"
               >
                 {showBotToken ? '🙈' : '👁'}
               </button>
@@ -465,7 +496,6 @@ export default function AdminSettingsTab({
                 onClick={handleAutoDetectChatId}
                 disabled={tgStatus.loading}
                 className="px-4 py-3.5 rounded-xl bg-sky-100 dark:bg-sky-900/40 hover:bg-sky-200 text-sky-700 dark:text-sky-300 font-black text-xs whitespace-nowrap transition active:scale-95 disabled:opacity-50"
-                title="Botingizga /start bosib, shu tugmani bosing — ID avtomatik topiladi"
               >
                 🔍 ID ni topish
               </button>
@@ -473,7 +503,6 @@ export default function AdminSettingsTab({
           </div>
         </div>
 
-        {/* Qaysi xabarlar yuborilishini tanlash */}
         <div>
           <p className="text-xs font-black uppercase tracking-wider text-gray-400 mb-3">
             Qaysi holatlarda Telegramga xabar yuborilsin?
@@ -485,7 +514,7 @@ export default function AdminSettingsTab({
               { key: 'notifyOnDiscount', icon: '🎁', title: 'Chegirma (Skidka) berilganda', desc: 'Kassir chegirma qilgan cheklar nazorati' },
               { key: 'notifyOnLowStock', icon: '⚠️', title: 'Ombor kam qolganda', desc: 'Masalliq qizil chegaradan tushganda' },
               { key: 'notifyOnEverySale', icon: '🧾', title: 'Har bir yopilgan chekda', desc: 'Barcha sotuvlarni bittalab jonli kuzatish' },
-              { key: 'notifyOnSecurity', icon: '🛡️', title: 'Xavfsizlik amallarida', desc: 'Muhim o\'chirish va Admin tasdiqlari' }
+              { key: 'notifyOnSecurity', icon: '🛡️', title: 'Xavfsizlik amallarida', desc: "Muhim o'chirish va Admin tasdiqlari" }
             ].map(opt => {
               const isChecked = Boolean(telegramConfig?.[opt.key]);
               return (
@@ -518,7 +547,6 @@ export default function AdminSettingsTab({
           </div>
         </div>
 
-        {/* Status xabari va Test tugmasi */}
         {tgStatus.message && (
           <div className={`p-3.5 rounded-2xl text-xs font-black ${
             tgStatus.isError
@@ -531,7 +559,7 @@ export default function AdminSettingsTab({
 
         <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
           <div className="text-[11px] font-bold text-gray-400 leading-relaxed">
-            💡 <b>Qanday ulanadi?</b> 1) Telegramda <b>@BotFather</b> ga kirib <code>/newbot</code> orqali bot oching va Tokenni nusxalang. 2) Yangi botingizga kirib <b>Start</b> bosing. 3) Shu yerda <b>"🔍 ID ni topish"</b> tugmasini bosing.
+            💡 1) <b>@BotFather</b> dan Token oling. 2) Botingizga kirib <b>Start</b> bosing. 3) <b>"🔍 ID ni topish"</b> tugmasini bosing.
           </div>
 
           <button
@@ -546,77 +574,69 @@ export default function AdminSettingsTab({
       </div>
 
       {/* 3-BLOK: ZAL STOLLARINI BOSHQARISH */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
-        <div>
-          <h3 className="text-lg font-black text-gray-900 dark:text-white">
-            🪑 Zal Stollari va Kabinalar Boshqaruvi ({safeTables.length} ta)
-          </h3>
-          <p className="text-xs font-bold text-gray-500 mt-1">
-            Ofitsiant va QR-Menyuda ko'rinadigan stollar yoki VIP-xonalar ro'yxati
-          </p>
-        </div>
+      {safeTables.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
+          <div>
+            <h3 className="text-lg font-black text-gray-900 dark:text-white">
+              🪑 Zal Stollari va Kabinalar Boshqaruvi ({safeTables.length} ta)
+            </h3>
+          </div>
 
-        <form onSubmit={handleAddTable} className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
-            value={newTableName}
-            onChange={e => setNewTableName(e.target.value)}
-            placeholder="Yangi stol yoki xona nomi (Masalan: 16-Stol yoki VIP-1)"
-            className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-amber-500"
-          />
-          <button
-            type="submit"
-            className="px-6 py-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-sm shadow-md transition active:scale-95 whitespace-nowrap"
-          >
-            + Stol Qo'shish
-          </button>
-        </form>
+          <form onSubmit={handleAddTable} className="flex flex-col sm:flex-row gap-3">
+            <input
+              type="text"
+              value={newTableName}
+              onChange={e => setNewTableName(e.target.value)}
+              placeholder="Yangi stol yoki xona nomi (Masalan: 16-Stol yoki VIP-1)"
+              className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-amber-500"
+            />
+            <button
+              type="submit"
+              className="px-6 py-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-sm shadow-md transition active:scale-95 whitespace-nowrap"
+            >
+              + Stol Qo'shish
+            </button>
+          </form>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
-          {safeTables.map(tName => {
-            const isBusy = activeTableNames.includes(tName);
-            return (
-              <div
-                key={tName}
-                className={`p-3 rounded-xl border flex justify-between items-center gap-2 ${
-                  isBusy
-                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700'
-                    : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-gray-700'
-                }`}
-              >
-                <div className="truncate">
-                  <span className="font-black text-xs sm:text-sm text-gray-800 dark:text-gray-200 block truncate">
-                    {tName}
-                  </span>
-                  <span className="text-[10px] font-bold text-gray-400">
-                    {isBusy ? '🔴 Band' : '🟢 Bo\'sh'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteTable(tName)}
-                  className="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-900/30 hover:bg-red-100 text-red-500 font-black text-xs flex items-center justify-center shrink-0 transition"
-                  title="Stolni o'chirish"
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+            {safeTables.map(tName => {
+              const isBusy = activeTableNames.includes(tName);
+              return (
+                <div
+                  key={tName}
+                  className={`p-3 rounded-xl border flex justify-between items-center gap-2 ${
+                    isBusy
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700'
+                      : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-gray-700'
+                  }`}
                 >
-                  ✕
-                </button>
-              </div>
-            );
-          })}
+                  <div className="truncate">
+                    <span className="font-black text-xs sm:text-sm text-gray-800 dark:text-gray-200 block truncate">
+                      {tName}
+                    </span>
+                    <span className="text-[10px] font-bold text-gray-400">
+                      {isBusy ? '🔴 Band' : "🟢 Bo'sh"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTable(tName)}
+                    className="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-900/30 hover:bg-red-100 text-red-500 font-black text-xs flex items-center justify-center shrink-0 transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* 4-BLOK: MA'LUMOTLAR BAZASI ZAXIRASI (BACKUP & RESTORE) */}
+      {/* 4-BLOK: BACKUP & RESTORE */}
       <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
-        <div>
-          <h3 className="text-lg font-black text-gray-900 dark:text-white">
-            💾 Ma'lumotlar Bazasini Zaxiralash (Backup & Restore)
-          </h3>
-          <p className="text-xs font-bold text-gray-500 mt-1">
-            Barcha menyu, ombor, xodimlar va cheklarni kompyuterga fayl qilib saqlab qo'ying yoki boshqa qurilmaga ko'chiring
-          </p>
-        </div>
-
+        <h3 className="text-lg font-black text-gray-900 dark:text-white">
+          💾 Ma'lumotlar Bazasini Zaxiralash (Backup & Restore)
+        </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <button
             type="button"
@@ -624,39 +644,22 @@ export default function AdminSettingsTab({
             className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 border-2 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-black text-sm flex items-center justify-center gap-3 transition active:scale-95"
           >
             <span className="text-2xl">📥</span>
-            <div className="text-left">
-              <span className="block">Zaxira Nusxa Yuklab Olish (.json)</span>
-              <span className="text-[11px] font-bold opacity-75">Kompyuterga saqlash</span>
-            </div>
+            <span>Zaxira Nusxa Yuklab Olish (.json)</span>
           </button>
 
           <label className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 border-2 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-black text-sm flex items-center justify-center gap-3 cursor-pointer transition active:scale-95">
             <span className="text-2xl">📤</span>
-            <div className="text-left">
-              <span className="block">Zaxiradan Tiklash (Restore)</span>
-              <span className="text-[11px] font-bold opacity-75">.json faylni tanlang</span>
-            </div>
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImportBackup}
-              className="hidden"
-            />
+            <span>Zaxiradan Tiklash (.json)</span>
+            <input type="file" accept=".json" onChange={handleImportBackup} className="hidden" />
           </label>
         </div>
       </div>
 
-      {/* 5-BLOK: XAVFLI HUDUD (DANGER ZONE) */}
+      {/* 5-BLOK: XAVFLI HUDUD */}
       <div className="bg-red-50/60 dark:bg-red-900/10 rounded-3xl p-6 md:p-8 border-2 border-red-200 dark:border-red-900/40 space-y-4">
-        <div>
-          <h3 className="text-lg font-black text-red-700 dark:text-red-400">
-            ⚠️ Xavfli Hudud (Tizimni Tozalash)
-          </h3>
-          <p className="text-xs font-bold text-red-600/80 dark:text-red-300/80 mt-1">
-            Ushbu amallar faqat Rahbar PIN-kodi bilan bajariladi. Ehtiyotkorlik bilan foydalaning!
-          </p>
-        </div>
-
+        <h3 className="text-lg font-black text-red-700 dark:text-red-400">
+          ⚠️ Xavfli Hudud (Tizimni Tozalash)
+        </h3>
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"
