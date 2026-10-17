@@ -5,7 +5,46 @@ import CashierReceipt from './CashierReceipt';
 import CashierPaymentControls from './CashierPaymentControls';
 
 // ==========================================
-// 1. XARAJAT TOIFALARI RO'YXATI
+// 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
+// ==========================================
+const DEFAULT_CUSTOMERS = [
+  {
+    id: 'cust_1',
+    name: 'Sardor aka (Doimiy mijoz)',
+    phone: '998901234567',
+    bonusBalance: 25000,
+    totalSpent: 1450000,
+    visitsCount: 12,
+    lastVisit: new Date().toLocaleDateString()
+  },
+  {
+    id: 'cust_2',
+    name: 'Dilshod bek (VIP)',
+    phone: '998977777777',
+    bonusBalance: 85000,
+    totalSpent: 4200000,
+    visitsCount: 28,
+    lastVisit: new Date().toLocaleDateString()
+  }
+];
+
+// Mijozning umumiy xarid summasiga qarab VIP darajasi va Cashback foizini aniqlash
+const getCustomerTierInfo = (totalSpent = 0) => {
+  const spent = Number(totalSpent) || 0;
+  if (spent >= 3000000) {
+    return { tierName: '🥇 Oltin VIP', percent: 10, badgeClass: 'bg-amber-100 text-amber-800 border-amber-300' };
+  }
+  if (spent >= 1000000) {
+    return { tierName: '🥈 Kumush', percent: 7, badgeClass: 'bg-slate-200 text-slate-800 border-slate-300' };
+  }
+  return { tierName: '🥉 Standart', percent: 5, badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+};
+
+// Telefon raqamni faqat raqamlardan iborat holatga keltirish (90 123-45-67 -> 901234567)
+const cleanPhoneDigits = (str) => String(str || '').replace(/\D/g, '');
+
+// ==========================================
+// 2. XARAJAT TOIFALARI RO'YXATI
 // ==========================================
 const EXPENSE_CATEGORIES = [
   { id: 'Bozorlik', label: '🍅 Bozorlik va mahsulot xaridi', isInkassatsiya: false },
@@ -18,7 +57,7 @@ const EXPENSE_CATEGORIES = [
 ];
 
 // ==========================================
-// 2. O'LCHOV BIRLIKLARI KONVERTORI (OMBOR UCHUN)
+// 3. O'LCHOV BIRLIKLARI KONVERTORI (OMBOR UCHUN)
 // ==========================================
 const UNIT_FACTORS = {
   gr: { family: 'weight', factor: 1 },
@@ -56,7 +95,7 @@ const convertRecipeToInventoryUnit = (amount, fromUnit, toInvUnit) => {
 };
 
 // ==========================================
-// 3. ICHKI XAVFSIZ TELEGRAM XABAR YUBORGICH
+// 4. ICHKI XAVFSIZ TELEGRAM XABAR YUBORGICH
 // ==========================================
 const escapeHtml = (str) =>
   String(str ?? '')
@@ -94,7 +133,7 @@ async function sendCashierTelegramAlert(linesArray, checkKey = null) {
       )
     );
   } catch {
-    // Internet bo'lmasa kassa ishlashiga xalaqit bermaydi
+    // Internet bo'lmasa kassa odatdagidek ishlayveradi
   }
 }
 
@@ -108,6 +147,8 @@ export default function CashierMode({
   setInventoryLogs,
   expenses,
   setExpenses,
+  customers: customersProp,
+  setCustomers: setCustomersProp,
   serviceFee = 10,
   cafeName,
   currentUser,
@@ -124,6 +165,7 @@ export default function CashierMode({
   const [stickyInventory, setStickyInventory] = useSticky('pos_inventory', []);
   const [, setStickyInventoryLogs] = useSticky('pos_inventory_logs', []);
   const [stickyExpenses, setStickyExpenses] = useSticky('pos_expenses', []);
+  const [stickyCustomers, setStickyCustomers] = useSticky('pos_customers', DEFAULT_CUSTOMERS);
   const [stickyCafeName] = useSticky('pos_cafe_name', 'Premium Cafe');
 
   const safeOrders = useMemo(() => {
@@ -146,15 +188,21 @@ export default function CashierMode({
     return Array.isArray(stickyExpenses) ? stickyExpenses : [];
   }, [expenses, stickyExpenses]);
 
+  const safeCustomers = useMemo(() => {
+    if (Array.isArray(customersProp)) return customersProp;
+    return Array.isArray(stickyCustomers) ? stickyCustomers : DEFAULT_CUSTOMERS;
+  }, [customersProp, stickyCustomers]);
+
   const resolvedCafeName = cafeName || stickyCafeName || 'Premium Cafe';
   const updateOrders = typeof setOrders === 'function' ? setOrders : setStickyOrders;
   const updateInventory = typeof setInventory === 'function' ? setInventory : setStickyInventory;
   const updateInventoryLogs = typeof setInventoryLogs === 'function' ? setInventoryLogs : setStickyInventoryLogs;
   const updateExpenses = typeof setExpenses === 'function' ? setExpenses : setStickyExpenses;
+  const updateCustomers = typeof setCustomersProp === 'function' ? setCustomersProp : setStickyCustomers;
   const triggerPrintModal = onPrintReceipt || setReceiptToPrint;
 
   // ==========================================
-  // 2. KASSA VA XARAJATLAR STATE'LARI
+  // 2. KASSA, XARAJAT VA CRM STATE'LARI
   // ==========================================
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'debt'
   const [selectedOrderId, setSelectedOrderId] = useState(null);
@@ -167,19 +215,49 @@ export default function CashierMode({
   const [mixedCard, setMixedCard] = useState('');
   const [debtorName, setDebtorName] = useState('');
 
-  // YANGI: Kassadan Chiqim / Xarajat Modallari statelari
+  // CRM (Mijoz va Bonus) statelari
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [useBonusAmount, setUseBonusAmount] = useState('');
+  const [isCrmModalOpen, setIsCrmModalOpen] = useState(false);
+  const [crmSearch, setCrmSearch] = useState('');
+  const [newCrmCustomer, setNewCrmCustomer] = useState({ name: '', phone: '', initialBonus: '' });
+
+  // Xarajat va Inkassatsiya Modallari statelari
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isExpenseListModalOpen, setIsExpenseListModalOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     category: EXPENSE_CATEGORIES[0].id,
     amount: '',
-    paymentSource: 'Naqd', // 'Naqd' | 'Plastik'
+    paymentSource: 'Naqd',
     recipient: '',
     note: ''
   });
 
   // ==========================================
-  // 3. CHEKLAR VA KASSA SEYFI BALANSI HISOB-KITOBI
+  // 3. MIJOZNI TELEFON YOKI ISM ORQALI TOPISH
+  // ==========================================
+  const matchedCustomer = useMemo(() => {
+    const rawQuery = customerPhone.trim();
+    if (!rawQuery || rawQuery.length < 3) return null;
+
+    const queryDigits = cleanPhoneDigits(rawQuery);
+    const queryLower = rawQuery.toLowerCase();
+
+    return (
+      safeCustomers.find(c => {
+        if (!c) return false;
+        const cDigits = cleanPhoneDigits(c.phone);
+        if (queryDigits.length >= 4 && cDigits.endsWith(queryDigits)) return true;
+        if (queryDigits.length >= 7 && cDigits.includes(queryDigits)) return true;
+        if (String(c.name || '').toLowerCase().includes(queryLower)) return true;
+        return false;
+      }) || null
+    );
+  }, [safeCustomers, customerPhone]);
+
+  // ==========================================
+  // 4. CHEKLAR VA KASSA SEYFI BALANSI
   // ==========================================
   const activeOrders = useMemo(() => {
     return safeOrders.filter(
@@ -191,19 +269,15 @@ export default function CashierMode({
     return safeOrders.filter(o => o && o.status === 'Qarz');
   }, [safeOrders]);
 
-  // Joriy smenada to'langan cheklar
   const currentShiftPaidOrders = useMemo(() => {
     return safeOrders.filter(o => o && o.status === "To'langan");
   }, [safeOrders]);
 
-  // Joriy smenadagi faol xarajatlar (Arxivga o'tmaganlari)
   const currentShiftExpenses = useMemo(() => {
     return safeExpenses.filter(e => e && e.status !== 'Arxiv');
   }, [safeExpenses]);
 
-  // Kassa Seyfi (Cash Drawer) jonli balansi
   const cashDrawerSummary = useMemo(() => {
-    // 1. Smenada kirgan jami Naqd pul (Naqd cheklar + Aralash to'lovning naqd qismi)
     let cashSalesIn = 0;
     let cardSalesIn = 0;
 
@@ -221,30 +295,18 @@ export default function CashierMode({
       }
     });
 
-    // 2. Smenada kassadan chiqqan Naqd va Plastik chiqimlar
     let cashExpensesOut = 0;
     let cardExpensesOut = 0;
-    let operationalExpensesTotal = 0;
-    let inkassatsiyaTotal = 0;
 
     currentShiftExpenses.forEach(exp => {
       const amt = Number(exp.amount) || 0;
-      const isInkass = exp.category === 'Inkassatsiya' || exp.isInkassatsiya;
-
       if (exp.paymentSource === 'Plastik') {
         cardExpensesOut += amt;
       } else {
         cashExpensesOut += amt;
       }
-
-      if (isInkass) {
-        inkassatsiyaTotal += amt;
-      } else {
-        operationalExpensesTotal += amt;
-      }
     });
 
-    // 3. Seyfda (Kassa tortmasida) hozir bo'lishi shart bo'lgan aniq naqd pul
     const expectedCashInDrawer = cashSalesIn - cashExpensesOut;
 
     return {
@@ -252,8 +314,6 @@ export default function CashierMode({
       cardSalesIn,
       cashExpensesOut,
       cardExpensesOut,
-      operationalExpensesTotal,
-      inkassatsiyaTotal,
       totalOutflow: cashExpensesOut + cardExpensesOut,
       expectedCashInDrawer
     };
@@ -265,7 +325,7 @@ export default function CashierMode({
   }, [activeOrders, selectedOrderId]);
 
   // ==========================================
-  // 4. TANLANGAN CHEK MATEMATIKASI (TOTALS)
+  // 5. CHEK SUMMASI, BONUS VA CASHBACK MATEMATIKASI
   // ==========================================
   const totals = useMemo(() => {
     if (!selectedOrder) {
@@ -274,7 +334,11 @@ export default function CashierMode({
         serviceFeePercent: 0,
         serviceFeeAmount: 0,
         discountAmount: 0,
-        finalTotal: 0
+        maxUsableBonus: 0,
+        usedBonusAmount: 0,
+        finalTotal: 0,
+        cashbackPercent: 5,
+        earnedCashback: 0
       };
     }
 
@@ -304,19 +368,41 @@ export default function CashierMode({
       discountAmount = Math.min(grossTotal, rawDiscVal);
     }
 
-    const finalTotal = Math.max(0, grossTotal - discountAmount);
+    const afterDiscountTotal = Math.max(0, grossTotal - discountAmount);
+
+    // Mijozning mavjud bonusidan qancha qismini ishlatish mumkin?
+    const customerAvailableBonus = Number(matchedCustomer?.bonusBalance || 0);
+    const maxUsableBonus = paymentMethod === 'Qarz'
+      ? 0
+      : Math.min(customerAvailableBonus, afterDiscountTotal);
+
+    const rawRequestedBonus = Math.max(0, Number(useBonusAmount) || 0);
+    const usedBonusAmount = Math.min(maxUsableBonus, rawRequestedBonus);
+
+    const finalTotal = Math.max(0, afterDiscountTotal - usedBonusAmount);
+
+    // Cashback foizi va yig'iladigan yangi bonus (Faqat naqd/karta to'langan qismdan yig'iladi)
+    const tierInfo = getCustomerTierInfo(matchedCustomer?.totalSpent || 0);
+    const hasCustomer = Boolean(matchedCustomer || customerPhone.trim().length >= 4);
+    const earnedCashback = (hasCustomer && paymentMethod !== 'Qarz' && finalTotal > 0)
+      ? Math.round((finalTotal * tierInfo.percent) / 100)
+      : 0;
 
     return {
       subTotal,
       serviceFeePercent: effectiveFeePercent,
       serviceFeeAmount,
       discountAmount,
-      finalTotal
+      maxUsableBonus,
+      usedBonusAmount,
+      finalTotal,
+      cashbackPercent: tierInfo.percent,
+      earnedCashback
     };
-  }, [selectedOrder, serviceFee, discountType, discountValue]);
+  }, [selectedOrder, serviceFee, discountType, discountValue, matchedCustomer, useBonusAmount, paymentMethod, customerPhone]);
 
   // ==========================================
-  // 5. FORMALARNI TOZALASH VA CHEK TANLASH
+  // 6. FORMALARNI TOZALASH VA CHEK TANLASH
   // ==========================================
   const resetPaymentControls = () => {
     setDiscountType('none');
@@ -325,6 +411,9 @@ export default function CashierMode({
     setMixedCash('');
     setMixedCard('');
     setDebtorName('');
+    setCustomerPhone('');
+    setCustomerName('');
+    setUseBonusAmount('');
   };
 
   const handleSelectOrder = (order) => {
@@ -335,6 +424,10 @@ export default function CashierMode({
     }
     setSelectedOrderId(order.id);
     resetPaymentControls();
+    // Agar buyurtmaning o'zida mijoz telefoni bo'lsa (masalan QR-menyudan), avtomatik to'ldiramiz
+    if (order.customerPhone) {
+      setCustomerPhone(order.customerPhone);
+    }
   };
 
   const handleMixedCashChange = (val) => {
@@ -354,7 +447,51 @@ export default function CashierMode({
   };
 
   // ==========================================
-  // 6. KASSADAN XARAJAT / CHIQIM QO'SHISH VA O'CHIRISH
+  // 7. CRM MIJOZLAR BAZASINI BOSHQARISH FUNKSIYALARI
+  // ==========================================
+  const handleCreateCrmCustomer = (e) => {
+    e.preventDefault();
+    const cleanName = newCrmCustomer.name.trim();
+    const cleanPhone = cleanPhoneDigits(newCrmCustomer.phone);
+    const initBonus = Math.max(0, Number(newCrmCustomer.initialBonus) || 0);
+
+    if (!cleanName || cleanPhone.length < 7) {
+      alert("Iltimos, mijoz ismini va to'g'ri telefon raqamini kiriting!");
+      return;
+    }
+
+    const exists = safeCustomers.some(c => cleanPhoneDigits(c?.phone) === cleanPhone);
+    if (exists) {
+      alert("⛔️ Ushbu telefon raqamli mijoz bazada allaqachon mavjud!");
+      return;
+    }
+
+    const created = {
+      id: `cust_${Date.now()}`,
+      name: cleanName,
+      phone: newCrmCustomer.phone.trim(),
+      bonusBalance: initBonus,
+      totalSpent: 0,
+      visitsCount: 0,
+      lastVisit: new Date().toLocaleDateString()
+    };
+
+    updateCustomers(prev => [created, ...(Array.isArray(prev) ? prev : [])]);
+    setNewCrmCustomer({ name: '', phone: '', initialBonus: '' });
+
+    if (typeof addAuditLog === 'function') {
+      addAuditLog('CRM: Yangi mijoz', `${cleanName} (${created.phone}) • Bonus: ${initBonus.toLocaleString()} s`);
+    }
+  };
+
+  const handleDeleteCustomer = (cust) => {
+    if (!cust) return;
+    if (!window.confirm(`Rostdan ham "${cust.name}" ni mijozlar bazasidan o'chirmoqchimisiz?`)) return;
+    updateCustomers(prev => (Array.isArray(prev) ? prev : []).filter(c => c.id !== cust.id));
+  };
+
+  // ==========================================
+  // 8. KASSADAN XARAJAT / CHIQIM QO'SHISH
   // ==========================================
   const handleSaveExpense = (e) => {
     e.preventDefault();
@@ -363,23 +500,21 @@ export default function CashierMode({
     const cleanRecipient = (expenseForm.recipient || '').trim();
 
     if (isNaN(amountNum) || amountNum <= 0) {
-      alert("Iltimos, xarajat summasini to'g'ri (0 dan katta) raqamda kiriting!");
+      alert("Iltimos, xarajat summasini to'g'ri kiriting!");
       return;
     }
-
     if (!cleanNote) {
-      alert("Iltimos, xarajat sababini (izohni) kiriting! (Masalan: 20 ta non olindi)");
+      alert("Iltimos, xarajat sababini (izohni) kiriting!");
       return;
     }
 
-    // Agar Naqd kassadan chiqim qilinayotgan bo'lsa va kassada naqd pul yetmasa ogohlantiramiz
     if (
       expenseForm.paymentSource === 'Naqd' &&
       amountNum > cashDrawerSummary.expectedCashInDrawer
     ) {
       const proceed = window.confirm(
-        `⚠️ Diqqat! Hozir kassada smena bo'yicha ${cashDrawerSummary.expectedCashInDrawer.toLocaleString()} so'm naqd pul bor.\n` +
-        `Siz ${amountNum.toLocaleString()} so'm chiqim kiritmoqdasiz (Kassa balansi manfiyga o'tadi). Davom etamizmi?`
+        `⚠️ Diqqat! Hozir seyfda ${cashDrawerSummary.expectedCashInDrawer.toLocaleString()} so'm naqd pul bor.\n` +
+        `Siz ${amountNum.toLocaleString()} so'm chiqim kiritmoqdasiz. Davom etamizmi?`
       );
       if (!proceed) return;
     }
@@ -394,11 +529,11 @@ export default function CashierMode({
       categoryLabel: catObj.label,
       isInkassatsiya: Boolean(catObj.isInkassatsiya),
       amount: Math.round(amountNum),
-      paymentSource: expenseForm.paymentSource, // 'Naqd' | 'Plastik'
+      paymentSource: expenseForm.paymentSource,
       recipient: cleanRecipient || '-',
       note: cleanNote,
       cashierName: currentUser?.name || 'Kassir',
-      status: 'Faol' // Smena yopilganda 'Arxiv' ga o'tadi
+      status: 'Faol'
     };
 
     updateExpenses(prev => [newExpense, ...(Array.isArray(prev) ? prev : [])]);
@@ -406,31 +541,20 @@ export default function CashierMode({
     if (typeof addAuditLog === 'function') {
       addAuditLog(
         newExpense.isInkassatsiya ? 'Kassa: Inkassatsiya' : 'Kassa: Kunlik Xarajat',
-        `${newExpense.category}: -${newExpense.amount.toLocaleString()} s (${newExpense.paymentSource}) • Sabab: ${newExpense.note}`
+        `${newExpense.category}: -${newExpense.amount.toLocaleString()} s (${newExpense.paymentSource}) • ${newExpense.note}`
       );
     }
-
-    // ✈️ Rahbarning Telegramiga darhol chiqim xabarini yuborish
-    const nextCashBalance = expenseForm.paymentSource === 'Naqd'
-      ? cashDrawerSummary.expectedCashInDrawer - newExpense.amount
-      : cashDrawerSummary.expectedCashInDrawer;
 
     sendCashierTelegramAlert(
       [
         newExpense.isInkassatsiya
-          ? `🏦 <b>INKASSATSIYA — KASSADAN PUL TOPSHIRILDI</b>`
-          : `💸 <b>KASSADAN CHIQIM (XARAJAT) KIRITILDI</b>`,
+          ? `🏦 <b>INKASSATSIYA — PUL TOPSHIRILDI</b>`
+          : `💸 <b>KASSADAN XARAJAT KIRITILDI</b>`,
         `🏪 <b>Kafe:</b> ${escapeHtml(resolvedCafeName)}`,
-        `━━━━━━━━━━━━━━━━━━`,
         `📂 <b>Toifa:</b> ${escapeHtml(catObj.label)}`,
-        `💰 <b>Summa:</b> <b>-${newExpense.amount.toLocaleString()} so'm</b>`,
-        `💳 <b>Manba:</b> Kassadagi ${escapeHtml(newExpense.paymentSource)} puldan`,
-        cleanRecipient ? `👤 <b>Kimga berildi:</b> ${escapeHtml(cleanRecipient)}` : null,
-        `📝 <b>Sababi / Izoh:</b> ${escapeHtml(cleanNote)}`,
-        `💻 <b>Kiritdi:</b> ${escapeHtml(newExpense.cashierName)}`,
-        `🕒 <b>Vaqt:</b> ${escapeHtml(nowStr)}`,
-        `━━━━━━━━━━━━━━━━━━`,
-        `🗄 <b>Seyfda qolgan naqd pul:</b> <b>${nextCashBalance.toLocaleString()} so'm</b>`
+        `💰 <b>Summa:</b> <b>-${newExpense.amount.toLocaleString()} so'm</b> (${escapeHtml(newExpense.paymentSource)})`,
+        `📝 <b>Sababi:</b> ${escapeHtml(cleanNote)}`,
+        `💻 <b>Kassir:</b> ${escapeHtml(newExpense.cashierName)}`
       ],
       'notifyOnSecurity'
     );
@@ -447,40 +571,20 @@ export default function CashierMode({
 
   const handleDeleteExpense = (expItem) => {
     if (!expItem) return;
-
     const performDelete = () => {
-      if (
-        !window.confirm(
-          `Rostdan ham "${expItem.note}" (-${Number(expItem.amount).toLocaleString()} so'm) xarajat yozuvini o'chirib tashlamoqchimisiz?`
-        )
-      ) {
-        return;
-      }
-
-      updateExpenses(prev =>
-        (Array.isArray(prev) ? prev : []).filter(e => e && String(e.id) !== String(expItem.id))
-      );
-
-      if (typeof addAuditLog === 'function') {
-        addAuditLog(
-          "Kassa xarajati o'chirildi",
-          `${expItem.category}: ${Number(expItem.amount).toLocaleString()} s (${expItem.note}) o'chirildi`
-        );
-      }
+      if (!window.confirm(`"${expItem.note}" (-${Number(expItem.amount).toLocaleString()} s) xarajat yozuvini o'chirasizmi?`)) return;
+      updateExpenses(prev => (Array.isArray(prev) ? prev : []).filter(e => e && String(e.id) !== String(expItem.id)));
     };
 
     if (typeof requireAdminOverride === 'function' && currentUser?.role !== 'admin') {
-      requireAdminOverride(
-        `Kassa xarajatini o'chirish (${Number(expItem.amount).toLocaleString()} s)`,
-        performDelete
-      );
+      requireAdminOverride(`Kassa xarajatini o'chirish`, performDelete);
     } else {
       performDelete();
     }
   };
 
   // ==========================================
-  // 7. OMBORDAN MASALLIQLARNI AVTOMATIK AYIRISH
+  // 9. OMBORDAN MASALLIQLARNI AVTOMATIK AYIRISH
   // ==========================================
   const deductOrderIngredientsFromStock = (orderToDeduct) => {
     if (!orderToDeduct || orderToDeduct.inventoryDeducted) return [];
@@ -599,7 +703,7 @@ export default function CashierMode({
   };
 
   // ==========================================
-  // 8. TO'LOVNI TASDIQLASH VA CHEKNI YOPISH
+  // 10. TO'LOVNI TASDIQLASH VA BONUS HISOBLASH
   // ==========================================
   const handlePaymentSubmit = () => {
     if (!selectedOrder) return;
@@ -629,6 +733,48 @@ export default function CashierMode({
       const closeTimeStr = new Date().toLocaleString();
       const nextStatus = paymentMethod === 'Qarz' ? 'Qarz' : "To'langan";
 
+      // CRM: Mijozning yangi bonus balansini yangilash yoki yangi mijoz yaratish
+      let finalCustomerName = '';
+      let finalCustomerPhone = '';
+      let updatedCustomerBalance = 0;
+
+      if (matchedCustomer) {
+        finalCustomerName = matchedCustomer.name;
+        finalCustomerPhone = matchedCustomer.phone;
+        const prevBalance = Number(matchedCustomer.bonusBalance || 0);
+        updatedCustomerBalance = Math.max(0, prevBalance - totals.usedBonusAmount + totals.earnedCashback);
+
+        updateCustomers(prev =>
+          (Array.isArray(prev) ? prev : []).map(c =>
+            c && c.id === matchedCustomer.id
+              ? {
+                  ...c,
+                  bonusBalance: updatedCustomerBalance,
+                  totalSpent: (Number(c.totalSpent) || 0) + (paymentMethod === 'Qarz' ? 0 : totals.finalTotal),
+                  visitsCount: (Number(c.visitsCount) || 0) + 1,
+                  lastVisit: new Date().toLocaleDateString()
+                }
+              : c
+          )
+        );
+      } else if (customerPhone.trim().length >= 4) {
+        finalCustomerPhone = customerPhone.trim();
+        finalCustomerName = customerName.trim() || `Mijoz (${finalCustomerPhone})`;
+        updatedCustomerBalance = totals.earnedCashback;
+
+        const newCustomerRecord = {
+          id: `cust_${Date.now()}`,
+          name: finalCustomerName,
+          phone: finalCustomerPhone,
+          bonusBalance: updatedCustomerBalance,
+          totalSpent: paymentMethod === 'Qarz' ? 0 : totals.finalTotal,
+          visitsCount: 1,
+          lastVisit: new Date().toLocaleDateString()
+        };
+
+        updateCustomers(prev => [newCustomerRecord, ...(Array.isArray(prev) ? prev : [])]);
+      }
+
       const paymentDetails = {
         cashAmount: paymentMethod === 'Naqd' ? totals.finalTotal : paymentMethod === 'Aralash' ? cashAmount : 0,
         cardAmount: paymentMethod === 'Plastik' ? totals.finalTotal : paymentMethod === 'Aralash' ? cardAmount : 0,
@@ -650,6 +796,11 @@ export default function CashierMode({
         discountValue: Number(discountValue) || 0,
         discountAmount: totals.discountAmount,
         discount: totals.discountAmount,
+        usedBonus: totals.usedBonusAmount,
+        earnedBonus: totals.earnedCashback,
+        customerName: finalCustomerName,
+        customerPhone: finalCustomerPhone,
+        customerBonusBalance: updatedCustomerBalance,
         finalTotal: totals.finalTotal,
         total: totals.finalTotal,
         debtorName: paymentMethod === 'Qarz' ? cleanDebtor : (selectedOrder.debtorName || ''),
@@ -663,26 +814,26 @@ export default function CashierMode({
       // 1) Ombordan masalliqlarni yechish
       const lowStockAlerts = deductOrderIngredientsFromStock(selectedOrder);
 
-      // 2) Buyurtmalar ro'yxatida statusni yangilash
+      // 2) Buyurtmalar ro'yxatini yangilash
       updateOrders(prev =>
         (Array.isArray(prev) ? prev : []).map(o =>
           o && String(o.id) === String(selectedOrder.id) ? closedOrderObject : o
         )
       );
 
-      // 3) Audit Log'ga yozish
+      // 3) Audit Log
       if (typeof addAuditLog === 'function') {
         addAuditLog(
           paymentMethod === 'Qarz' ? 'Chek qarzga yopildi' : "Chek to'landi",
           `${closedOrderObject.table}: ${totals.finalTotal.toLocaleString()} s (${paymentMethod})${
-            totals.discountAmount > 0 ? ` • Chegirma: -${totals.discountAmount.toLocaleString()} s` : ''
+            totals.usedBonusAmount > 0 ? ` • Bonusdan: -${totals.usedBonusAmount.toLocaleString()} s` : ''
           }`
         );
       }
 
       // 4) Telegramga xabar yuborish
       const isDebt = paymentMethod === 'Qarz';
-      const hasDiscount = totals.discountAmount > 0;
+      const hasDiscount = totals.discountAmount > 0 || totals.usedBonusAmount > 0;
       const tgFlagKey = isDebt ? 'notifyOnDebt' : hasDiscount ? 'notifyOnDiscount' : 'notifyOnEverySale';
 
       sendCashierTelegramAlert(
@@ -690,15 +841,15 @@ export default function CashierMode({
           isDebt
             ? `📝 <b>YANGI NASIYA (QARZ) CHEKI!</b>`
             : hasDiscount
-            ? `🎁 <b>CHEGIRMALI CHEK YOPILDI</b>`
+            ? `🎁 <b>CHEGIRMALI / BONUSLI CHEK YOPILDI</b>`
             : `🧾 <b>YANGI CHEK YOPILDI</b>`,
           `🏪 <b>Kafe:</b> ${escapeHtml(resolvedCafeName)}`,
           `🪑 <b>Joy:</b> ${escapeHtml(closedOrderObject.table)}`,
-          `👤 <b>Ofitsiant:</b> ${escapeHtml(closedOrderObject.waiterName || closedOrderObject.waiter || 'Ofitsiant')}`,
-          isDebt ? `⚠️ <b>Qarzdor:</b> ${escapeHtml(cleanDebtor)}` : null,
-          hasDiscount ? `🎁 <b>Chegirma:</b> -${totals.discountAmount.toLocaleString()} so'm` : null,
-          `💰 <b>JAMI TO'LOV:</b> <b>${totals.finalTotal.toLocaleString()} so'm</b> (${escapeHtml(paymentMethod)})`,
-          `🕒 <b>Vaqt:</b> ${escapeHtml(closeTimeStr)}`
+          finalCustomerName ? `👤 <b>Mijoz:</b> ${escapeHtml(finalCustomerName)}` : null,
+          totals.discountAmount > 0 ? `🏷 <b>Chegirma:</b> -${totals.discountAmount.toLocaleString()} s` : null,
+          totals.usedBonusAmount > 0 ? `🎁 <b>Ishlatilgan bonus:</b> -${totals.usedBonusAmount.toLocaleString()} s` : null,
+          totals.earnedCashback > 0 ? `✨ <b>Yangi Cashback:</b> +${totals.earnedCashback.toLocaleString()} s` : null,
+          `💰 <b>JAMI TO'LOV:</b> <b>${totals.finalTotal.toLocaleString()} so'm</b> (${escapeHtml(paymentMethod)})`
         ],
         tgFlagKey
       );
@@ -723,7 +874,7 @@ export default function CashierMode({
         });
       }
 
-      // 6) Tanlangan chekni yopish
+      // 6) Formani tozalash
       setSelectedOrderId(null);
       resetPaymentControls();
     };
@@ -744,18 +895,14 @@ export default function CashierMode({
   };
 
   // ==========================================
-  // 9. QARZNI SO'NDIRISH VA CHEKNI O'CHIRISH
+  // 11. QARZNI SO'NDIRISH VA CHEKNI O'CHIRISH
   // ==========================================
   const handlePayOffDebt = (debtOrder) => {
     if (!debtOrder) return;
     const debtAmount = Number(debtOrder.finalTotal ?? debtOrder.total ?? 0) || 0;
     const debtor = debtOrder.debtorName || debtOrder.paymentDetails?.debtorName || "Noma'lum mijoz";
 
-    if (
-      !window.confirm(
-        `💰 "${debtor}" ning ${debtAmount.toLocaleString()} so'm qarzini to'landi deb tasdiqlaysizmi?`
-      )
-    ) {
+    if (!window.confirm(`💰 "${debtor}" ning ${debtAmount.toLocaleString()} so'm qarzini to'landi deb tasdiqlaysizmi?`)) {
       return;
     }
 
@@ -764,33 +911,14 @@ export default function CashierMode({
     updateOrders(prev =>
       (Array.isArray(prev) ? prev : []).map(o =>
         o && String(o.id) === String(debtOrder.id)
-          ? {
-              ...o,
-              status: "To'langan",
-              paymentMethod: 'Naqd',
-              debtPaidAt: paidTime,
-              closeTime: paidTime
-            }
+          ? { ...o, status: "To'langan", paymentMethod: 'Naqd', debtPaidAt: paidTime, closeTime: paidTime }
           : o
       )
     );
 
     if (typeof addAuditLog === 'function') {
-      addAuditLog(
-        "Qarz to'landi",
-        `${debtor} (${debtOrder.table}): +${debtAmount.toLocaleString()} so'm kassaga kirim qilindi`
-      );
+      addAuditLog("Qarz to'landi", `${debtor}: +${debtAmount.toLocaleString()} so'm`);
     }
-
-    sendCashierTelegramAlert(
-      [
-        `✅ <b>NASIYA QARZ TO'LANDI (${escapeHtml(resolvedCafeName)})</b>`,
-        `👤 <b>Mijoz:</b> ${escapeHtml(debtor)}`,
-        `💰 <b>To'langan summa:</b> +${debtAmount.toLocaleString()} so'm`,
-        `🕒 <b>Vaqt:</b> ${escapeHtml(paidTime)}`
-      ],
-      'notifyOnDebt'
-    );
 
     alert(`✅ "${debtor}" ning ${debtAmount.toLocaleString()} so'm qarzi muvaffaqiyatli yopildi!`);
   };
@@ -799,9 +927,7 @@ export default function CashierMode({
     if (!orderId) return;
 
     const performDelete = () => {
-      if (!window.confirm(`⚠️ Rostdan ham "${tableName}" buyurtmasini butunlay bekor qilib o'chirmoqchimisiz?`)) {
-        return;
-      }
+      if (!window.confirm(`⚠️ Rostdan ham "${tableName}" buyurtmasini butunlay o'chirmoqchimisiz?`)) return;
 
       updateOrders(prev =>
         (Array.isArray(prev) ? prev : []).filter(o => o && String(o.id) !== String(orderId))
@@ -811,31 +937,37 @@ export default function CashierMode({
         setSelectedOrderId(null);
         resetPaymentControls();
       }
-
-      if (typeof addAuditLog === 'function') {
-        addAuditLog("Chek bekor qilindi (O'chirildi)", `${tableName} buyurtmasi kassadan o'chirildi`);
-      }
     };
 
     if (typeof requireAdminOverride === 'function' && currentUser?.role !== 'admin') {
-      requireAdminOverride(`${tableName} chekini bekor qilish va o'chirish`, performDelete);
+      requireAdminOverride(`${tableName} chekini o'chirish`, performDelete);
     } else {
       performDelete();
     }
   };
 
+  const filteredCrmCustomers = useMemo(() => {
+    const q = crmSearch.trim().toLowerCase();
+    if (!q) return safeCustomers;
+    return safeCustomers.filter(
+      c =>
+        c &&
+        (String(c.name || '').toLowerCase().includes(q) ||
+          String(c.phone || '').toLowerCase().includes(q))
+    );
+  }, [safeCustomers, crmSearch]);
+
   // ==========================================
-  // 10. RENDER (UI DIZAYN)
+  // 12. RENDER (UI DIZAYN)
   // ==========================================
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-4 pb-6 animate-fade-in">
       
       {/* =======================================================
-          TEPADAGI JONLI KASSA SEYFI BALANSI VA XARAJAT TUGMALARI
+          TEPADAGI JONLI KASSA SEYFI, XARAJAT VA CRM PANELI
           ======================================================= */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4">
         
-        {/* 3 ta jonli kassa ko'rsatkichi */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
           <div className="bg-emerald-50/70 dark:bg-emerald-900/20 px-4 py-2.5 rounded-2xl border border-emerald-200/70 dark:border-emerald-800/50 flex justify-between items-center">
             <div>
@@ -878,15 +1010,24 @@ export default function CashierMode({
           </div>
         </div>
 
-        {/* Chiqim kiritish va Xarajatlar Jurnali tugmalari */}
-        <div className="flex gap-2.5 shrink-0">
+        {/* Xarajat, Chiqimlar Jurnali va CRM Mijozlar Bazasi Tugmalari */}
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsCrmModalOpen(true)}
+            className="flex-1 sm:flex-initial px-4 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs sm:text-sm shadow-lg shadow-amber-500/25 transition active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap"
+          >
+            <span>🎁</span>
+            <span>Mijozlar & Bonus ({safeCustomers.length})</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setIsExpenseModalOpen(true)}
-            className="flex-1 sm:flex-initial px-5 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-red-600/25 transition active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap"
+            className="flex-1 sm:flex-initial px-4 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-red-600/25 transition active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap"
           >
             <span>💸</span>
-            <span>+ Xarajat / Inkassatsiya</span>
+            <span>+ Xarajat</span>
           </button>
 
           <button
@@ -903,9 +1044,9 @@ export default function CashierMode({
       {/* =======================================================
           ASOSIY KASSA ISHCHI MAYDONI (3 USTUNLI)
           ======================================================= */}
-      <div className="h-[calc(100vh-195px)] min-h-[540px] flex flex-col lg:flex-row gap-6">
+      <div className="h-[calc(100vh-195px)] min-h-[560px] flex flex-col lg:flex-row gap-6">
         
-        {/* 1-USTUN (CHAP): OCHIQ CHEKLAR VA QARZ DAFTARI RO'YXATI */}
+        {/* 1-USTUN: OCHIQ CHEKLAR VA QARZ DAFTARI */}
         <CashierOrderList
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -917,7 +1058,7 @@ export default function CashierMode({
           onDeleteOrder={handleDeleteOrder}
         />
 
-        {/* 2 VA 3-USTUNLAR (O'RTA VA O'NG): CHEK HAMDA TO'LOV BOSHQARUVI */}
+        {/* 2 VA 3-USTUNLAR: CHEK VA TO'LOV BOSHQARUVI */}
         {selectedOrder ? (
           <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
             
@@ -925,6 +1066,9 @@ export default function CashierMode({
               selectedOrder={selectedOrder}
               totals={totals}
               serviceFee={serviceFee}
+              matchedCustomer={matchedCustomer}
+              earnedCashback={totals.earnedCashback}
+              cashbackPercent={totals.cashbackPercent}
             />
 
             <CashierPaymentControls
@@ -940,6 +1084,18 @@ export default function CashierMode({
               setMixedCard={handleMixedCardChange}
               debtorName={debtorName}
               setDebtorName={setDebtorName}
+              customers={safeCustomers}
+              customerPhone={customerPhone}
+              setCustomerPhone={setCustomerPhone}
+              customerName={customerName}
+              setCustomerName={setCustomerName}
+              matchedCustomer={matchedCustomer}
+              useBonusAmount={useBonusAmount}
+              setUseBonusAmount={setUseBonusAmount}
+              maxUsableBonus={totals.maxUsableBonus}
+              earnedCashback={totals.earnedCashback}
+              cashbackPercent={totals.cashbackPercent}
+              onOpenCrmModal={() => setIsCrmModalOpen(true)}
               onPaymentSubmit={handlePaymentSubmit}
             />
 
@@ -953,14 +1109,157 @@ export default function CashierMode({
               Hisob-kitob uchun chekni tanlang
             </h3>
             <p className="text-xs sm:text-sm font-bold text-gray-400 max-w-sm leading-relaxed">
-              Chap tomondagi ro'yxatdan ochiq stolni tanlang yoki tepadagi tugma orqali kunlik kassa xarajatlarini kiriting.
+              Chap tomondagi ro'yxatdan ochiq stolni tanlang. Mijoz telefon raqamini kiritib Cashback va bonuslarni qo'llashingiz mumkin.
             </p>
           </div>
         )}
       </div>
 
       {/* =======================================================
-          MODAL 1: YANGI XARAJAT YOKI INKASSATSIYA KIRITISH
+          MODAL 1: 🎁 CRM MIJOZLAR BAZASI VA BONUS MARKAZI
+          ======================================================= */}
+      {isCrmModalOpen && (
+        <div
+          onClick={() => setIsCrmModalOpen(false)}
+          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="bg-white dark:bg-gray-800 w-full max-w-4xl rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] flex flex-col border border-gray-100 dark:border-gray-700"
+          >
+            <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700">
+              <div>
+                <h3 className="font-black text-xl text-gray-900 dark:text-white flex items-center gap-2">
+                  <span>🎁</span> Doimiy Mijozlar Bazasi va Cashback Tizimi (CRM)
+                </h3>
+                <p className="text-xs font-bold text-gray-400 mt-0.5">
+                  🥉 Standart: 5% Cashback • 🥈 Kumush (1 mln+): 7% • 🥇 Oltin VIP (3 mln+): 10%
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCrmModalOpen(false)}
+                className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 hover:text-red-500 font-black flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Yangi mijoz qo'shish formasi */}
+            <form
+              onSubmit={handleCreateCrmCustomer}
+              className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 bg-amber-50/70 dark:bg-gray-900/60 p-3.5 rounded-2xl border border-amber-200 dark:border-gray-700"
+            >
+              <input
+                type="text"
+                required
+                value={newCrmCustomer.name}
+                onChange={e => setNewCrmCustomer(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="👤 Mijoz ismi *"
+                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+              />
+              <input
+                type="tel"
+                required
+                value={newCrmCustomer.phone}
+                onChange={e => setNewCrmCustomer(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="📞 Tel: 90 123 45 67 *"
+                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+              />
+              <input
+                type="number"
+                min="0"
+                value={newCrmCustomer.initialBonus}
+                onChange={e => setNewCrmCustomer(prev => ({ ...prev, initialBonus: e.target.value }))}
+                placeholder="🎁 Boshlang'ich bonus (s)"
+                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+              />
+              <button
+                type="submit"
+                className="py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase tracking-wider shadow-md transition active:scale-95"
+              >
+                + Mijoz Qo'shish
+              </button>
+            </form>
+
+            {/* Qidiruv */}
+            <input
+              type="text"
+              value={crmSearch}
+              onChange={e => setCrmSearch(e.target.value)}
+              placeholder="🔍 Mijoz ismi yoki telefon raqami bo'yicha qidirish..."
+              className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+            />
+
+            {/* Mijozlar ro'yxati */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+              {filteredCrmCustomers.length === 0 ? (
+                <div className="text-center py-10 text-gray-400 font-bold">
+                  Mijozlar topilmadi.
+                </div>
+              ) : (
+                filteredCrmCustomers.map(cust => {
+                  const tier = getCustomerTierInfo(cust.totalSpent);
+                  return (
+                    <div
+                      key={cust.id}
+                      className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-black text-base text-gray-900 dark:text-white">
+                            {cust.name}
+                          </span>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${tier.badgeClass}`}>
+                            {tier.tierName} ({tier.percent}%)
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-gray-500">
+                          📞 {cust.phone} • Tashrif: {cust.visitsCount || 0} marta • Jami xarid: {Number(cust.totalSpent || 0).toLocaleString()} so'm
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block">Bonus Balansi</span>
+                          <span className="font-black text-lg text-amber-600 dark:text-amber-400">
+                            {Number(cust.bonusBalance || 0).toLocaleString()} s
+                          </span>
+                        </div>
+
+                        {selectedOrder && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomerPhone(cust.phone);
+                              setIsCrmModalOpen(false);
+                            }}
+                            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs transition active:scale-95"
+                          >
+                            Chekka Tanlash ✓
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCustomer(cust)}
+                          className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-500 font-black text-xs flex items-center justify-center"
+                          title="O'chirish"
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =======================================================
+          MODAL 2: YANGI XARAJAT YOKI INKASSATSIYA KIRITISH
           ======================================================= */}
       {isExpenseModalOpen && (
         <div
@@ -985,7 +1284,6 @@ export default function CashierMode({
             </div>
 
             <form onSubmit={handleSaveExpense} className="space-y-4">
-              {/* 1. Toifa tanlash */}
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                   Chiqim Toifasi *
@@ -996,14 +1294,11 @@ export default function CashierMode({
                   className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-red-500 cursor-pointer"
                 >
                   {EXPENSE_CATEGORIES.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
+                    <option key={c.id} value={c.id}>{c.label}</option>
                   ))}
                 </select>
               </div>
 
-              {/* 2. Qaysi puldan berildi (Naqd yoki Plastik) */}
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                   Qaysi hisobdan berildi? *
@@ -1029,7 +1324,6 @@ export default function CashierMode({
                 </div>
               </div>
 
-              {/* 3. Summa va Oluvchi shaxs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
@@ -1056,27 +1350,12 @@ export default function CashierMode({
                     type="text"
                     value={expenseForm.recipient}
                     onChange={e => setExpenseForm(prev => ({ ...prev, recipient: e.target.value }))}
-                    placeholder="Masalan: Oshpaz Ali / Nonvoy"
+                    placeholder="Masalan: Oshpaz Ali"
                     className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-red-500"
                   />
                 </div>
               </div>
 
-              {/* Tezkor summa tugmalari */}
-              <div className="flex flex-wrap gap-1.5">
-                {[10000, 20000, 50000, 100000, 200000, 500000].map(preset => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setExpenseForm(prev => ({ ...prev, amount: String(preset) }))}
-                    className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-red-100 dark:hover:bg-red-900/40 text-gray-700 dark:text-gray-200 font-black text-xs transition"
-                  >
-                    {(preset / 1000).toLocaleString()} ming
-                  </button>
-                ))}
-              </div>
-
-              {/* 4. Sababi / Izoh */}
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                   Aniq sababi / Izoh *
@@ -1086,7 +1365,7 @@ export default function CashierMode({
                   required
                   value={expenseForm.note}
                   onChange={e => setExpenseForm(prev => ({ ...prev, note: e.target.value }))}
-                  placeholder="Masalan: Bozordan ko'kat, limon va 30 ta non olindi"
+                  placeholder="Masalan: Bozordan ko'kat va 30 ta non olindi"
                   className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-red-500"
                 />
               </div>
@@ -1112,7 +1391,7 @@ export default function CashierMode({
       )}
 
       {/* =======================================================
-          MODAL 2: JORIY SMENADAGI XARAJATLAR VA INKASSATSIYA RO'YXATI
+          MODAL 3: JORIY SMENA XARAJATLARI JURNALI
           ======================================================= */}
       {isExpenseListModalOpen && (
         <div
@@ -1126,10 +1405,10 @@ export default function CashierMode({
             <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700">
               <div>
                 <h3 className="font-black text-lg text-gray-900 dark:text-white">
-                  📋 Joriy Smena Chiqimlari va Inkassatsiya Jurnali
+                  📋 Joriy Smena Chiqimlari Jurnali
                 </h3>
                 <p className="text-xs font-bold text-gray-400">
-                  Jami chiqim: -{cashDrawerSummary.totalOutflow.toLocaleString()} so'm ({currentShiftExpenses.length} ta yozuv)
+                  Jami chiqim: -{cashDrawerSummary.totalOutflow.toLocaleString()} so'm ({currentShiftExpenses.length} ta)
                 </p>
               </div>
               <button
@@ -1144,7 +1423,7 @@ export default function CashierMode({
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
               {currentShiftExpenses.length === 0 ? (
                 <div className="text-center py-12 text-gray-400 font-bold">
-                  Hozirgi smenada hali hech qanday xarajat kiritilmagan.
+                  Hozirgi smenada hali xarajat kiritilmagan.
                 </div>
               ) : (
                 currentShiftExpenses.map(exp => (
@@ -1153,35 +1432,22 @@ export default function CashierMode({
                     className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 flex justify-between items-start gap-3"
                   >
                     <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                          exp.isInkassatsiya || exp.category === 'Inkassatsiya'
-                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-                        }`}>
-                          {exp.categoryLabel || exp.category}
-                        </span>
-                        <span className="text-xs font-bold text-gray-400">
-                          {exp.date}
-                        </span>
-                      </div>
-
-                      <p className="font-black text-sm text-gray-900 dark:text-white">
-                        {exp.note}
-                      </p>
+                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                        {exp.categoryLabel || exp.category}
+                      </span>
+                      <p className="font-black text-sm text-gray-900 dark:text-white">{exp.note}</p>
                       <p className="text-xs font-bold text-gray-500">
-                        Olgan: {exp.recipient || '-'} • Kassir: {exp.cashierName} • Manba: {exp.paymentSource}
+                        Olgan: {exp.recipient || '-'} • Kassir: {exp.cashierName} ({exp.paymentSource})
                       </p>
                     </div>
-
                     <div className="text-right shrink-0 space-y-2">
-                      <span className="font-black text-base text-red-600 dark:text-red-400 block">
+                      <span className="font-black text-base text-red-600 block">
                         -{Number(exp.amount || 0).toLocaleString()} s
                       </span>
                       <button
                         type="button"
                         onClick={() => handleDeleteExpense(exp)}
-                        className="text-xs font-black text-gray-400 hover:text-red-600 transition"
+                        className="text-xs font-black text-gray-400 hover:text-red-600"
                       >
                         🗑 O'chirish
                       </button>
@@ -1189,22 +1455,6 @@ export default function CashierMode({
                   </div>
                 ))
               )}
-            </div>
-
-            <div className="pt-3 border-t dark:border-gray-700 flex justify-between items-center">
-              <span className="text-xs font-black text-gray-500">
-                🗄️ Seyfda qolishi shart bo'lgan naqd pul: <strong className="text-indigo-600 dark:text-indigo-400 text-sm">{cashDrawerSummary.expectedCashInDrawer.toLocaleString()} so'm</strong>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsExpenseListModalOpen(false);
-                  setIsExpenseModalOpen(true);
-                }}
-                className="px-4 py-2.5 rounded-xl bg-red-600 text-white font-black text-xs"
-              >
-                + Yangi Chiqim Qo'shish
-              </button>
             </div>
           </div>
         </div>
