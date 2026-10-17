@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import useSticky from '../hooks/useSticky';
 import StatsOverviewCards from './StatsOverviewCards';
 import StatsPaymentBreakdown from './StatsPaymentBreakdown';
-import StatsWaiterPayroll from './StatsWaiterPayroll';
 import StatsPopularItems from './StatsPopularItems';
 import PrintReceiptModal from './PrintReceiptModal';
 
@@ -101,8 +100,6 @@ export default function StatsMode({
   inventory,
   expenses,
   setExpenses,
-  users,
-  serviceFee,
   currentUser,
   auditLogs,
   setAuditLogs,
@@ -115,8 +112,6 @@ export default function StatsMode({
   const [stickyMenu] = useSticky('pos_menu', []);
   const [stickyInventory] = useSticky('pos_inventory', []);
   const [stickyExpenses, setStickyExpenses] = useSticky('pos_expenses', []);
-  const [stickyUsers] = useSticky('pos_users', []);
-  const [stickyServiceFee] = useSticky('pos_service_fee', 10);
   const [stickyCafeName] = useSticky('pos_cafe_name', 'Premium Cafe');
   const [, setStickyAuditLogs] = useSticky('pos_audit_logs', []);
 
@@ -129,7 +124,7 @@ export default function StatsMode({
   const [viewScope, setViewScope] = useState('current');
   const [tgSending, setTgSending] = useState(false);
 
-  // DAVR VA SANA ORALIG'I FILTRI
+  // YANGI: 1.b va 1.c — DAVR VA SANA ORALIG'I FILTRI
   // 'shift_all' | 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | 'custom'
   const [periodPreset, setPeriodPreset] = useState('shift_all');
 
@@ -144,7 +139,7 @@ export default function StatsMode({
   const [endDate, setEndDate] = useState(todayDateStr);
   const [selectedMonthPicker, setSelectedMonthPicker] = useState(() => todayDateStr.slice(0, 7)); // YYYY-MM
 
-  // CHEKLAR RO'YXATI VA ICHKI MA'LUMOTLARINI KO'RISH STATE'LARI
+  // YANGI: 1.a — CHEKLAR RO'YXATI VA ICHKI MA'LUMOTLARINI KO'RISH STATE'LARI
   const [isReceiptsModalOpen, setIsReceiptsModalOpen] = useState(false);
   const [receiptsModalCategory, setReceiptsModalCategory] = useState('paid'); // 'paid' | 'debt' | 'open'
   const [receiptSearchQuery, setReceiptSearchQuery] = useState('');
@@ -171,13 +166,6 @@ export default function StatsMode({
     if (Array.isArray(expenses)) return expenses;
     return Array.isArray(stickyExpenses) ? stickyExpenses : [];
   }, [expenses, stickyExpenses]);
-
-  const safeUsers = useMemo(() => {
-    if (Array.isArray(users) && users.length > 0) return users;
-    return Array.isArray(stickyUsers) ? stickyUsers : [];
-  }, [users, stickyUsers]);
-
-  const resolvedServiceFee = serviceFee !== undefined ? Number(serviceFee) : Number(stickyServiceFee ?? 10);
 
   const updateOrdersState = typeof setOrders === 'function' ? setOrders : setStickyOrders;
   const updateExpensesState = typeof setExpenses === 'function' ? setExpenses : setStickyExpenses;
@@ -268,6 +256,7 @@ export default function StatsMode({
     };
   }, [periodPreset, startDate, endDate, viewScope]);
 
+  // Oy tanlagich (Masalan: 2026-09) o'zgarganda avtomatik o'sha oyning 1-sanasidan oxirgi sanasigacha qo'yish
   const handleMonthPickerChange = (yyyyMm) => {
     setSelectedMonthPicker(yyyyMm);
     if (!yyyyMm) return;
@@ -370,7 +359,7 @@ export default function StatsMode({
     if (order.serviceFeeAmount !== undefined) return Number(order.serviceFeeAmount) || 0;
     if (order.table === 'Olib ketish') return 0;
     const sub = getOrderSubTotal(order);
-    const pct = Number(order.serviceFee ?? resolvedServiceFee) || 0;
+    const pct = Number(order.serviceFee ?? 10) || 0;
     return Math.round((sub * pct) / 100);
   };
 
@@ -400,10 +389,14 @@ export default function StatsMode({
     );
   }, [safeOrders]);
 
+  // Smena + Sana oralig'i bo'yicha filtrlangan to'langan cheklar
   const completedOrders = useMemo(() => {
     let baseList = currentShiftPaidOrders;
+    // Agar foydalanuvchi o'tgan kun/hafta/oy/sana oralig'ini tanlasa, arxivdagi cheklarni ham qo'shib qidiramiz!
     if (activeDateRange.isFiltered) {
-      baseList = viewScope === 'archived'
+      baseList = viewScope === 'current'
+        ? [...currentShiftPaidOrders, ...archivedPaidOrders]
+        : viewScope === 'archived'
         ? archivedPaidOrders
         : [...currentShiftPaidOrders, ...archivedPaidOrders];
     } else {
@@ -424,6 +417,7 @@ export default function StatsMode({
     activeDateRange
   ]);
 
+  // Xarajatlarni ham smena va sana oralig'i bo'yicha ajratish
   const scopedExpenses = useMemo(() => {
     let baseExp = safeExpenses.filter(e => e && e.status !== 'Arxiv');
     if (activeDateRange.isFiltered || viewScope === 'all') {
@@ -441,7 +435,7 @@ export default function StatsMode({
   }, [safeExpenses, viewScope, activeDateRange]);
 
   // ===============================================
-  // 5. ASOSIY MOLIYAVIY KO'RSATKICHLAR VA KUNLIK GRAFIK
+  // 5. ASOSIY MOLIYAVIY KO'RSATKICHLAR VA KUNLIK GRAFIK (MB SARFI USLUBIDA)
   // ===============================================
   const totalRevenue = useMemo(() => {
     return completedOrders.reduce((sum, order) => sum + getOrderFinalAmount(order), 0);
@@ -508,6 +502,7 @@ export default function StatsMode({
     ? Math.round(totalRevenue / totalOrdersCount) 
     : 0;
 
+  // Telefonlardagi "MB / Trafik sarfi" kabi Kunlar bo'yicha daromad taqsimoti
   const dailyRevenueBreakdown = useMemo(() => {
     const map = {};
     completedOrders.forEach(o => {
@@ -839,11 +834,12 @@ export default function StatsMode({
             <span className="text-3xl md:text-4xl">📈</span> Moliya, Cheklar va Z-Otchyot Markazi
           </h2>
           <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">
-            Sanalar oralig'idagi daromad, yopilgan cheklarning ichki tarkibi, ofitsiantlar maoshi va sof foyda nazorati.
+            Sanalar oralig'idagi daromad, yopilgan cheklarning ichki tarkibi, tannarx va sof foyda nazorati.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
+          {/* Cheklar ichini ko'rish tezkor tugmasi */}
           <button
             type="button"
             onClick={() => handleOpenReceiptsExplorer('paid')}
@@ -918,9 +914,13 @@ export default function StatsMode({
         </div>
       </div>
 
-      {/* TELEFON "MB SARFI / TRAFIK LIMITI" USLUBIDAGI SANALAR ORALIG'I FILTRI VA DAROMAD GRAFIGI */}
+      {/* =========================================================================
+          YANGI BLOK (1.b va 1.c): TELEFON "MB SARFI / TRAFIK LIMITI" USLUBIDAGI
+          SANALAR ORALIG'I FILTRI VA DAROMAD GRAFIGI
+          ========================================================================= */}
       <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-sm border-2 border-indigo-100 dark:border-indigo-900/40 space-y-5">
         
+        {/* 1-Qator: Tezkor Davr Tugmalari (Kun, Kecha, Hafta, Shu oy, O'tgan oy, Sana oralig'i) */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
           <div className="flex items-center gap-2.5">
             <span className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl font-black">
@@ -962,6 +962,7 @@ export default function StatsMode({
           </div>
         </div>
 
+        {/* 2-Qator: Aniq Sana Oralig'i (... dan ... gacha) va Oy Tanlagich */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-gray-50 dark:bg-gray-900/60 p-4 rounded-2xl border border-gray-200/70 dark:border-gray-700">
           <div>
             <label className="block text-[10px] font-black uppercase text-gray-500 mb-1">
@@ -1016,7 +1017,9 @@ export default function StatsMode({
           </div>
         </div>
 
+        {/* 3-Qator: Telefon MB-Sarfi / Limit Bar va Kunlar bo'yicha Ustunli Grafik */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">
+          {/* Chap: Maqsadli Daromad Limiti (Xuddi MB Limit Progress Bari kabi) */}
           <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/30 border border-indigo-200/70 dark:border-indigo-800/50 space-y-2.5">
             <div className="flex justify-between items-center">
               <span className="text-[11px] font-black uppercase text-indigo-700 dark:text-indigo-300">
@@ -1080,6 +1083,7 @@ export default function StatsMode({
             </div>
           </div>
 
+          {/* O'ng: Kunlar bo'yicha daromad ustunlari (Daily Usage Chart) */}
           <div className="lg:col-span-2 p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200/70 dark:border-gray-700">
             <div className="flex justify-between items-center mb-3">
               <span className="text-xs font-black uppercase text-gray-500">
@@ -1132,7 +1136,7 @@ export default function StatsMode({
         </div>
       </div>
 
-      {/* ZALDAGI OCHIQ STOLLAR, NASIYALAR VA SEYF NAQD PUL BALANSI SATRI */}
+      {/* ZALDAGI OCHIQ STOLLAR, NASIYALAR VA SEYF NAQD PUL BALANSI SATRI (BOSILGANDA OCHILADI) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-indigo-50/80 dark:bg-indigo-900/20 px-5 py-4 rounded-2xl border border-indigo-200 dark:border-indigo-800/50 flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -1194,7 +1198,7 @@ export default function StatsMode({
         </div>
       </div>
 
-      {/* 1. KPI Kartochkalar */}
+      {/* 1. KPI Kartochkalar (6 ta to'liq moliyaviy ko'rsatkich + Bosilganda Cheklarni ochish) */}
       <StatsOverviewCards 
         totalRevenue={totalRevenue}
         totalFoodCost={totalFoodCost}
@@ -1214,21 +1218,7 @@ export default function StatsMode({
         averageReceipt={averageReceipt}
       />
 
-      {/* =========================================================================
-          3. YANGI: OFITSIANTLAR ULUSHI VA OYLIK MAOSH HISOBLAGICHI (HR PAYROLL)
-          ========================================================================= */}
-      <StatsWaiterPayroll
-        scopedOrders={completedOrders}
-        allOrders={safeOrders}
-        scopedExpenses={scopedExpenses}
-        allExpenses={safeExpenses}
-        users={safeUsers}
-        serviceFee={resolvedServiceFee}
-        activePeriodLabel={activeDateRange.label}
-        addAuditLog={addAuditLog}
-      />
-
-      {/* 4. SMENA XARAJATLARI VA INKASSATSIYA TAFSILOTLARI JADVALI */}
+      {/* 3. SMENA XARAJATLARI VA INKASSATSIYA TAFSILOTLARI JADVALI */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div>
@@ -1293,14 +1283,16 @@ export default function StatsMode({
         )}
       </div>
 
-      {/* 5. Top Taomlar va Smenani Yopish */}
+      {/* 4. Top Taomlar (Ichida mustaqil Sana oralig'i filtri bilan) va Smenani Yopish */}
       <StatsPopularItems 
         popularItems={popularItems}
         orders={safeOrders}
         onCloseShift={handleCloseShift}
       />
 
-      {/* YOPILGAN CHEKLARNING ICHKI TARKIBINI KO'RISH MODALI */}
+      {/* =========================================================================
+          YANGI MODAL (1.a va 1.b): YOPILGAN CHEKLARNING ICHKI TARKIBINI KO'RISH
+          ========================================================================= */}
       {isReceiptsModalOpen && (
         <div
           onClick={() => setIsReceiptsModalOpen(false)}
@@ -1310,6 +1302,7 @@ export default function StatsMode({
             onClick={e => e.stopPropagation()}
             className="bg-white dark:bg-gray-800 w-full max-w-6xl rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col max-h-[92vh] overflow-hidden"
           >
+            {/* Modal Tepasi: Sarlavha, Sana Oralig'i va Toifa Switcheri */}
             <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/70 space-y-4">
               <div className="flex justify-between items-start gap-3">
                 <div>
@@ -1329,6 +1322,7 @@ export default function StatsMode({
                 </button>
               </div>
 
+              {/* Modal ichida ham Sana oralig'ini tezkor almashtirish */}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap gap-1.5">
                   {[
@@ -1354,6 +1348,7 @@ export default function StatsMode({
                   ))}
                 </div>
 
+                {/* Qidiruv va To'lov usuli filtri */}
                 <div className="flex flex-wrap items-center gap-2 flex-1 sm:flex-initial justify-end">
                   <input
                     type="text"
@@ -1380,6 +1375,7 @@ export default function StatsMode({
               </div>
             </div>
 
+            {/* Modal Asosiy Qismi: Chapda Cheklar Ro'yxati | O'ngda Tanlangan Chekning To'liq Ichki Ma'lumoti */}
             <div className="flex-1 min-h-0 flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-gray-200 dark:divide-gray-700 overflow-hidden">
               
               {/* CHAP USTUN: CHEKLAR RO'YXATI */}
@@ -1487,6 +1483,7 @@ export default function StatsMode({
                           </button>
                         </div>
 
+                        {/* Xodimlar va Mijoz Rekvizitlari */}
                         <div className="grid grid-cols-2 gap-2.5 text-xs bg-gray-50 dark:bg-gray-900/60 p-3.5 rounded-2xl border border-gray-100 dark:border-gray-700 font-bold">
                           <div>
                             <span className="text-gray-400 block text-[10px] uppercase">Ofitsiant:</span>
@@ -1510,6 +1507,7 @@ export default function StatsMode({
                           )}
                         </div>
 
+                        {/* Chek ichidagi taomlar ro'yxati */}
                         <div className="space-y-2">
                           <p className="text-xs font-black uppercase text-gray-400">
                             🍽 Buyurtma Qilingan Taomlar ({Array.isArray(ord.items) ? ord.items.length : 0} xil):
@@ -1543,6 +1541,7 @@ export default function StatsMode({
                           </div>
                         </div>
 
+                        {/* Chek Moliyaviy Xulosasi */}
                         <div className="border-t-2 border-dashed border-gray-200 dark:border-gray-700 pt-3 space-y-1.5 text-xs font-bold">
                           <div className="flex justify-between text-gray-500">
                             <span>Taomlar summasi:</span>
