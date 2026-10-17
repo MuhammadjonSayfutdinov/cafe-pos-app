@@ -1,5 +1,4 @@
-import React, { useState, useMemo } from 'react';
-import useSticky from '../hooks/useSticky';
+import React, { useState, useEffect, useMemo } from 'react';
 
 // Birliklar konvertatsiyasi (Retseptdagi gr/kg/ml/litr ni ombordagi birlikka aniq o'girish)
 const RECIPE_UNITS = [
@@ -50,6 +49,16 @@ const convertRecipeQtyToInventoryUnit = (qty, recipeUnit, invUnit) => {
   return Number((inBase / iMeta.factor).toFixed(6));
 };
 
+// Ichki xavfsiz xotira o'qigich (Tashqi useSticky fayliga ehtiyoj yo'q)
+const readLocalBackup = (key, fallback = []) => {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 export default function AdminMenuTab({ 
   menuItems = [], 
   setMenuItems, 
@@ -57,15 +66,21 @@ export default function AdminMenuTab({
   inventory = [],
   addAuditLog
 }) {
-  // Agar inventory prop bo'sh kelsa, zaxira sifatida useSticky dan o'qiymiz
-  const [stickyInventory] = useSticky('pos_inventory', []);
+  // Agar AdminPanel dan inventory prop uzatilmagan bo'lsa, localStorage dan olamiz
+  const [localInventory, setLocalInventory] = useState(() => readLocalBackup('pos_inventory', []));
+
+  useEffect(() => {
+    setLocalInventory(readLocalBackup('pos_inventory', []));
+  }, []);
 
   const safeCategories = Array.isArray(menuCategories) && menuCategories.length > 0 
     ? menuCategories 
-    : ['Asosiy'];
+    : readLocalBackup('pos_categories', ['Asosiy', 'Ichimlik', 'Shirinlik']);
+
   const safeInventory = Array.isArray(inventory) && inventory.length > 0 
     ? inventory 
-    : (Array.isArray(stickyInventory) ? stickyInventory : []);
+    : (Array.isArray(localInventory) ? localInventory : []);
+
   const safeMenuItems = Array.isArray(menuItems) ? menuItems : [];
 
   // Qidiruv va Filtr statelari
@@ -79,7 +94,7 @@ export default function AdminMenuTab({
   
   const [newItemData, setNewItemData] = useState({
     name: '', 
-    category: safeCategories[0], 
+    category: safeCategories[0] || 'Asosiy', 
     is_available: true
   });
 
@@ -90,32 +105,36 @@ export default function AdminMenuTab({
   const [recipeInputs, setRecipeInputs] = useState([]);
 
   // ==========================================
-  // 1. TAOM TANNARXI VA SOF FOYDASINI HISOBLASH MOTORI
+  // 1. TAOM TANNARXI VA SOF FOYDASINI HISOBLASH
   // ==========================================
   const calculateRecipeFoodCost = (recipeList) => {
     if (!Array.isArray(recipeList) || recipeList.length === 0) return 0;
 
     let totalCost = 0;
     recipeList.forEach(r => {
-      if (!r || !r.inventoryId) return;
-      const rawQty = Number(r.qty ?? r.amount ?? 0) || 0;
+      if (!r || !(r.inventoryId ?? r.productId)) return;
+      const rawQty = Number(r.rawQty ?? r.qty ?? r.amount ?? 0) || 0;
       if (rawQty <= 0) return;
 
-      const invObj = safeInventory.find(i => i && String(i.id) === String(r.inventoryId ?? r.productId));
+      const invObj = safeInventory.find(
+        i => i && String(i.id) === String(r.inventoryId ?? r.productId)
+      );
       if (!invObj) return;
 
       const invCostPrice = Number(invObj.costPrice ?? invObj.price ?? 0) || 0;
       const invUnit = normalizeUnit(invObj.unit || 'kg');
       const recUnit = normalizeUnit(r.recipeUnit || invUnit);
 
-      const qtyInInvUnit = convertRecipeQtyToInventoryUnit(rawQty, recUnit, invUnit);
+      const qtyInInvUnit = r.rawQty !== undefined
+        ? convertRecipeQtyToInventoryUnit(r.rawQty, recUnit, invUnit)
+        : (r.recipeUnit ? convertRecipeQtyToInventoryUnit(rawQty, recUnit, invUnit) : Number(r.qty ?? r.amount ?? 0));
+
       totalCost += qtyInInvUnit * invCostPrice;
     });
 
     return Math.round(totalCost);
   };
 
-  // Modal ichidagi jonli tannarx va sof foyda hisoboti
   const modalProfitAnalysis = useMemo(() => {
     const sellingPrice = Number(variantInputs[0]?.price) || 0;
     const foodCost = calculateRecipeFoodCost(recipeInputs);
@@ -157,11 +176,13 @@ export default function AdminMenuTab({
   // 3. MODALNI OCHISH VA BOSHQARISH
   // ==========================================
   const handleOpenMenuModal = (item = null) => {
+    setLocalInventory(readLocalBackup('pos_inventory', []));
+
     if (item) {
       setEditingItem(item);
       setNewItemData({
         name: item.name || '',
-        category: item.category || safeCategories[0],
+        category: item.category || safeCategories[0] || 'Asosiy',
         is_available: item.is_available !== false
       });
 
@@ -198,7 +219,7 @@ export default function AdminMenuTab({
       setEditingItem(null);
       setNewItemData({ 
         name: '', 
-        category: safeCategories[0], 
+        category: safeCategories[0] || 'Asosiy', 
         is_available: true 
       });
       setVariantInputs([
@@ -275,7 +296,6 @@ export default function AdminMenuTab({
       return;
     }
 
-    // Retseptni ombor asosiy birligiga konvertatsiya qilib saqlaymiz (Sotuv vaqtida to'g'ri ayirishi uchun)
     const cleanedRecipe = recipeInputs
       .filter(r => r.inventoryId && Number(r.qty) > 0)
       .map(r => {
@@ -285,7 +305,6 @@ export default function AdminMenuTab({
         const chosenRecUnit = normalizeUnit(r.recipeUnit || invBaseUnit);
         const rawQtyNum = Number(r.qty);
 
-        // Ombor birligiga o'girilgan aniq miqdor
         const qtyInBaseUnit = convertRecipeQtyToInventoryUnit(rawQtyNum, chosenRecUnit, invBaseUnit);
 
         return {
@@ -484,7 +503,7 @@ export default function AdminMenuTab({
                     : [{ name: '1 porsiya', price: Number(item.price || 0) }];
 
                   const mainSellPrice = Number(variants[0]?.price || item.price || 0);
-                  const liveFoodCost = calculateRecipeFoodCost(item.recipe);
+                  const liveFoodCost = calculateRecipeFoodCost(item.recipe) || Number(item.costPrice || 0);
                   const netProfit = mainSellPrice - liveFoodCost;
                   const foodCostPct = mainSellPrice > 0 ? Math.round((liveFoodCost / mainSellPrice) * 100) : 0;
                   const marginPct = mainSellPrice > 0 ? Math.round((netProfit / mainSellPrice) * 100) : 0;
@@ -496,7 +515,6 @@ export default function AdminMenuTab({
                         !isAvailable ? 'opacity-65 bg-red-50/30 dark:bg-red-900/10' : ''
                       }`}
                     >
-                      {/* 1. Taom nomi va toifasi */}
                       <td className="p-4">
                         <p className="font-black text-gray-900 dark:text-gray-100 text-base">
                           {item.name}
@@ -506,7 +524,6 @@ export default function AdminMenuTab({
                         </span>
                       </td>
 
-                      {/* 2. Stop-List tugmasi */}
                       <td className="p-4">
                         <button
                           type="button"
@@ -521,7 +538,6 @@ export default function AdminMenuTab({
                         </button>
                       </td>
 
-                      {/* 3. Sotish Narxi */}
                       <td className="p-4">
                         <div className="space-y-1">
                           {variants.map((v, vIdx) => (
@@ -537,7 +553,6 @@ export default function AdminMenuTab({
                         </div>
                       </td>
                       
-                      {/* 4. Tannarxi (Food Cost) */}
                       <td className="p-4">
                         {Array.isArray(item.recipe) && item.recipe.length > 0 ? (
                           <div className="space-y-1">
@@ -561,7 +576,6 @@ export default function AdminMenuTab({
                         )}
                       </td>
 
-                      {/* 5. Sof Foyda (Margin) */}
                       <td className="p-4">
                         {Array.isArray(item.recipe) && item.recipe.length > 0 && liveFoodCost > 0 ? (
                           <div>
@@ -579,7 +593,6 @@ export default function AdminMenuTab({
                         )}
                       </td>
                       
-                      {/* 6. Amallar */}
                       <td className="p-4 text-right space-x-2 whitespace-nowrap">
                         <button 
                           type="button"
@@ -606,16 +619,14 @@ export default function AdminMenuTab({
         </div>
       </div>
 
-      {/* =======================================================
-          MODAL: YANGI TAOM / TEXNOLOGIK KARTA VA TANNARX KALKULYATORI
-          ======================================================= */}
+      {/* MODAL */}
       {isMenuModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-4 my-8 relative max-h-[92vh] overflow-y-auto">
             
             <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
               <h3 className="font-black text-lg text-gray-900 dark:text-white">
-                {editingItem ? '✏️ Taom va Tannarx Kalkulyatsiyasini Tahrirlash' : '🍽 Yangi Taom va Tannarx Kalkulyatsiyasi'}
+                {editingItem ? '✏️ Taom va Tannarxni Tahrirlash' : '🍽 Yangi Taom va Tannarx Kalkulyatsiyasi'}
               </h3>
               <button 
                 type="button"
@@ -627,8 +638,6 @@ export default function AdminMenuTab({
             </div>
 
             <form onSubmit={handleSaveMenuItem} className="space-y-5 pt-2">
-              
-              {/* 1. Taom Nomi va Toifasi */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
@@ -660,7 +669,7 @@ export default function AdminMenuTab({
                 </div>
               </div>
 
-              {/* 2. Porsiyalar va Sotish Narxi */}
+              {/* Porsiyalar va Sotish Narxi */}
               <div className="bg-gray-50 dark:bg-gray-900/40 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-3">
                 <div className="flex justify-between items-center">
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">
@@ -709,7 +718,7 @@ export default function AdminMenuTab({
                 </div>
               </div>
 
-              {/* 3. Texnologik Karta (Masalliqlar va Har birining Tannarxi) */}
+              {/* Texnologik Karta */}
               <div className="bg-amber-50/50 dark:bg-gray-900/30 p-4 rounded-2xl border border-amber-100 dark:border-gray-700 space-y-3">
                 <div className="flex justify-between items-center">
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">
@@ -843,7 +852,6 @@ export default function AdminMenuTab({
                 </div>
               </div>
 
-              {/* 4. Sotuv holati */}
               <label className="flex items-center justify-between p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-600 cursor-pointer">
                 <div>
                   <span className="font-black text-xs text-gray-900 dark:text-white block">
@@ -861,7 +869,6 @@ export default function AdminMenuTab({
                 />
               </label>
 
-              {/* 5. Saqlash va Bekor qilish */}
               <div className="flex gap-3 pt-4 border-t dark:border-gray-700">
                 <button 
                   type="button" 
