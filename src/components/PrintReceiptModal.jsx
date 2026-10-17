@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
 export default function PrintReceiptModal({ 
-  cafeName = 'Premium Cafe', 
+  cafeName: cafeNameProp, 
   receiptData, 
   order: orderProp,
   receipt: receiptProp,
@@ -9,8 +9,21 @@ export default function PrintReceiptModal({
   serviceFee = 10,
   onClose 
 }) {
-  // Printer qog'ozi kengligi: '80mm' (standart) yoki '58mm' (kichik kassa)
+  // Printer qog'ozi kengligi: '80mm' (standart kassa) yoki '58mm' (kichik mobil printer)
   const [paperSize, setPaperSize] = useState('80mm');
+  const [copiedReceipt, setCopiedReceipt] = useState(false);
+
+  // Kafe nomini prop'dan yoki localStorage'dan xavfsiz olish
+  const cafeName = useMemo(() => {
+    if (cafeNameProp && String(cafeNameProp).trim()) return String(cafeNameProp).trim();
+    try {
+      const saved = window.localStorage.getItem('pos_cafe_name');
+      if (saved) return JSON.parse(saved) || 'Premium Cafe';
+    } catch {
+      // ignore error
+    }
+    return 'Premium Cafe';
+  }, [cafeNameProp]);
 
   // ==========================================
   // 1. PROP'LARNI XAVFSIZ ANIQLASH (CRASH PROTECTION)
@@ -35,7 +48,9 @@ export default function PrintReceiptModal({
     return Array.isArray(resolvedOrder?.items) ? resolvedOrder.items : [];
   }, [resolvedOrder]);
 
-  // Agar totals alohida uzatilmagan bo'lsa, order ichidan avtomatik hisoblaymiz
+  // ==========================================
+  // 2. BARCHA SUMMALAR, CHEGIRMA VA BONUSLARNI HISOBLASH
+  // ==========================================
   const resolvedTotals = useMemo(() => {
     const rawTotals = receiptData?.totals || totalsProp;
 
@@ -55,7 +70,11 @@ export default function PrintReceiptModal({
     const isTakeaway = resolvedOrder?.table === 'Olib ketish';
     const feePct = isTakeaway 
       ? 0 
-      : Number(resolvedOrder?.serviceFee !== undefined ? resolvedOrder.serviceFee : serviceFee) || 0;
+      : Number(
+          rawTotals?.serviceFeePercent ??
+          resolvedOrder?.serviceFeePercent ??
+          (resolvedOrder?.serviceFee !== undefined ? resolvedOrder.serviceFee : serviceFee)
+        ) || 0;
 
     const serviceFeeAmount = Number(
       rawTotals?.serviceFeeAmount ?? 
@@ -70,24 +89,44 @@ export default function PrintReceiptModal({
       0
     ) || 0;
 
+    const usedBonusAmount = Number(
+      rawTotals?.usedBonusAmount ??
+      resolvedOrder?.usedBonus ??
+      0
+    ) || 0;
+
+    const earnedCashback = Number(
+      rawTotals?.earnedCashback ??
+      resolvedOrder?.earnedBonus ??
+      0
+    ) || 0;
+
     const finalTotal = Number(
       rawTotals?.finalTotal ?? 
       resolvedOrder?.finalTotal ?? 
       resolvedOrder?.total ?? 
-      Math.max(0, subTotal + serviceFeeAmount - discountAmount)
+      Math.max(0, subTotal + serviceFeeAmount - discountAmount - usedBonusAmount)
     ) || 0;
+
+    // Jami porsiyalar soni
+    const totalPortionsCount = safeItems.reduce((sum, item) => {
+      return sum + (Number(item?.quantity ?? item?.qty ?? 1) || 0);
+    }, 0);
 
     return {
       subTotal,
       serviceFeePercent: feePct,
       serviceFeeAmount,
       discountAmount,
-      finalTotal
+      usedBonusAmount,
+      earnedCashback,
+      finalTotal,
+      totalPortionsCount
     };
   }, [receiptData, totalsProp, resolvedOrder, safeItems, serviceFee]);
 
   // ==========================================
-  // 2. AVTOMATIK PRINT VA KLAVIATURA (ESC)
+  // 3. AVTOMATIK PRINT VA KLAVIATURA (ESC)
   // ==========================================
   useEffect(() => {
     if (!resolvedOrder) return;
@@ -111,15 +150,16 @@ export default function PrintReceiptModal({
   if (!resolvedOrder) return null;
 
   // ==========================================
-  // 3. YORDAMCHI MA'LUMOTLARNI FORMATLASH
+  // 4. REKVIZITLAR VA ELEKTRON CHEK MATNI
   // ==========================================
   const checkNumber = String(resolvedOrder.id || Date.now()).slice(-4);
   const tableLabel = resolvedOrder.table || '1-Stol';
   const waiterLabel = resolvedOrder.waiterName || resolvedOrder.waiter || 'Ofitsiant';
   const cashierLabel = resolvedOrder.cashierName || 'Kassir';
   const paymentMethodLabel = resolvedOrder.paymentMethod || 'Naqd';
+  const isDebtOrder = paymentMethodLabel === 'Qarz' || resolvedOrder.status === 'Qarz';
+  const debtorPerson = resolvedOrder.debtorName || resolvedOrder.paymentDetails?.debtorName || '';
 
-  // Sana va vaqtni xavfsiz shakllantirish (undefined chiqmasligi uchun)
   const displayDateTime = (() => {
     if (resolvedOrder.closeTime) return resolvedOrder.closeTime;
     if (resolvedOrder.date && resolvedOrder.time) return `${resolvedOrder.date} ${resolvedOrder.time}`;
@@ -138,15 +178,48 @@ export default function PrintReceiptModal({
     0
   ) || 0;
 
+  // Telegram va Nusxalash uchun matnli chek
+  const shareableText = [
+    `🧾 *${cafeName} — Xarid Cheki (#${checkNumber})*`,
+    `📅 Sana: ${displayDateTime}`,
+    `🪑 Joy: ${tableLabel} | 👤 Xodim: ${waiterLabel}`,
+    resolvedOrder.customerName ? `👑 Mijoz: ${resolvedOrder.customerName}` : null,
+    `--------------------------------`,
+    ...safeItems.map(item => {
+      const p = Number(item?.price ?? item?.variants?.[0]?.price ?? 0) || 0;
+      const q = Number(item?.quantity ?? item?.qty ?? 1) || 0;
+      return `• ${item?.name} (${q} x ${p.toLocaleString()}) = ${(p * q).toLocaleString()} so'm`;
+    }),
+    `--------------------------------`,
+    `Taomlar jami: ${resolvedTotals.subTotal.toLocaleString()} so'm`,
+    resolvedTotals.serviceFeeAmount > 0 ? `Xizmat haqi (${resolvedTotals.serviceFeePercent}%): +${resolvedTotals.serviceFeeAmount.toLocaleString()} so'm` : null,
+    resolvedTotals.discountAmount > 0 ? `Chegirma: -${resolvedTotals.discountAmount.toLocaleString()} so'm` : null,
+    resolvedTotals.usedBonusAmount > 0 ? `Bonusdan qoplandi: -${resolvedTotals.usedBonusAmount.toLocaleString()} so'm` : null,
+    `💰 *${isDebtOrder ? 'NASIYA (QARZ):' : "JAMI TO'LOV:"} ${resolvedTotals.finalTotal.toLocaleString()} so'm* (${paymentMethodLabel})`,
+    resolvedTotals.earnedCashback > 0 ? `🎁 Yangi yozilgan Cashback: +${resolvedTotals.earnedCashback.toLocaleString()} so'm` : null,
+    resolvedOrder.customerBonusBalance !== undefined && resolvedOrder.customerName
+      ? `💎 Umumiy bonus balansingiz: ${Number(resolvedOrder.customerBonusBalance).toLocaleString()} so'm`
+      : null,
+    `\nXaridingiz uchun rahmat! 😊`
+  ].filter(Boolean).join('\n');
+
+  const handleCopyText = () => {
+    if (!navigator?.clipboard) return;
+    navigator.clipboard.writeText(shareableText.replace(/\*/g, ''));
+    setCopiedReceipt(true);
+    setTimeout(() => setCopiedReceipt(false), 2000);
+  };
+
   // ==========================================
-  // 4. RENDER (UI VA PRINT SHABLONI)
+  // 5. RENDER (UI VA PRINT SHABLONI)
   // ==========================================
   return (
     <div 
+      id="receipt-modal-backdrop"
       onClick={() => typeof onClose === 'function' && onClose()}
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
     >
-      {/* TERMOPRINTER UCHUN MAXSUS CSS */}
+      {/* TERMOPRINTER UCHUN MAXSUS CSS (KESILIB QOLMASLIK KAFOLATI BILAN) */}
       <style>
         {`
           @media print {
@@ -154,22 +227,46 @@ export default function PrintReceiptModal({
               size: ${paperSize} auto;
               margin: 0mm;
             }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+              height: auto !important;
+              overflow: visible !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
             body * {
               visibility: hidden;
             }
-            #printable-receipt, #printable-receipt * {
-              visibility: visible;
+            #receipt-modal-backdrop,
+            #receipt-modal-box {
+              position: static !important;
+              width: auto !important;
+              max-width: none !important;
+              max-height: none !important;
+              height: auto !important;
+              overflow: visible !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              background: transparent !important;
+              box-shadow: none !important;
+            }
+            #printable-receipt,
+            #printable-receipt * {
+              visibility: visible !important;
             }
             #printable-receipt {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: ${paperSize};
-              margin: 0;
-              padding: ${paperSize === '58mm' ? '4px' : '10px'};
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: ${paperSize} !important;
+              margin: 0 !important;
+              padding: ${paperSize === '58mm' ? '4px' : '10px'} !important;
               box-shadow: none !important;
               background: #ffffff !important;
               color: #000000 !important;
+              overflow: visible !important;
             }
             .no-print {
               display: none !important;
@@ -180,8 +277,9 @@ export default function PrintReceiptModal({
 
       {/* MODAL QUTISI */}
       <div 
+        id="receipt-modal-box"
         onClick={(e) => e.stopPropagation()}
-        className="relative bg-white text-black p-4 sm:p-5 rounded-3xl shadow-2xl w-full max-w-[360px] max-h-[92vh] overflow-y-auto flex flex-col"
+        className="relative bg-white text-black p-4 sm:p-5 rounded-3xl shadow-2xl w-full max-w-[370px] max-h-[92vh] overflow-y-auto flex flex-col"
       >
         
         {/* YUQORI BOSHQARUV PANELI (Printda ko'rinmaydi) */}
@@ -257,13 +355,22 @@ export default function PrintReceiptModal({
               <span>Kassir:</span>
               <span className="font-bold">{cashierLabel}</span>
             </div>
+            {resolvedOrder.customerName && (
+              <div className="flex justify-between pt-0.5 border-t border-dotted border-black">
+                <span>Doimiy mijoz:</span>
+                <span className="font-black">
+                  {resolvedOrder.customerName}
+                  {resolvedOrder.customerPhone ? ` (${resolvedOrder.customerPhone})` : ''}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* 3. TAOMLAR JADVALI */}
           <table className="w-full text-[11px] mb-2.5">
             <thead>
               <tr className="border-b border-black font-black uppercase">
-                <th className="text-left pb-1 w-1/2">Taom</th>
+                <th className="text-left pb-1 w-1/2">Taom ({safeItems.length} xil)</th>
                 <th className="text-center pb-1">Soni</th>
                 <th className="text-right pb-1">Summa</th>
               </tr>
@@ -303,14 +410,14 @@ export default function PrintReceiptModal({
           {/* 4. YAKUNIY HISOB-KITOBLAR */}
           <div className="border-t-2 border-dashed border-black pt-2 mb-3 space-y-1 text-[11px]">
             <div className="flex justify-between">
-              <span>Taomlar jami:</span>
+              <span>Taomlar jami ({resolvedTotals.totalPortionsCount} pors):</span>
               <span className="font-bold">{resolvedTotals.subTotal.toLocaleString()} so'm</span>
             </div>
 
             {resolvedTotals.serviceFeeAmount > 0 && (
               <div className="flex justify-between">
                 <span>Xizmat haqi ({resolvedTotals.serviceFeePercent}%):</span>
-                <span className="font-bold">{resolvedTotals.serviceFeeAmount.toLocaleString()} so'm</span>
+                <span className="font-bold">+ {resolvedTotals.serviceFeeAmount.toLocaleString()} so'm</span>
               </div>
             )}
 
@@ -320,9 +427,16 @@ export default function PrintReceiptModal({
                 <span>- {resolvedTotals.discountAmount.toLocaleString()} so'm</span>
               </div>
             )}
+
+            {resolvedTotals.usedBonusAmount > 0 && (
+              <div className="flex justify-between font-black">
+                <span>Bonusdan qoplandi:</span>
+                <span>- {resolvedTotals.usedBonusAmount.toLocaleString()} so'm</span>
+              </div>
+            )}
             
             <div className="flex justify-between font-black text-sm pt-2 mt-1.5 border-t border-black">
-              <span>JAMI TO'LOV:</span>
+              <span>{isDebtOrder ? 'NASIYA SUMMASI:' : "JAMI TO'LOV:"}</span>
               <span>{resolvedTotals.finalTotal.toLocaleString()} so'm</span>
             </div>
             
@@ -345,31 +459,74 @@ export default function PrintReceiptModal({
               </div>
             )}
 
-            {/* Qarzga yozilgan bo'lsa */}
-            {paymentMethodLabel === 'Qarz' && (resolvedOrder.debtorName || resolvedOrder.paymentDetails?.debtorName) && (
-              <div className="flex justify-between text-[10px] pt-1">
-                <span>Mijoz (Qarzdor):</span>
-                <span className="font-black">
-                  {resolvedOrder.debtorName || resolvedOrder.paymentDetails?.debtorName}
-                </span>
+            {/* Qarzga (Nasiyaga) yozilgan bo'lsa — Qarzdor va Imzo joyi */}
+            {isDebtOrder && (
+              <div className="mt-2 pt-2 border-t border-dashed border-black space-y-1.5 text-[10px]">
+                <p className="font-black text-center uppercase">
+                  ⚠️ CHEK NASIYAGA (QARZGA) YOZILDI
+                </p>
+                {debtorPerson && (
+                  <div className="flex justify-between">
+                    <span>Qarzdor mijoz:</span>
+                    <span className="font-black">{debtorPerson}</span>
+                  </div>
+                )}
+                <div className="pt-3 flex justify-between items-end">
+                  <span>Mijoz imzosi:</span>
+                  <span>___________________</span>
+                </div>
               </div>
             )}
           </div>
 
-          {/* 5. FOOTER VA FISKAL QR-KOD */}
-          <div className="text-center text-[11px] mt-4 mb-2 border-t border-dashed border-black pt-3">
+          {/* 5. CRM CASHBACK VA BONUS BALANSI QUTISI */}
+          {(resolvedTotals.earnedCashback > 0 ||
+            resolvedTotals.usedBonusAmount > 0 ||
+            (resolvedOrder.customerName && resolvedOrder.customerBonusBalance !== undefined)) && (
+            <div className="border-2 border-black p-2 rounded-lg text-center mb-3 space-y-0.5 text-[10px]">
+              <p className="font-black uppercase border-b border-dotted border-black pb-0.5 mb-1">
+                🎁 Jamg'arma Bonus Dasturi
+              </p>
+              {resolvedTotals.usedBonusAmount > 0 && (
+                <div className="flex justify-between">
+                  <span>Chegirilgan bonus:</span>
+                  <span className="font-bold">-{resolvedTotals.usedBonusAmount.toLocaleString()} so'm</span>
+                </div>
+              )}
+              {resolvedTotals.earnedCashback > 0 && (
+                <div className="flex justify-between">
+                  <span>Shu xariddan Cashback:</span>
+                  <span className="font-black">+{resolvedTotals.earnedCashback.toLocaleString()} so'm</span>
+                </div>
+              )}
+              {resolvedOrder.customerBonusBalance !== undefined && (
+                <div className="flex justify-between pt-0.5 border-t border-dotted border-black font-black">
+                  <span>Joriy bonus qoldig'i:</span>
+                  <span>{Number(resolvedOrder.customerBonusBalance).toLocaleString()} so'm</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 6. FOOTER VA INLINE SVG QR-KOD */}
+          <div className="text-center text-[11px] mt-3 mb-2 border-t border-dashed border-black pt-3">
             <p className="font-black uppercase">Xaridingiz uchun rahmat!</p>
             <p className="text-[10px] mt-0.5">Yoqimli ishtaha! Yana kutib qolamiz :)</p>
           </div>
           
           <div className="flex flex-col items-center justify-center mt-2 pb-2">
-            <div className="w-20 h-20 border-2 border-black flex items-center justify-center p-1">
-              <div 
-                className="w-full h-full bg-cover"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0xMCAxMGgzMHYzMEgxMHptMTAgMTBoMTB2MTBIMjB6bTQwLTQwaDMwdjMwSDYwem0xMCAxMGgxMHYxMEg3MHpNMTAgNjBoMzB2MzBIMTB6bTEwIDEwaDEwdjEwSDIwem0zMC02MGgyMHYxMEg1MHptMCA0MGgyMHYzMEg1MHpNNzAgNjBoMjB2MTBINzB6IiBmaWxsPSJibGFjayIvPjwvc3ZnPg==")`
-                }}
-              />
+            <div className="w-20 h-20 border-2 border-black flex items-center justify-center p-1 bg-white">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 100 100"
+                className="w-full h-full"
+              >
+                <rect width="100" height="100" fill="#ffffff" />
+                <path
+                  d="M10 10h30v30H10zm10 10h10v10H20zm40-10h30v30H60zm10 10h10v10H70zM10 60h30v30H10zm10 10h10v10H20zm30-60h10v20H50zm0 30h20v10H50zm-10 10h10v10H40zm10 10h10v30H50zm20 0h20v10H70zm0 20h10v10H70zm10-10h10v20H80z"
+                  fill="#000000"
+                />
+              </svg>
             </div>
             <span className="text-[9px] font-bold mt-1">
               ID: {resolvedOrder.id || checkNumber}
@@ -381,22 +538,43 @@ export default function PrintReceiptModal({
         {/* PRINTERGA KETADIGAN QISM TUGADI            */}
         {/* ========================================== */}
 
-        {/* PASTKI TUGMALAR (Printda ko'rinmaydi) */}
-        <div className="no-print flex gap-2 mt-4 pt-3 border-t border-gray-200">
-          <button 
-            type="button"
-            onClick={onClose}
-            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-black py-3.5 rounded-2xl text-sm transition active:scale-95"
-          >
-            Yopish
-          </button>
-          <button 
-            type="button"
-            onClick={() => window.print()}
-            className="flex-[1.5] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-2xl text-sm shadow-lg shadow-indigo-600/30 transition active:scale-95 flex items-center justify-center gap-1.5"
-          >
-            <span>🖨</span> Qayta chop etish
-          </button>
+        {/* PASTKI BOSHQARUV TUGMALARI (Printda ko'rinmaydi) */}
+        <div className="no-print space-y-2 mt-4 pt-3 border-t border-gray-200">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleCopyText}
+              className="py-2.5 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-black text-xs transition active:scale-95"
+            >
+              {copiedReceipt ? '✅ Nusxalandi!' : '📋 Matnni nusxalash'}
+            </button>
+
+            <a
+              href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(shareableText)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="py-2.5 px-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-black text-xs text-center flex items-center justify-center gap-1 transition active:scale-95"
+            >
+              <span>✈️</span> Telegramdan ulashish
+            </a>
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-black py-3.5 rounded-2xl text-sm transition active:scale-95"
+            >
+              Yopish
+            </button>
+            <button 
+              type="button"
+              onClick={() => window.print()}
+              className="flex-[1.5] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-2xl text-sm shadow-lg shadow-indigo-600/30 transition active:scale-95 flex items-center justify-center gap-1.5"
+            >
+              <span>🖨</span> Qayta chop etish
+            </button>
+          </div>
         </div>
 
       </div>
