@@ -8,7 +8,9 @@ export default function StatsOverviewCards({
   totalNetProfit,
   totalOrdersCount = 0, 
   totalServiceFee = 0, 
-  totalDiscount = 0 
+  totalDiscount = 0,
+  periodLabel = 'Joriy davr',
+  onOpenReceiptsModal
 }) {
   // Xavfsiz raqamlar (Oq oyna va NaN xatosidan 100% himoya)
   const safeRevenue = Number(totalRevenue) || 0;
@@ -51,18 +53,33 @@ export default function StatsOverviewCards({
     ? ((safeDiscount / grossBeforeDiscount) * 100).toFixed(1) 
     : '0.0';
 
+  const handleOpenReceipts = () => {
+    if (typeof onOpenReceiptsModal === 'function') {
+      onOpenReceiptsModal('paid');
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
       
-      {/* 1. JAMI TUSHUM KARTASI */}
-      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/80 dark:from-emerald-900/30 dark:to-emerald-800/20 p-6 rounded-3xl border border-emerald-200 dark:border-emerald-800/50 shadow-sm hover:shadow-md transition-all relative overflow-hidden group flex flex-col justify-between">
+      {/* 1. JAMI TUSHUM KARTASI (Bosilganda cheklar ro'yxatini ochadi) */}
+      <div 
+        onClick={handleOpenReceipts}
+        className="bg-gradient-to-br from-emerald-50 to-emerald-100/80 dark:from-emerald-900/30 dark:to-emerald-800/20 p-6 rounded-3xl border border-emerald-200 dark:border-emerald-800/50 shadow-sm hover:shadow-md transition-all relative overflow-hidden group flex flex-col justify-between cursor-pointer"
+        title="Bosib ushbu davrdagi cheklar ro'yxatini ko'ring"
+      >
         <div className="absolute right-[-16px] top-[-16px] opacity-10 text-8xl group-hover:scale-110 transition-transform select-none pointer-events-none">
           💰
         </div>
         <div className="relative z-10">
-          <p className="text-emerald-700 dark:text-emerald-400 text-xs font-black uppercase tracking-wider mb-2">
-            1. Jami Kassaga Tushum
-          </p>
+          <div className="flex justify-between items-center gap-2 mb-2">
+            <p className="text-emerald-700 dark:text-emerald-400 text-xs font-black uppercase tracking-wider">
+              1. Jami Kassaga Tushum
+            </p>
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-emerald-200/70 dark:bg-emerald-800/60 text-emerald-800 dark:text-emerald-200 truncate max-w-[130px]">
+              📅 {periodLabel}
+            </span>
+          </div>
           <h2 className="text-2xl sm:text-3xl xl:text-4xl font-black text-gray-900 dark:text-white tracking-tight break-words">
             {safeRevenue.toLocaleString()}{' '}
             <span className="text-base sm:text-lg text-emerald-600 dark:text-emerald-400 font-extrabold">
@@ -86,7 +103,7 @@ export default function StatsOverviewCards({
             2. Xomashyo Tannarxi (Food Cost)
           </p>
           <h2 className="text-2xl sm:text-3xl xl:text-4xl font-black text-gray-900 dark:text-white tracking-tight break-words">
-            -{safeFoodCost.toLocaleString()}{' '}
+            {safeFoodCost > 0 ? `-${safeFoodCost.toLocaleString()}` : '0'}{' '}
             <span className="text-base sm:text-lg text-orange-600 dark:text-orange-400 font-extrabold">
               s
             </span>
@@ -98,7 +115,7 @@ export default function StatsOverviewCards({
         </div>
       </div>
 
-      {/* 3. KUNLIK KASSA XARAJATLARI VA INKASSATSIYA (YANGI KARTA) */}
+      {/* 3. KUNLIK KASSA XARAJATLARI VA INKASSATSIYA */}
       <div className="bg-gradient-to-br from-rose-50 to-red-100/80 dark:from-rose-900/30 dark:to-red-800/20 p-6 rounded-3xl border border-rose-200 dark:border-rose-800/50 shadow-sm hover:shadow-md transition-all relative overflow-hidden group flex flex-col justify-between">
         <div className="absolute right-[-16px] top-[-16px] opacity-10 text-8xl group-hover:scale-110 transition-transform select-none pointer-events-none">
           💸
@@ -108,7 +125,7 @@ export default function StatsOverviewCards({
             3. Kunlik Xarajatlar ({expensePercent}%)
           </p>
           <h2 className="text-2xl sm:text-3xl xl:text-4xl font-black text-gray-900 dark:text-white tracking-tight break-words">
-            -{safeExpenses.toLocaleString()}{' '}
+            {safeExpenses > 0 ? `-${safeExpenses.toLocaleString()}` : '0'}{' '}
             <span className="text-base sm:text-lg text-rose-600 dark:text-rose-400 font-extrabold">
               s
             </span>
@@ -144,15 +161,24 @@ export default function StatsOverviewCards({
         </div>
       </div>
       
-      {/* 5. YOPILGAN CHEKLAR VA XIZMAT HAQI KARTASI */}
-      <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/80 dark:from-indigo-900/30 dark:to-indigo-800/20 p-6 rounded-3xl border border-indigo-200 dark:border-indigo-800/50 shadow-sm hover:shadow-md transition-all relative overflow-hidden group flex flex-col justify-between">
+      {/* 5. YOPILGAN CHEKLAR VA INTERAKTIV OCHISH KARTASI */}
+      <div 
+        onClick={handleOpenReceipts}
+        className="bg-gradient-to-br from-indigo-50 to-indigo-100/80 dark:from-indigo-900/30 dark:to-indigo-800/20 p-6 rounded-3xl border-2 border-indigo-300 dark:border-indigo-700 shadow-sm hover:shadow-lg hover:border-indigo-500 transition-all relative overflow-hidden group flex flex-col justify-between cursor-pointer"
+        title="Barcha yopilgan cheklarning ichini va sanalar bo'yicha ro'yxatini ko'rish uchun bosing"
+      >
         <div className="absolute right-[-16px] top-[-16px] opacity-10 text-8xl group-hover:scale-110 transition-transform select-none pointer-events-none">
           🧾
         </div>
         <div className="relative z-10">
-          <p className="text-indigo-700 dark:text-indigo-400 text-xs font-black uppercase tracking-wider mb-2">
-            5. Yopilgan Cheklar ({safeOrdersCount} ta)
-          </p>
+          <div className="flex justify-between items-center gap-2 mb-2">
+            <p className="text-indigo-700 dark:text-indigo-400 text-xs font-black uppercase tracking-wider">
+              5. Yopilgan Cheklar ({safeOrdersCount} ta)
+            </p>
+            <span className="px-2.5 py-1 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase shadow-sm group-hover:scale-105 transition">
+              👁 Cheklarni ochish →
+            </span>
+          </div>
           <h2 className="text-2xl sm:text-3xl xl:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
             {averageCheck.toLocaleString()}{' '}
             <span className="text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 font-extrabold">
