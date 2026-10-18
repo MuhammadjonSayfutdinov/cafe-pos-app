@@ -3,8 +3,7 @@ import useSticky from '../hooks/useSticky';
 import WaiterTableGrid from './WaiterTableGrid';
 import WaiterMenu from './WaiterMenu';
 import WaiterCart from './WaiterCart';
-import PrintReceiptModal from './PrintReceiptModal';
-import { TableQrModal } from './Modals';
+import WaiterActionModals from './WaiterActionModals';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -16,8 +15,8 @@ const playWaiterBeep = () => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(784, now); // G5
-    osc.frequency.setValueAtTime(1046.5, now + 0.15); // C6
+    osc.frequency.setValueAtTime(784, now);
+    osc.frequency.setValueAtTime(1046.5, now + 0.15);
     gain.gain.setValueAtTime(0.25, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
     osc.connect(gain);
@@ -29,7 +28,6 @@ const playWaiterBeep = () => {
   }
 };
 
-// Ichki xavfsiz Telegram xabar yuborgich (Taom o'chirilganda yoki Pre-chek buzilganda)
 const escapeHtml = (str) =>
   String(str ?? '')
     .replace(/&/g, '&amp;')
@@ -65,7 +63,7 @@ async function sendWaiterSecurityTelegram(linesArray) {
       )
     );
   } catch {
-    // Internet bo'lmasa ofitsiant ishlashiga xalaqit bermaydi
+    // ignore offline error
   }
 }
 
@@ -80,13 +78,12 @@ export default function WaiterMode({
   cafeName: cafeNameProp,
   serviceFee = 10,
   currentUser,
-  requireAdminOverride,
   onPrintReceipt,
   setReceiptToPrint,
   addAuditLog
 }) {
   // =========================================================
-  // 1. ZAXIRA XOTIRA VA BRON / VIP-TAYMER STATE'LARI
+  // 1. ZAXIRA XOTIRA VA AUDIT LOG SINXRONIZATORI
   // =========================================================
   const [stickyTables] = useSticky(
     'pos_tables',
@@ -98,6 +95,7 @@ export default function WaiterMode({
   const [stickyUsers] = useSticky('pos_users', []);
   const [stickyOverrideEnabled] = useSticky('pos_override_enabled', true);
   const [stickyCafeName] = useSticky('pos_cafe_name', 'Premium Cafe');
+  const [, setStickyAuditLogs] = useSticky('pos_audit_logs', []);
 
   // Stol Bronlari va Soatbay VIP-Taymerlar xotirasi
   const [reservations, setReservations] = useSticky('pos_reservations', {});
@@ -131,12 +129,54 @@ export default function WaiterMode({
 
   const resolvedCafeName = cafeNameProp || stickyCafeName || 'Premium Cafe';
 
+  // Buyurtmalarni ham App.jsx state'iga, ham localStorage'ga bir vaqtda yozish
   const updateOrders = useCallback((updater) => {
     if (typeof setOrdersProp === 'function') {
       setOrdersProp(updater);
     }
     setStickyOrders(updater);
   }, [setOrdersProp, setStickyOrders]);
+
+  // 🕵️‍♂️ KAFOLATLANGAN AUDIT LOG YOZUVCHISI (App.jsx dan prop kelmasa ham 100% Tarixga yozadi!)
+  const recordAuditLog = useCallback((action, details) => {
+    const nowStr = new Date().toLocaleString();
+    const newEntry = {
+      id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      date: nowStr,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      user: currentUser?.name || 'Ofitsiant',
+      userName: currentUser?.name || 'Ofitsiant',
+      role: currentUser?.role || 'waiter',
+      action,
+      details
+    };
+
+    if (typeof addAuditLog === 'function') {
+      addAuditLog(action, details);
+    } else {
+      setStickyAuditLogs(prev => [newEntry, ...(Array.isArray(prev) ? prev : [])]);
+    }
+
+    // LocalStorage'ga to'g'ridan-to'g'ri kafolatli yozish
+    try {
+      const raw = window.localStorage.getItem('pos_audit_logs');
+      const list = raw ? JSON.parse(raw) : [];
+      const isDuplicate =
+        Array.isArray(list) &&
+        list[0] &&
+        list[0].action === action &&
+        list[0].details === details &&
+        Date.now() - Number(String(list[0].id).split('_')[1] || 0) < 1500;
+
+      if (!isDuplicate) {
+        const nextList = [newEntry, ...(Array.isArray(list) ? list : [])];
+        window.localStorage.setItem('pos_audit_logs', JSON.stringify(nextList));
+        window.dispatchEvent(new Event('pos-sticky-update'));
+      }
+    } catch {
+      // ignore storage error
+    }
+  }, [addAuditLog, currentUser, setStickyAuditLogs]);
 
   // =========================================================
   // 2. OFITSIANT ISHCHI VA XAVFSIZLIK STATE'LARI
@@ -155,13 +195,12 @@ export default function WaiterMode({
   const [splitTargetTable, setSplitTargetTable] = useState('');
   const [splitQuantities, setSplitQuantities] = useState({});
 
-  // 🔒 ICHKI ADMIN PIN TASDIQLASH MODALI (Agar App.jsx dan requireAdminOverride kelmagan bo'lsa ham 100% ishlaydi)
-  const [securityPrompt, setSecurityPrompt] = useState(null); // { title, reason, onConfirm }
+  // Admin PIN tasdiqlash modali statelari
+  const [securityPrompt, setSecurityPrompt] = useState(null);
   const [pinInput, setPinInput] = useState('');
   const [cancelReasonInput, setCancelReasonInput] = useState('Mijoz rad etdi');
   const [pinError, setPinError] = useState('');
 
-  // Tayyor taom yoki mijoz chaqiruvi uchun ovozli signal nazorati
   const prevReadyCountRef = useRef(0);
 
   useEffect(() => {
@@ -175,7 +214,6 @@ export default function WaiterMode({
     prevReadyCountRef.current = readyOrCalledCount;
   }, [safeOrders]);
 
-  // Tanlangan stolning joriy ochiq buyurtmasi
   const currentTableOrder = useMemo(() => {
     if (!selectedTable) return null;
     return (
@@ -189,16 +227,63 @@ export default function WaiterMode({
   }, [safeOrders, selectedTable]);
 
   // =========================================================
-  // 3. 🔒 UNIVERSAL ADMIN PIN HIMOYA MOTORI
+  // 3. 🔥 OSHXONA VA KASSANI JONLI YANGILOVCHI FUNKSIYA (BUG FIX!)
   // =========================================================
-  const requestSecurityApproval = useCallback((actionTitle, onApprovedCallback) => {
-    // Agar foydalanuvchining o'zi Admin bo'lsa yoki PIN-himoya o'chirilgan bo'lsa
-    if (currentUser?.role === 'admin' || stickyOverrideEnabled === false) {
-      onApprovedCallback('Admin tomonidan bajarildi');
+  const syncOrderInDatabase = useCallback((nextCartItems) => {
+    if (!currentTableOrder) return;
+
+    // AGAR CHEKDAGI BARCHA TAOMLAR O'CHIRILGAN BO'LSA -> BUYURTMANI OSHXONA VA KASSADAN HAM O'CHIRAMIZ!
+    if (!Array.isArray(nextCartItems) || nextCartItems.length === 0) {
+      updateOrders(prev =>
+        (Array.isArray(prev) ? prev : []).filter(
+          o => o && String(o.id) !== String(currentTableOrder.id)
+        )
+      );
+      setCart([]);
+      setSelectedTable(null);
       return;
     }
 
-    // Ichki Admin PIN + Sabab modalini ochamiz
+    // Agar chekda taomlar qolgan bo'lsa -> Oshxona va Kassadagi buyurtmani darhol yangilaymiz!
+    const subTotal = nextCartItems.reduce((sum, item) => {
+      const p = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;
+      const q = Number(item.quantity ?? item.qty ?? 1) || 0;
+      return sum + p * q;
+    }, 0);
+
+    const isTakeaway = selectedTable === 'Olib ketish';
+    const feePct = isTakeaway ? 0 : Number(currentTableOrder.serviceFee ?? serviceFee) || 0;
+    const serviceFeeAmount = Math.round((subTotal * feePct) / 100);
+    const totalAmount = subTotal + serviceFeeAmount;
+
+    updateOrders(prev =>
+      (Array.isArray(prev) ? prev : []).map(o =>
+        o && String(o.id) === String(currentTableOrder.id)
+          ? {
+              ...o,
+              items: nextCartItems,
+              subTotal,
+              subtotal: subTotal,
+              serviceFee: feePct,
+              serviceFeePercent: feePct,
+              serviceFeeAmount,
+              total: totalAmount,
+              finalTotal: totalAmount
+            }
+          : o
+      )
+    );
+  }, [currentTableOrder, selectedTable, serviceFee, updateOrders]);
+
+  // =========================================================
+  // 4. 🔒 ADMIN PIN TEKSHIRUV MOTORI
+  // =========================================================
+  const requestSecurityApproval = useCallback((actionTitle, onApprovedCallback) => {
+    if (stickyOverrideEnabled === false) {
+      onApprovedCallback('Erkin rejimda bajarildi');
+      return;
+    }
+
     setPinInput('');
     setCancelReasonInput('Mijoz rad etdi');
     setPinError('');
@@ -206,7 +291,7 @@ export default function WaiterMode({
       title: actionTitle,
       onConfirm: onApprovedCallback
     });
-  }, [currentUser?.role, stickyOverrideEnabled]);
+  }, [stickyOverrideEnabled]);
 
   const handleConfirmSecurityPin = (e) => {
     e.preventDefault();
@@ -217,17 +302,18 @@ export default function WaiterMode({
       u => u && String(u.role || '').toLowerCase() === 'admin'
     );
 
-    const isValidAdminPin =
-      adminUsers.some(u => String(u.pin || u.password || '') === cleanPin) ||
-      ['111111', '000000', '123456', '1111', '0000'].includes(cleanPin);
+    const matchedAdmin = adminUsers.find(u => String(u.pin || u.password || '') === cleanPin);
+    const isDefaultPin = ['111111', '000000', '123456', '1111', '0000'].includes(cleanPin);
 
-    if (!isValidAdminPin) {
+    if (!matchedAdmin && !isDefaultPin) {
       setPinError("❌ Admin PIN-kodi noto'g'ri!");
       return;
     }
 
+    const adminLabel = matchedAdmin?.name || 'Admin';
     const callback = securityPrompt.onConfirm;
-    const reason = cancelReasonInput.trim() || 'Sabab ko\'rsatilmadi';
+    const reason = `${cancelReasonInput} (Tasdiqladi: ${adminLabel})`;
+
     setSecurityPrompt(null);
     setPinInput('');
     setPinError('');
@@ -238,7 +324,7 @@ export default function WaiterMode({
   };
 
   // =========================================================
-  // 4. STOL TANLASH VA SAVATCHA (CART) BOSHQARUVI
+  // 5. STOL TANLASH VA SAVATCHA HARAKATLARI
   // =========================================================
   const handleSelectTable = (tableName) => {
     setSelectedTable(tableName);
@@ -261,7 +347,6 @@ export default function WaiterMode({
             cartItemId: item.cartItemId || `${item.id || idx}_${idx}`,
             quantity: currentQ,
             qty: currentQ,
-            // sentQty — bu taomdan oshxonaga nechta porsiya allaqachon ketganini bildiradi (Qulf uchun!)
             sentQty: Number(item.sentQty ?? currentQ) || currentQ,
             price: Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0
           };
@@ -272,7 +357,6 @@ export default function WaiterMode({
     }
   };
 
-  // Taomni savatchaga qo'shish
   const handleAddToCart = useCallback((dishItem, chosenVariant = null, customNote = '') => {
     if (!dishItem || dishItem.is_available === false) return;
 
@@ -323,14 +407,14 @@ export default function WaiterMode({
           price: itemPrice,
           quantity: 1,
           qty: 1,
-          sentQty: 0, // Yangi qo'shilgan taom hali oshxonaga ketmagan
+          sentQty: 0,
           note: itemNote
         }
       ];
     });
   }, []);
 
-  // 🔒 Savatchada taom miqdorini o'zgartirish (+1 / -1) — OSHXONA VA PRE-CHEK QULFI BILAN!
+  // 🔒 Miqdorni o'zgartirish (+1 / -1) -> Oshxona va Kassani DARHOL yangilaydi!
   const handleUpdateQuantity = useCallback((targetIdentifier, delta = 0) => {
     const numDelta = Number(delta) || 0;
     if (numDelta === 0) return;
@@ -352,7 +436,6 @@ export default function WaiterMode({
     const nextQty = currentQty + numDelta;
     const isPreCheckLocked = Boolean(currentTableOrder?.isPreCheckPrinted);
 
-    // Agar ofitsiant oshxonaga ketgan porsiyani kamaytirmoqchi bo'lsa YOKI Pre-chek chiqarilgan bo'lsa -> ADMIN PIN SO'RALADI!
     if (numDelta < 0 && (nextQty < sentQty || isPreCheckLocked)) {
       const removedCount = Math.min(currentQty, Math.abs(numDelta));
       const lostSum = removedCount * (Number(targetItem.price) || 0);
@@ -360,53 +443,51 @@ export default function WaiterMode({
       requestSecurityApproval(
         `🔒 ${selectedTable}: "${targetItem.name}" taomini kamaytirish (-${removedCount} pors / -${lostSum.toLocaleString()} s)`,
         (reason) => {
-          setCart(prev =>
-            prev
-              .map((item, idx) => {
-                if (!item) return null;
-                const isMatch =
-                  item.cartItemId === targetIdentifier ||
-                  String(item.id) === String(targetIdentifier) ||
-                  item.name === targetIdentifier ||
-                  idx === targetIdentifier;
-                if (!isMatch) return item;
+          const updatedCart = cart
+            .map((item, idx) => {
+              if (!item) return null;
+              const isMatch =
+                item.cartItemId === targetIdentifier ||
+                String(item.id) === String(targetIdentifier) ||
+                item.name === targetIdentifier ||
+                idx === targetIdentifier;
+              if (!isMatch) return item;
 
-                return nextQty > 0
-                  ? {
-                      ...item,
-                      quantity: nextQty,
-                      qty: nextQty,
-                      sentQty: Math.min(sentQty, nextQty)
-                    }
-                  : null;
-              })
-              .filter(Boolean)
+              return nextQty > 0
+                ? {
+                    ...item,
+                    quantity: nextQty,
+                    qty: nextQty,
+                    sentQty: Math.min(sentQty, nextQty)
+                  }
+                : null;
+            })
+            .filter(Boolean);
+
+          setCart(updatedCart);
+          // DARHOL OSHXONA VA KASSANI YANGILASH!
+          syncOrderInDatabase(updatedCart);
+
+          // DARHOL AUDIT LOG'GA YOZISH!
+          recordAuditLog(
+            'Oshxonaga ketgan taom kamaytirildi (PIN)',
+            `${selectedTable}: "${targetItem.name}" (-${removedCount} pors / -${lostSum.toLocaleString()} s) • Xodim: ${currentUser?.name || 'Ofitsiant'} • Sabab: ${reason}`
           );
-
-          if (typeof addAuditLog === 'function') {
-            addAuditLog(
-              'Oshxonaga ketgan taom kamaytirildi (PIN)',
-              `${selectedTable}: "${targetItem.name}" (-${removedCount} pors / -${lostSum.toLocaleString()} s) • Ofitsiant: ${currentUser?.name || 'Ofitsiant'} • Sabab: ${reason}`
-            );
-          }
 
           sendWaiterSecurityTelegram([
             `🚨 <b>CHEKDAGI TAOM KAMAYTIRILDI (${escapeHtml(resolvedCafeName)})</b>`,
             isPreCheckLocked ? `🔒 <b>DIQQAT:</b> Pre-chek chiqarilgan stoldan!` : null,
-            `━━━━━━━━━━━━━━━━━━`,
             `🪑 <b>Joy:</b> ${escapeHtml(selectedTable)}`,
             `🍽 <b>Taom:</b> ${escapeHtml(targetItem.name)} (-${removedCount} pors)`,
             `💰 <b>Kamaygan summa:</b> <b>-${lostSum.toLocaleString()} so'm</b>`,
             `👤 <b>Ofitsiant:</b> ${escapeHtml(currentUser?.name || 'Ofitsiant')}`,
-            `📝 <b>Sababi:</b> ${escapeHtml(reason)}`,
-            `🕒 <b>Vaqt:</b> ${escapeHtml(new Date().toLocaleString())}`
+            `📝 <b>Sababi:</b> ${escapeHtml(reason)}`
           ]);
         }
       );
       return;
     }
 
-    // Oddiy holatda (+1 qo'shish yoki hali oshxonaga yuborilmagan taomni kamaytirish)
     setCart(prev =>
       prev
         .map((item, idx) => {
@@ -424,9 +505,9 @@ export default function WaiterMode({
         })
         .filter(Boolean)
     );
-  }, [cart, currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, addAuditLog]);
+  }, [cart, currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, syncOrderInDatabase, recordAuditLog]);
 
-  // 🔒 Savatchadan taomni butunlay o'chirish (`🗑`) — OSHXONA VA PRE-CHEK QULFI BILAN!
+  // 🔒 Taomni savatchadan butunlay o'chirish (`🗑`) -> Oshxona va Kassadan DARHOL o'chiradi!
   const handleRemoveFromCart = useCallback((targetIdentifier) => {
     const targetItem = cart.find((item, idx) => {
       if (!item) return false;
@@ -448,37 +529,36 @@ export default function WaiterMode({
       const lostSum = currentQty * (Number(targetItem.price) || 0);
 
       requestSecurityApproval(
-        `🔒 ${selectedTable}: "${targetItem.name}" (x${currentQty}) taomini chekdan butunlay o'chirish (-${lostSum.toLocaleString()} s)`,
+        `🔒 ${selectedTable}: "${targetItem.name}" (x${currentQty}) taomini o'chirish (-${lostSum.toLocaleString()} s)`,
         (reason) => {
-          setCart(prev =>
-            prev.filter((item, idx) => {
-              if (!item) return false;
-              const isMatch =
-                item.cartItemId === targetIdentifier ||
-                String(item.id) === String(targetIdentifier) ||
-                item.name === targetIdentifier ||
-                idx === targetIdentifier;
-              return !isMatch;
-            })
-          );
+          const updatedCart = cart.filter((item, idx) => {
+            if (!item) return false;
+            const isMatch =
+              item.cartItemId === targetIdentifier ||
+              String(item.id) === String(targetIdentifier) ||
+              item.name === targetIdentifier ||
+              idx === targetIdentifier;
+            return !isMatch;
+          });
 
-          if (typeof addAuditLog === 'function') {
-            addAuditLog(
-              "Oshxonaga ketgan taom o'chirildi (PIN)",
-              `${selectedTable}: "${targetItem.name}" (x${currentQty} / -${lostSum.toLocaleString()} s) • Sabab: ${reason}`
-            );
-          }
+          setCart(updatedCart);
+          // DARHOL OSHXONA VA KASSADAN O'CHIRISH!
+          syncOrderInDatabase(updatedCart);
+
+          // DARHOL AUDIT LOG'GA YOZISH!
+          recordAuditLog(
+            "Oshxonaga ketgan taom o'chirildi (PIN)",
+            `${selectedTable}: "${targetItem.name}" (x${currentQty} / -${lostSum.toLocaleString()} s) • Xodim: ${currentUser?.name || 'Ofitsiant'} • Sabab: ${reason}`
+          );
 
           sendWaiterSecurityTelegram([
             `🚨 <b>CHEKDAN TAOM O'CHIRILDI (${escapeHtml(resolvedCafeName)})</b>`,
             isPreCheckLocked ? `🔒 <b>DIQQAT:</b> Pre-chek chiqarilgan stoldan!` : null,
-            `━━━━━━━━━━━━━━━━━━`,
             `🪑 <b>Joy:</b> ${escapeHtml(selectedTable)}`,
             `🗑 <b>O'chirilgan taom:</b> ${escapeHtml(targetItem.name)} (x${currentQty})`,
             `💰 <b>Summa:</b> <b>-${lostSum.toLocaleString()} so'm</b>`,
             `👤 <b>Ofitsiant:</b> ${escapeHtml(currentUser?.name || 'Ofitsiant')}`,
-            `📝 <b>Sababi:</b> ${escapeHtml(reason)}`,
-            `🕒 <b>Vaqt:</b> ${escapeHtml(new Date().toLocaleString())}`
+            `📝 <b>Sababi:</b> ${escapeHtml(reason)}`
           ]);
         }
       );
@@ -496,7 +576,33 @@ export default function WaiterMode({
         return !isMatch;
       })
     );
-  }, [cart, currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, addAuditLog]);
+  }, [cart, currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, syncOrderInDatabase, recordAuditLog]);
+
+  // 🔒 Stol buyurtmasini to'liq bekor qilish (Oshxona va Kassadan butunlay o'chirish)
+  const handleCancelEntireOrder = useCallback(() => {
+    if (!currentTableOrder) return;
+    const orderTotal = Number(currentTableOrder.finalTotal || currentTableOrder.total || 0);
+
+    requestSecurityApproval(
+      `🛑 ${selectedTable} buyurtmasini to'liq bekor qilish va o'chirish (-${orderTotal.toLocaleString()} s)`,
+      (reason) => {
+        syncOrderInDatabase([]);
+
+        recordAuditLog(
+          "Stol buyurtmasi to'liq bekor qilindi (PIN)",
+          `${selectedTable} cheki (-${orderTotal.toLocaleString()} s) o'chirildi • Xodim: ${currentUser?.name || 'Ofitsiant'} • Sabab: ${reason}`
+        );
+
+        sendWaiterSecurityTelegram([
+          `🚨 <b>STOL BUYURTMASI TO'LIQ BEKOR QILINDI (${escapeHtml(resolvedCafeName)})</b>`,
+          `🪑 <b>Joy:</b> ${escapeHtml(selectedTable)}`,
+          `💰 <b>Bekor bo'lgan summa:</b> <b>-${orderTotal.toLocaleString()} so'm</b>`,
+          `👤 <b>Ofitsiant:</b> ${escapeHtml(currentUser?.name || 'Ofitsiant')}`,
+          `📝 <b>Sababi:</b> ${escapeHtml(reason)}`
+        ]);
+      }
+    );
+  }, [currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, syncOrderInDatabase, recordAuditLog]);
 
   const handleUpdateNote = useCallback((targetIdentifier, nextNote) => {
     setCart(prev =>
@@ -513,7 +619,7 @@ export default function WaiterMode({
   }, []);
 
   // =========================================================
-  // 5. 🔒 OFITSIANT EKRANIDAN PRE-CHEK CHIQARISH VA QULFLASH
+  // 6. PRE-CHEK CHIQARISH VA BUYURTMANI OSHXONAGA YUBORISH
   // =========================================================
   const handleLockAndPrintPreCheck = () => {
     if (!currentTableOrder) return;
@@ -544,12 +650,10 @@ export default function WaiterMode({
       )
     );
 
-    if (typeof addAuditLog === 'function') {
-      addAuditLog(
-        'Ofitsiant Pre-chek chiqardi (Qulflandi)',
-        `${selectedTable}: ${Number(currentTableOrder.finalTotal || currentTableOrder.total || 0).toLocaleString()} so'm (${nextPreCheckCount}-marta)`
-      );
-    }
+    recordAuditLog(
+      'Ofitsiant Pre-chek chiqardi (Qulflandi)',
+      `${selectedTable}: ${Number(currentTableOrder.finalTotal || currentTableOrder.total || 0).toLocaleString()} so'm (${nextPreCheckCount}-marta)`
+    );
 
     const externalPrinter = onPrintReceipt || setReceiptToPrint;
     if (typeof externalPrinter === 'function') {
@@ -559,20 +663,9 @@ export default function WaiterMode({
     }
   };
 
-  // =========================================================
-  // 6. BUYURTMANI OSHXONAGA YUBORISH VA YETKAZILDI BELGISI
-  // =========================================================
   const handleSubmitOrder = () => {
-    if (!selectedTable) {
-      alert("Iltimos, avval stolni tanlang!");
-      return;
-    }
-    if (!Array.isArray(cart) || cart.length === 0) {
-      alert("Savatcha bo'sh! Iltimos, menyudan kamida 1 ta taom tanlang.");
-      return;
-    }
+    if (!selectedTable || !Array.isArray(cart) || cart.length === 0) return;
 
-    // Oshxonaga yuborilayotgan barcha taomlarga sentQty = qty muhrini bosamiz
     const normalizedCart = cart.map((item, idx) => {
       const price = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;
       const qty = Number(item.quantity ?? item.qty ?? 1) || 1;
@@ -587,7 +680,6 @@ export default function WaiterMode({
     });
 
     const subTotal = normalizedCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
     const isTakeaway = selectedTable === 'Olib ketish';
     const feePct = isTakeaway ? 0 : Number(serviceFee) || 0;
     const serviceFeeAmount = Math.round((subTotal * feePct) / 100);
@@ -595,7 +687,6 @@ export default function WaiterMode({
 
     const nowDate = new Date().toLocaleDateString();
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
     const activeBooking = reservations?.[selectedTable];
 
     if (currentTableOrder) {
@@ -617,13 +708,10 @@ export default function WaiterMode({
             : o
         )
       );
-
-      if (typeof addAuditLog === 'function') {
-        addAuditLog(
-          'Buyurtma yangilandi',
-          `${selectedTable}: Jami ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
-        );
-      }
+      recordAuditLog(
+        'Buyurtma yangilandi',
+        `${selectedTable}: Jami ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
+      );
     } else {
       const newOrder = {
         id: Date.now().toString(),
@@ -648,13 +736,10 @@ export default function WaiterMode({
       };
 
       updateOrders(prev => [newOrder, ...(Array.isArray(prev) ? prev : [])]);
-
-      if (typeof addAuditLog === 'function') {
-        addAuditLog(
-          'Yangi buyurtma ochildi',
-          `${selectedTable}: ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
-        );
-      }
+      recordAuditLog(
+        'Yangi buyurtma ochildi',
+        `${selectedTable}: ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
+      );
     }
 
     if (activeBooking) {
@@ -691,20 +776,14 @@ export default function WaiterMode({
   };
 
   // =========================================================
-  // 7. 📌 BRON (RESERVATION) BOSHQARUV FUNKSIYALARI
+  // 7. BRON, VIP-TAYMER, KO'CHIRISH VA BO'LISH FUNKSIYALARI
   // =========================================================
   const handleSaveReservation = (tableName, bookingData) => {
-    setReservations(prev => ({
-      ...(prev || {}),
-      [tableName]: bookingData
-    }));
-
-    if (typeof addAuditLog === 'function') {
-      addAuditLog(
-        'Stol bron qilindi',
-        `${tableName}: ${bookingData.customerName} (${bookingData.time}, ${bookingData.guestsCount} kishi)`
-      );
-    }
+    setReservations(prev => ({ ...(prev || {}), [tableName]: bookingData }));
+    recordAuditLog(
+      'Stol bron qilindi',
+      `${tableName}: ${bookingData.customerName} (${bookingData.time}, ${bookingData.guestsCount} kishi)`
+    );
   };
 
   const handleCancelReservation = (tableName) => {
@@ -725,9 +804,6 @@ export default function WaiterMode({
     handleSelectTable(tableName);
   };
 
-  // =========================================================
-  // 8. ⏱️ SOATBAY VIP-TAYMER (TARIFIKATOR) FUNKSIYALARI
-  // =========================================================
   const handleStartTableTimer = (tableName, config) => {
     setTableTimers(prev => ({
       ...(prev || {}),
@@ -740,40 +816,24 @@ export default function WaiterMode({
         isPaused: false
       }
     }));
-
-    if (typeof addAuditLog === 'function') {
-      addAuditLog(
-        'VIP Taymer yoqildi',
-        `${tableName}: ${config.serviceTitle} (${config.hourlyRate.toLocaleString()} s/soat)`
-      );
-    }
+    recordAuditLog(
+      'VIP Taymer yoqildi',
+      `${tableName}: ${config.serviceTitle} (${config.hourlyRate.toLocaleString()} s/soat)`
+    );
   };
 
   const handlePauseResumeTableTimer = (tableName) => {
     setTableTimers(prev => {
       const current = prev?.[tableName];
       if (!current) return prev;
-
       if (current.isPaused) {
-        return {
-          ...prev,
-          [tableName]: {
-            ...current,
-            startTimeMs: Date.now(),
-            isPaused: false
-          }
-        };
-      } else {
-        const addedMs = Math.max(0, Date.now() - Number(current.startTimeMs));
-        return {
-          ...prev,
-          [tableName]: {
-            ...current,
-            accruedMs: (Number(current.accruedMs) || 0) + addedMs,
-            isPaused: true
-          }
-        };
+        return { ...prev, [tableName]: { ...current, startTimeMs: Date.now(), isPaused: false } };
       }
+      const addedMs = Math.max(0, Date.now() - Number(current.startTimeMs));
+      return {
+        ...prev,
+        [tableName]: { ...current, accruedMs: (Number(current.accruedMs) || 0) + addedMs, isPaused: true }
+      };
     });
   };
 
@@ -788,15 +848,12 @@ export default function WaiterMode({
 
   const handleFinishTimerAndAddToOrder = (tableName, timerStats) => {
     if (!timerStats) return;
-
     const lineItemName = `${timerStats.serviceTitle} (${timerStats.durationHuman})`;
     const lineItemPrice = Number(timerStats.currentCost) || 0;
 
     if (
       !window.confirm(
-        `⏱️ "${tableName}" vaqt hisobini yakunlab, chekka qo'shamizmi?\n\n` +
-        `• Vaqt: ${timerStats.durationHuman} (${timerStats.formattedClock})\n` +
-        `• Hisoblangan summa: ${lineItemPrice.toLocaleString()} so'm`
+        `⏱️ "${tableName}" vaqt hisobini yakunlab, chekka qo'shamizmi?\n\n• Vaqt: ${timerStats.durationHuman}\n• Summa: ${lineItemPrice.toLocaleString()} so'm`
       )
     ) {
       return;
@@ -815,10 +872,7 @@ export default function WaiterMode({
     };
 
     const existingOrder = safeOrders.find(
-      o =>
-        o &&
-        o.table === tableName &&
-        !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
+      o => o && o.table === tableName && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
     );
 
     if (existingOrder) {
@@ -874,17 +928,9 @@ export default function WaiterMode({
       return next;
     });
 
-    if (typeof addAuditLog === 'function') {
-      addAuditLog(
-        "VIP Vaqt chekka qo'shildi",
-        `${tableName}: ${lineItemName} — +${lineItemPrice.toLocaleString()} so'm`
-      );
-    }
+    recordAuditLog("VIP Vaqt chekka qo'shildi", `${tableName}: ${lineItemName} — +${lineItemPrice.toLocaleString()} so'm`);
   };
 
-  // =========================================================
-  // 9. STOL KO'CHIRISH VA CHEK BO'LISH FUNKSIYALARI
-  // =========================================================
   const freeTablesForAction = useMemo(() => {
     const busySet = new Set(
       safeOrders
@@ -900,16 +946,10 @@ export default function WaiterMode({
 
     updateOrders(prev =>
       (Array.isArray(prev) ? prev : []).map(o =>
-        o && String(o.id) === String(transferOrder.id)
-          ? { ...o, table: targetTransferTable }
-          : o
+        o && String(o.id) === String(transferOrder.id) ? { ...o, table: targetTransferTable } : o
       )
     );
-
-    if (typeof addAuditLog === 'function') {
-      addAuditLog("Stol ko'chirildi", `${transferOrder.table} -> ${targetTransferTable}`);
-    }
-
+    recordAuditLog("Stol ko'chirildi", `${transferOrder.table} -> ${targetTransferTable}`);
     setTransferOrder(null);
     setTargetTransferTable('');
   };
@@ -926,9 +966,7 @@ export default function WaiterMode({
       const totalQty = Number(item.quantity ?? item.qty ?? 1) || 1;
       const moveQty = Math.min(totalQty, Math.max(0, Number(splitQuantities[idx]) || 0));
 
-      if (moveQty > 0) {
-        movedItems.push({ ...item, quantity: moveQty, qty: moveQty, sentQty: moveQty });
-      }
+      if (moveQty > 0) movedItems.push({ ...item, quantity: moveQty, qty: moveQty, sentQty: moveQty });
       if (totalQty - moveQty > 0) {
         const remQ = totalQty - moveQty;
         remainingItems.push({ ...item, quantity: remQ, qty: remQ, sentQty: remQ });
@@ -940,15 +978,15 @@ export default function WaiterMode({
       return;
     }
 
-    const calcOrderTotals = (itemsList, feePct) => {
+    const calcTotals = (itemsList, feePct) => {
       const sub = itemsList.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
       const fee = Math.round((sub * feePct) / 100);
       return { sub, fee, total: sub + fee };
     };
 
     const feePct = Number(splitOrder.serviceFee ?? serviceFee) || 0;
-    const remTotals = calcOrderTotals(remainingItems, feePct);
-    const movTotals = calcOrderTotals(movedItems, feePct);
+    const remTotals = calcTotals(remainingItems, feePct);
+    const movTotals = calcTotals(movedItems, feePct);
 
     const newSplitOrder = {
       ...splitOrder,
@@ -979,18 +1017,18 @@ export default function WaiterMode({
       )
     ]);
 
+    recordAuditLog("Chek bo'lindi", `${splitOrder.table} -> ${splitTargetTable} (${movTotals.total.toLocaleString()} s)`);
     setSplitOrder(null);
     setSplitTargetTable('');
     setSplitQuantities({});
   };
 
   // =========================================================
-  // 10. RENDER (UI DIZAYN)
+  // 8. RENDER (UI DIZAYN)
   // =========================================================
   return (
     <div className="max-w-7xl mx-auto pb-8">
       {!selectedTable ? (
-        /* 1-EKRAN: ZAL STOLLARI, BRONLAR VA VIP-TAYMERLAR XARITASI */
         <WaiterTableGrid
           tables={safeTables}
           orders={safeOrders}
@@ -1018,7 +1056,6 @@ export default function WaiterMode({
           onCancelTableTimer={handleCancelTableTimer}
         />
       ) : (
-        /* 2-EKRAN: TANLANGAN STOL MENYUSI VA SAVATCHASI */
         <div className="space-y-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex justify-between items-center">
             <button
@@ -1082,6 +1119,7 @@ export default function WaiterMode({
               onMarkAsDelivered={handleMarkAsDelivered}
               markAsServed={handleMarkAsDelivered}
               onLockPreCheck={handleLockAndPrintPreCheck}
+              onCancelEntireOrder={handleCancelEntireOrder}
               onBack={() => {
                 setSelectedTable(null);
                 setCart([]);
@@ -1091,251 +1129,37 @@ export default function WaiterMode({
         </div>
       )}
 
-      {/* =========================================================
-          MODAL 1: 🔒 ADMIN PIN VA SABAB TASDIQLASH MODALI (ANTI-FRAUD)
-          ========================================================= */}
-      {securityPrompt && (
-        <div
-          onClick={() => setSecurityPrompt(null)}
-          className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[180] flex items-center justify-center p-4 animate-fade-in"
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl p-6 shadow-2xl border-2 border-red-400 dark:border-red-600 space-y-4"
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-red-600 text-white flex items-center justify-center text-2xl shrink-0 shadow-md">
-                🔒
-              </div>
-              <div>
-                <h3 className="font-black text-lg text-gray-900 dark:text-white">
-                  Xavfsizlik Qulfi (Admin Tasdig'i)
-                </h3>
-                <p className="text-xs font-bold text-red-600 dark:text-red-400 mt-0.5">
-                  {securityPrompt.title}
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleConfirmSecurityPin} className="space-y-3.5">
-              <div>
-                <label className="block text-[11px] font-black uppercase text-gray-500 mb-1">
-                  Bekor qilish / kamaytirish sababi *
-                </label>
-                <select
-                  value={cancelReasonInput}
-                  onChange={e => setCancelReasonInput(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-900 dark:text-white outline-none focus:border-red-500"
-                >
-                  <option value="Mijoz rad etdi">🙅‍♂️ Mijoz taomni rad etdi</option>
-                  <option value="Ofitsiant adashib urgan">✍️ Ofitsiant adashib urgan</option>
-                  <option value="Oshxonada mahsulot tugagan">🛑 Oshxonada mahsulot tugab qoldi</option>
-                  <option value="Boshqa stolga ko'chirildi">🔄 Boshqa stolga o'tkazildi</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-black uppercase text-gray-500 mb-1">
-                  Admin PIN-Kodi *
-                </label>
-                <input
-                  type="password"
-                  required
-                  autoFocus
-                  value={pinInput}
-                  onChange={e => {
-                    setPinInput(e.target.value);
-                    setPinError('');
-                  }}
-                  placeholder="••••••"
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-red-300 dark:border-red-700 font-black text-xl text-center tracking-widest text-gray-900 dark:text-white outline-none focus:border-red-500"
-                />
-                {pinError && (
-                  <p className="text-xs font-black text-red-600 mt-1 text-center">
-                    {pinError}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSecurityPrompt(null)}
-                  className="flex-1 py-3.5 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-bold text-xs"
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-red-600/30 transition active:scale-95"
-                >
-                  🔓 Tasdiqlash
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* PRE-CHEK CHOP ETISH MODALI */}
-      {localPreCheckPrintOrder && (
-        <PrintReceiptModal
-          cafeName={resolvedCafeName}
-          order={localPreCheckPrintOrder}
-          serviceFee={serviceFee}
-          onClose={() => setLocalPreCheckPrintOrder(null)}
-        />
-      )}
-
-      {/* QR-KOD MODALI */}
-      {qrModalTable && (
-        <TableQrModal
-          table={qrModalTable}
-          cafeName={resolvedCafeName}
-          onClose={() => setQrModalTable(null)}
-        />
-      )}
-
-      {/* STOL KO'CHIRISH MODALI */}
-      {transferOrder && (
-        <div
-          onClick={() => setTransferOrder(null)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4"
-          >
-            <h3 className="font-black text-lg text-gray-900 dark:text-white">
-              🔄 {transferOrder.table} ni Boshqa Stolga Ko'chirish
-            </h3>
-            <form onSubmit={handleConfirmTransfer} className="space-y-4">
-              <select
-                required
-                value={targetTransferTable}
-                onChange={e => setTargetTransferTable(e.target.value)}
-                className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white"
-              >
-                <option value="">-- Bo'sh stolni tanlang --</option>
-                {freeTablesForAction.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTransferOrder(null)}
-                  className="flex-1 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-bold text-xs"
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-black text-xs"
-                >
-                  Ko'chirish ✓
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* CHEKNI BO'LISH MODALI */}
-      {splitOrder && (
-        <div
-          onClick={() => setSplitOrder(null)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 max-h-[88vh] flex flex-col"
-          >
-            <h3 className="font-black text-lg text-gray-900 dark:text-white">
-              ✂️ {splitOrder.table} Chekini Bo'lish
-            </h3>
-            <form onSubmit={handleConfirmSplit} className="space-y-4 flex-1 overflow-y-auto">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                  Qaysi bo'sh stolga ajratamiz?
-                </label>
-                <select
-                  required
-                  value={splitTargetTable}
-                  onChange={e => setSplitTargetTable(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-900 dark:text-white"
-                >
-                  <option value="">-- Stolni tanlang --</option>
-                  {freeTablesForAction.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                {(splitOrder.items || []).map((it, idx) => {
-                  const maxQ = Number(it.quantity ?? it.qty ?? 1) || 1;
-                  const chosenQ = Number(splitQuantities[idx]) || 0;
-                  return (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 flex justify-between items-center"
-                    >
-                      <div>
-                        <p className="font-black text-xs text-gray-900 dark:text-white">{it.name}</p>
-                        <span className="text-[10px] font-bold text-gray-400">Mavjud: {maxQ} pors</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSplitQuantities(prev => ({
-                              ...prev,
-                              [idx]: Math.max(0, chosenQ - 1)
-                            }))
-                          }
-                          className="w-7 h-7 rounded-lg bg-gray-200 dark:bg-gray-700 font-black"
-                        >
-                          -
-                        </button>
-                        <span className="font-black text-xs w-6 text-center">{chosenQ}</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSplitQuantities(prev => ({
-                              ...prev,
-                              [idx]: Math.min(maxQ, chosenQ + 1)
-                            }))
-                          }
-                          className="w-7 h-7 rounded-lg bg-indigo-600 text-white font-black"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSplitOrder(null)}
-                  className="flex-1 py-3 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-bold text-xs"
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-3 rounded-xl bg-purple-600 text-white font-black text-xs"
-                >
-                  ✂️ Chekni Ajratish
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* BARCHA MODALLAR ALOHIDA FAYLDA */}
+      <WaiterActionModals
+        securityPrompt={securityPrompt}
+        setSecurityPrompt={setSecurityPrompt}
+        pinInput={pinInput}
+        setPinInput={setPinInput}
+        cancelReasonInput={cancelReasonInput}
+        setCancelReasonInput={setCancelReasonInput}
+        pinError={pinError}
+        setPinError={setPinError}
+        onConfirmSecurityPin={handleConfirmSecurityPin}
+        transferOrder={transferOrder}
+        setTransferOrder={setTransferOrder}
+        targetTransferTable={targetTransferTable}
+        setTargetTransferTable={setTargetTransferTable}
+        freeTablesForAction={freeTablesForAction}
+        onConfirmTransfer={handleConfirmTransfer}
+        splitOrder={splitOrder}
+        setSplitOrder={setSplitOrder}
+        splitTargetTable={splitTargetTable}
+        setSplitTargetTable={setSplitTargetTable}
+        splitQuantities={splitQuantities}
+        setSplitQuantities={setSplitQuantities}
+        onConfirmSplit={handleConfirmSplit}
+        localPreCheckPrintOrder={localPreCheckPrintOrder}
+        setLocalPreCheckPrintOrder={setLocalPreCheckPrintOrder}
+        qrModalTable={qrModalTable}
+        setQrModalTable={setQrModalTable}
+        cafeName={resolvedCafeName}
+        serviceFee={serviceFee}
+      />
     </div>
   );
 }
