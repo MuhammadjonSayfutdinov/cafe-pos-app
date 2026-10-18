@@ -28,7 +28,6 @@ const DEFAULT_CUSTOMERS = [
   }
 ];
 
-// Mijozning umumiy xarid summasiga qarab VIP darajasi va Cashback foizini aniqlash
 const getCustomerTierInfo = (totalSpent = 0) => {
   const spent = Number(totalSpent) || 0;
   if (spent >= 3000000) {
@@ -40,7 +39,6 @@ const getCustomerTierInfo = (totalSpent = 0) => {
   return { tierName: '🥉 Standart', percent: 5, badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
 };
 
-// Telefon raqamni faqat raqamlardan iborat holatga keltirish (90 123-45-67 -> 901234567)
 const cleanPhoneDigits = (str) => String(str || '').replace(/\D/g, '');
 
 // ==========================================
@@ -370,7 +368,6 @@ export default function CashierMode({
 
     const afterDiscountTotal = Math.max(0, grossTotal - discountAmount);
 
-    // Mijozning mavjud bonusidan qancha qismini ishlatish mumkin?
     const customerAvailableBonus = Number(matchedCustomer?.bonusBalance || 0);
     const maxUsableBonus = paymentMethod === 'Qarz'
       ? 0
@@ -381,7 +378,6 @@ export default function CashierMode({
 
     const finalTotal = Math.max(0, afterDiscountTotal - usedBonusAmount);
 
-    // Cashback foizi va yig'iladigan yangi bonus (Faqat naqd/karta to'langan qismdan yig'iladi)
     const tierInfo = getCustomerTierInfo(matchedCustomer?.totalSpent || 0);
     const hasCustomer = Boolean(matchedCustomer || customerPhone.trim().length >= 4);
     const earnedCashback = (hasCustomer && paymentMethod !== 'Qarz' && finalTotal > 0)
@@ -424,7 +420,6 @@ export default function CashierMode({
     }
     setSelectedOrderId(order.id);
     resetPaymentControls();
-    // Agar buyurtmaning o'zida mijoz telefoni bo'lsa (masalan QR-menyudan), avtomatik to'ldiramiz
     if (order.customerPhone) {
       setCustomerPhone(order.customerPhone);
     }
@@ -447,7 +442,70 @@ export default function CashierMode({
   };
 
   // ==========================================
-  // 7. CRM MIJOZLAR BAZASINI BOSHQARISH FUNKSIYALARI
+  // 7. 🔒 PRE-CHEK CHIQARISH VA CHEKNI QULFLASH FUNKSIYASI
+  // ==========================================
+  const handlePrintPreCheck = () => {
+    if (!selectedOrder) return;
+
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nextPreCheckCount = (Number(selectedOrder.preCheckCount) || 0) + 1;
+
+    const lockedOrder = {
+      ...selectedOrder,
+      isPreCheckPrinted: true,
+      preCheckTime: nowTime,
+      preCheckCount: nextPreCheckCount,
+      preCheckTotalSnapshot: totals.finalTotal,
+      paymentMethod: 'PRE-CHEK (HISOB)'
+    };
+
+    // Buyurtmani bazada "Qulflangan (isPreCheckPrinted: true)" qilib belgilaymiz
+    updateOrders(prev =>
+      (Array.isArray(prev) ? prev : []).map(o =>
+        o && String(o.id) === String(selectedOrder.id)
+          ? {
+              ...o,
+              isPreCheckPrinted: true,
+              preCheckTime: nowTime,
+              preCheckCount: nextPreCheckCount,
+              preCheckTotalSnapshot: totals.finalTotal
+            }
+          : o
+      )
+    );
+
+    if (typeof addAuditLog === 'function') {
+      addAuditLog(
+        'Pre-chek chiqarildi (Qulflandi)',
+        `${selectedOrder.table}: ${totals.finalTotal.toLocaleString()} so'm (${nextPreCheckCount}-marta)`
+      );
+    }
+
+    // Agar Pre-chek 2 yoki undan ko'p marta qayta chiqarilsa, Rahbar Telegramiga ogohlantirish boradi
+    if (nextPreCheckCount > 1) {
+      sendCashierTelegramAlert(
+        [
+          `⚠️ <b>PRE-CHEK QAYTA CHIQARILDI (${escapeHtml(resolvedCafeName)})</b>`,
+          `🪑 <b>Joy:</b> ${escapeHtml(selectedOrder.table)}`,
+          `🔢 <b>Nechanchi marta:</b> ${nextPreCheckCount}-marta`,
+          `💰 <b>Hisob summasi:</b> ${totals.finalTotal.toLocaleString()} so'm`,
+          `💻 <b>Kassir:</b> ${escapeHtml(currentUser?.name || 'Kassir')}`
+        ],
+        'notifyOnSecurity'
+      );
+    }
+
+    // Printer oynasini ochish (Stol yopilmaydi, faqat hisob qog'ozi chiqadi)
+    if (typeof triggerPrintModal === 'function') {
+      triggerPrintModal({
+        order: lockedOrder,
+        totals
+      });
+    }
+  };
+
+  // ==========================================
+  // 8. CRM MIJOZLAR BAZASINI BOSHQARISH FUNKSIYALARI
   // ==========================================
   const handleCreateCrmCustomer = (e) => {
     e.preventDefault();
@@ -491,7 +549,7 @@ export default function CashierMode({
   };
 
   // ==========================================
-  // 8. KASSADAN XARAJAT / CHIQIM QO'SHISH
+  // 9. KASSADAN XARAJAT / CHIQIM QO'SHISH
   // ==========================================
   const handleSaveExpense = (e) => {
     e.preventDefault();
@@ -584,7 +642,7 @@ export default function CashierMode({
   };
 
   // ==========================================
-  // 9. OMBORDAN MASALLIQLARNI AVTOMATIK AYIRISH
+  // 10. OMBORDAN MASALLIQLARNI AVTOMATIK AYIRISH
   // ==========================================
   const deductOrderIngredientsFromStock = (orderToDeduct) => {
     if (!orderToDeduct || orderToDeduct.inventoryDeducted) return [];
@@ -703,7 +761,7 @@ export default function CashierMode({
   };
 
   // ==========================================
-  // 10. TO'LOVNI TASDIQLASH VA BONUS HISOBLASH
+  // 11. TO'LOVNI TASDIQLASH VA PRE-CHEK HIMOYASI
   // ==========================================
   const handlePaymentSubmit = () => {
     if (!selectedOrder) return;
@@ -807,6 +865,7 @@ export default function CashierMode({
         paymentDetails,
         cashierName: currentUser?.name || 'Kassir',
         closeTime: closeTimeStr,
+        closedAtMs: Date.now(),
         inventoryDeducted: true,
         hasCall: false
       };
@@ -826,12 +885,29 @@ export default function CashierMode({
         addAuditLog(
           paymentMethod === 'Qarz' ? 'Chek qarzga yopildi' : "Chek to'landi",
           `${closedOrderObject.table}: ${totals.finalTotal.toLocaleString()} s (${paymentMethod})${
-            totals.usedBonusAmount > 0 ? ` • Bonusdan: -${totals.usedBonusAmount.toLocaleString()} s` : ''
+            totals.discountAmount > 0 ? ` • Chegirma: -${totals.discountAmount.toLocaleString()} s` : ''
           }`
         );
       }
 
-      // 4) Telegramga xabar yuborish
+      // 4) Agar Pre-chek chiqarilgandan keyin chegirma berilgan bo'lsa — MAXSUS XAVFSIZLIK TREVOGASI
+      if (selectedOrder.isPreCheckPrinted && totals.discountAmount > 0) {
+        sendCashierTelegramAlert(
+          [
+            `🚨 <b>XAVFSIZLIK OGOHLANTIRISHI (${escapeHtml(resolvedCafeName)})</b>`,
+            `Mijozga Pre-chek chiqarilgandan keyin chekka chegirma kiritildi!`,
+            `━━━━━━━━━━━━━━━━━━`,
+            `🪑 <b>Joy:</b> ${escapeHtml(closedOrderObject.table)}`,
+            `📋 <b>Pre-chek summasi edi:</b> ${Number(selectedOrder.preCheckTotalSnapshot || (totals.subTotal + totals.serviceFeeAmount)).toLocaleString()} so'm`,
+            `🎁 <b>Kiritilgan chegirma:</b> <b>-${totals.discountAmount.toLocaleString()} so'm</b>`,
+            `💰 <b>Yopilgan summa:</b> ${totals.finalTotal.toLocaleString()} so'm`,
+            `💻 <b>Kassir:</b> ${escapeHtml(currentUser?.name || 'Kassir')}`
+          ],
+          'notifyOnSecurity'
+        );
+      }
+
+      // 5) Oddiy Telegram xabari
       const isDebt = paymentMethod === 'Qarz';
       const hasDiscount = totals.discountAmount > 0 || totals.usedBonusAmount > 0;
       const tgFlagKey = isDebt ? 'notifyOnDebt' : hasDiscount ? 'notifyOnDiscount' : 'notifyOnEverySale';
@@ -866,7 +942,7 @@ export default function CashierMode({
         );
       }
 
-      // 5) Chek chiqarish oynasini ochish
+      // 6) Chek chiqarish oynasini ochish
       if (typeof triggerPrintModal === 'function') {
         triggerPrintModal({
           order: closedOrderObject,
@@ -874,28 +950,35 @@ export default function CashierMode({
         });
       }
 
-      // 6) Formani tozalash
+      // 7) Formani tozalash
       setSelectedOrderId(null);
       resetPaymentControls();
     };
 
+    // 🔒 PRE-CHEK QULFI: Agar Pre-chek chiqarilgan chekka chegirma kiritilsa YOKI chegirma >= 20% bo'lsa — Admin PIN so'raladi!
+    const isDiscountAfterPreCheck = Boolean(selectedOrder.isPreCheckPrinted && totals.discountAmount > 0);
     const isHighDiscount =
       totals.discountAmount > 0 &&
       totals.subTotal > 0 &&
       totals.discountAmount / (totals.subTotal + totals.serviceFeeAmount) >= 0.2;
 
-    if (isHighDiscount && currentUser?.role !== 'admin' && typeof requireAdminOverride === 'function') {
-      requireAdminOverride(
-        `${selectedOrder.table} uchun katta chegirma (-${totals.discountAmount.toLocaleString()} s)`,
-        executeCloseOrder
-      );
+    if (
+      (isDiscountAfterPreCheck || isHighDiscount) &&
+      currentUser?.role !== 'admin' &&
+      typeof requireAdminOverride === 'function'
+    ) {
+      const reasonText = isDiscountAfterPreCheck
+        ? `🔒 Pre-chek chiqarilgan ${selectedOrder.table} ga chegirma (-${totals.discountAmount.toLocaleString()} s) kiritish`
+        : `${selectedOrder.table} uchun katta chegirma (-${totals.discountAmount.toLocaleString()} s)`;
+
+      requireAdminOverride(reasonText, executeCloseOrder);
     } else {
       executeCloseOrder();
     }
   };
 
   // ==========================================
-  // 11. QARZNI SO'NDIRISH VA CHEKNI O'CHIRISH
+  // 12. QARZNI SO'NDIRISH VA CHEKNI O'CHIRISH
   // ==========================================
   const handlePayOffDebt = (debtOrder) => {
     if (!debtOrder) return;
@@ -927,6 +1010,7 @@ export default function CashierMode({
     if (!orderId) return;
 
     const performDelete = () => {
+      const targetOrder = safeOrders.find(o => o && String(o.id) === String(orderId));
       if (!window.confirm(`⚠️ Rostdan ham "${tableName}" buyurtmasini butunlay o'chirmoqchimisiz?`)) return;
 
       updateOrders(prev =>
@@ -936,6 +1020,22 @@ export default function CashierMode({
       if (String(selectedOrderId) === String(orderId)) {
         setSelectedOrderId(null);
         resetPaymentControls();
+      }
+
+      if (typeof addAuditLog === 'function') {
+        addAuditLog("Chek bekor qilindi (O'chirildi)", `${tableName} buyurtmasi kassadan o'chirildi`);
+      }
+
+      if (targetOrder) {
+        sendCashierTelegramAlert(
+          [
+            `🚨 <b>CHEK BEKOR QILINDI (${escapeHtml(resolvedCafeName)})</b>`,
+            `🪑 <b>Joy:</b> ${escapeHtml(targetOrder.table || tableName)}`,
+            targetOrder.isPreCheckPrinted ? `🔒 <b>Holati:</b> PRE-CHEK CHIQARILGAN EDI!` : null,
+            `💻 <b>O'chirdi:</b> ${escapeHtml(currentUser?.name || 'Kassir')}`
+          ],
+          'notifyOnSecurity'
+        );
       }
     };
 
@@ -958,14 +1058,12 @@ export default function CashierMode({
   }, [safeCustomers, crmSearch]);
 
   // ==========================================
-  // 12. RENDER (UI DIZAYN)
+  // 13. RENDER (UI DIZAYN)
   // ==========================================
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-4 pb-6 animate-fade-in">
       
-      {/* =======================================================
-          TEPADAGI JONLI KASSA SEYFI, XARAJAT VA CRM PANELI
-          ======================================================= */}
+      {/* TEPADAGI JONLI KASSA SEYFI, XARAJAT VA CRM PANELI */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4">
         
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
@@ -1010,7 +1108,6 @@ export default function CashierMode({
           </div>
         </div>
 
-        {/* Xarajat, Chiqimlar Jurnali va CRM Mijozlar Bazasi Tugmalari */}
         <div className="flex flex-wrap gap-2 shrink-0">
           <button
             type="button"
@@ -1041,12 +1138,9 @@ export default function CashierMode({
         </div>
       </div>
 
-      {/* =======================================================
-          ASOSIY KASSA ISHCHI MAYDONI (3 USTUNLI)
-          ======================================================= */}
+      {/* ASOSIY KASSA ISHCHI MAYDONI (3 USTUNLI) */}
       <div className="h-[calc(100vh-195px)] min-h-[560px] flex flex-col lg:flex-row gap-6">
         
-        {/* 1-USTUN: OCHIQ CHEKLAR VA QARZ DAFTARI */}
         <CashierOrderList
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -1058,7 +1152,6 @@ export default function CashierMode({
           onDeleteOrder={handleDeleteOrder}
         />
 
-        {/* 2 VA 3-USTUNLAR: CHEK VA TO'LOV BOSHQARUVI */}
         {selectedOrder ? (
           <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
             
@@ -1069,6 +1162,7 @@ export default function CashierMode({
               matchedCustomer={matchedCustomer}
               earnedCashback={totals.earnedCashback}
               cashbackPercent={totals.cashbackPercent}
+              onPrintPreCheck={handlePrintPreCheck}
             />
 
             <CashierPaymentControls
@@ -1109,15 +1203,13 @@ export default function CashierMode({
               Hisob-kitob uchun chekni tanlang
             </h3>
             <p className="text-xs sm:text-sm font-bold text-gray-400 max-w-sm leading-relaxed">
-              Chap tomondagi ro'yxatdan ochiq stolni tanlang. Mijoz telefon raqamini kiritib Cashback va bonuslarni qo'llashingiz mumkin.
+              Chap tomondagi ro'yxatdan ochiq stolni tanlang. Mijozga Pre-chek chiqarib chekni qulflashingiz yoki to'lovni qabul qilishingiz mumkin.
             </p>
           </div>
         )}
       </div>
 
-      {/* =======================================================
-          MODAL 1: 🎁 CRM MIJOZLAR BAZASI VA BONUS MARKAZI
-          ======================================================= */}
+      {/* MODAL 1: 🎁 CRM MIJOZLAR BAZASI VA BONUS MARKAZI */}
       {isCrmModalOpen && (
         <div
           onClick={() => setIsCrmModalOpen(false)}
@@ -1145,7 +1237,6 @@ export default function CashierMode({
               </button>
             </div>
 
-            {/* Yangi mijoz qo'shish formasi */}
             <form
               onSubmit={handleCreateCrmCustomer}
               className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 bg-amber-50/70 dark:bg-gray-900/60 p-3.5 rounded-2xl border border-amber-200 dark:border-gray-700"
@@ -1182,7 +1273,6 @@ export default function CashierMode({
               </button>
             </form>
 
-            {/* Qidiruv */}
             <input
               type="text"
               value={crmSearch}
@@ -1191,7 +1281,6 @@ export default function CashierMode({
               className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500"
             />
 
-            {/* Mijozlar ro'yxati */}
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
               {filteredCrmCustomers.length === 0 ? (
                 <div className="text-center py-10 text-gray-400 font-bold">
@@ -1258,9 +1347,7 @@ export default function CashierMode({
         </div>
       )}
 
-      {/* =======================================================
-          MODAL 2: YANGI XARAJAT YOKI INKASSATSIYA KIRITISH
-          ======================================================= */}
+      {/* MODAL 2: YANGI XARAJAT YOKI INKASSATSIYA KIRITISH */}
       {isExpenseModalOpen && (
         <div
           onClick={() => setIsExpenseModalOpen(false)}
@@ -1390,9 +1477,7 @@ export default function CashierMode({
         </div>
       )}
 
-      {/* =======================================================
-          MODAL 3: JORIY SMENA XARAJATLARI JURNALI
-          ======================================================= */}
+      {/* MODAL 3: JORIY SMENA XARAJATLARI JURNALI */}
       {isExpenseListModalOpen && (
         <div
           onClick={() => setIsExpenseListModalOpen(false)}
