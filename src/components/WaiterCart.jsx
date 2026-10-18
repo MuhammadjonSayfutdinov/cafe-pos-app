@@ -30,7 +30,8 @@ export default function WaiterCart({
   handleSendOrder,
   onMarkAsDelivered,
   markAsServed,
-  onLockPreCheck
+  onLockPreCheck,
+  onCancelEntireOrder
 }) {
   const [expandedNoteId, setExpandedNoteId] = useState(null);
 
@@ -75,7 +76,6 @@ export default function WaiterCart({
     };
   }, [safeCart, resolvedTable, serviceFee]);
 
-  // Miqdorni o'zgartirish (WaiterMode dagi Pre-chek / Oshxona qulfi orqali o'tadi)
   const changeItemQty = (itemKey, delta) => {
     if (typeof handleQtyChange === 'function') {
       handleQtyChange(itemKey, delta);
@@ -140,8 +140,8 @@ export default function WaiterCart({
             </p>
           </div>
 
-          {/* Agar hali oshxonaga yuborilmagan yangi buyurtma bo'lsa, Tozalash tugmasi chiqadi */}
-          {safeCart.length > 0 && typeof setCart === 'function' && !resolvedOrder && (
+          {/* Agar yangi buyurtma bo'lsa — Tozalash, agar aktiv buyurtma bo'lsa — Pre-chek va Bekor qilish */}
+          {safeCart.length > 0 && typeof setCart === 'function' && !resolvedOrder ? (
             <button
               type="button"
               onClick={() => {
@@ -153,23 +153,37 @@ export default function WaiterCart({
             >
               Tozalash
             </button>
-          )}
+          ) : (
+            resolvedOrder && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                {typeof onLockPreCheck === 'function' && (
+                  <button
+                    type="button"
+                    onClick={onLockPreCheck}
+                    className={`px-2.5 py-1.5 rounded-xl font-black text-[11px] transition active:scale-95 flex items-center gap-1 border ${
+                      isPreCheckLocked
+                        ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 border-red-200 dark:border-red-800'
+                        : 'bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                    }`}
+                    title="Mijozga hisob (Pre-chek) chiqarish va chekni qulflash"
+                  >
+                    <span>{isPreCheckLocked ? '🔒' : '🧾'}</span>
+                    <span>Pre-chek</span>
+                  </button>
+                )}
 
-          {/* Agar stolda ochiq buyurtma bo'lsa — Pre-chek (Hisob) chiqarish va qulflash tugmasi */}
-          {resolvedOrder && typeof onLockPreCheck === 'function' && (
-            <button
-              type="button"
-              onClick={onLockPreCheck}
-              className={`px-3 py-1.5 rounded-xl font-black text-[11px] transition active:scale-95 flex items-center gap-1 border shrink-0 ${
-                isPreCheckLocked
-                  ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 border-red-200 dark:border-red-800'
-                  : 'bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
-              }`}
-              title="Mijozga hisob (Pre-chek) chiqarish va chekni qulflash"
-            >
-              <span>{isPreCheckLocked ? '🔒' : '🧾'}</span>
-              <span>{isPreCheckLocked ? 'Qayta Pre-chek' : 'Pre-chek (Qulflash)'}</span>
-            </button>
+                {typeof onCancelEntireOrder === 'function' && (
+                  <button
+                    type="button"
+                    onClick={onCancelEntireOrder}
+                    className="px-2.5 py-1.5 rounded-xl bg-red-50 dark:bg-red-900/30 hover:bg-red-100 text-red-600 dark:text-red-300 border border-red-200 dark:border-red-800 font-black text-[11px] transition active:scale-95"
+                    title="Stol buyurtmasini to'liq bekor qilish (Admin PIN bilan)"
+                  >
+                    🗑 Chekni o'chirish
+                  </button>
+                )}
+              </div>
+            )
           )}
         </div>
 
@@ -182,8 +196,8 @@ export default function WaiterCart({
           }`}>
             <span>
               {isPreCheckLocked
-                ? '🔒 Pre-chek chiqarilgan! Taomni kamaytirish faqat Admin PIN bilan.'
-                : '🛡️ Oshxonaga ketgan taomni kamaytirish/o\'chirish Admin PIN talab qiladi.'}
+                ? '🔒 Pre-chek chiqarilgan! O\'chirish Admin PIN orqali Oshxona va Kassadan ham o\'chiradi.'
+                : '🛡️ Oshxonadagi taomni o\'chirsangiz (PIN bilan), Oshxona va Kassada darhol yangilanadi.'}
             </span>
           </div>
         )}
@@ -225,7 +239,6 @@ export default function WaiterCart({
             const lineTotal = price * qty;
             const isNoteOpen = expandedNoteId === itemKey;
 
-            // Agar taom oshxonaga yuborilgan bo'lsa va hozirgi miqdor sentQty ga teng bo'lsa, "-" va "🗑" tugmalari qulflangan (PIN so'raydi)
             const isReductionProtected = isPreCheckLocked || (sentQty > 0 && qty <= sentQty);
             const isDeleteProtected = isPreCheckLocked || sentQty > 0;
 
