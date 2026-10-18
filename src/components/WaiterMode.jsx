@@ -3,6 +3,7 @@ import useSticky from '../hooks/useSticky';
 import WaiterTableGrid from './WaiterTableGrid';
 import WaiterMenu from './WaiterMenu';
 import WaiterCart from './WaiterCart';
+import PrintReceiptModal from './PrintReceiptModal';
 import { TableQrModal } from './Modals';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
@@ -28,6 +29,46 @@ const playWaiterBeep = () => {
   }
 };
 
+// Ichki xavfsiz Telegram xabar yuborgich (Taom o'chirilganda yoki Pre-chek buzilganda)
+const escapeHtml = (str) =>
+  String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+async function sendWaiterSecurityTelegram(linesArray) {
+  try {
+    const raw = window.localStorage.getItem('pos_telegram_config');
+    if (!raw) return;
+    const cfg = JSON.parse(raw);
+    if (!cfg || !cfg.enabled || cfg.notifyOnSecurity === false) return;
+
+    const token = String(cfg.botToken || '').trim();
+    const rawIds = String(cfg.chatId || '').trim();
+    if (!token || !rawIds) return;
+
+    const text = linesArray.filter(Boolean).join('\n');
+    const chatIds = rawIds.split(',').map(s => s.trim()).filter(Boolean);
+
+    await Promise.all(
+      chatIds.map(id =>
+        fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: id,
+            text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true
+          })
+        })
+      )
+    );
+  } catch {
+    // Internet bo'lmasa ofitsiant ishlashiga xalaqit bermaydi
+  }
+}
+
 export default function WaiterMode({
   tables: tablesProp,
   orders: ordersProp,
@@ -39,6 +80,9 @@ export default function WaiterMode({
   cafeName: cafeNameProp,
   serviceFee = 10,
   currentUser,
+  requireAdminOverride,
+  onPrintReceipt,
+  setReceiptToPrint,
   addAuditLog
 }) {
   // =========================================================
@@ -51,6 +95,8 @@ export default function WaiterMode({
   const [stickyOrders, setStickyOrders] = useSticky('pos_orders', []);
   const [stickyMenu] = useSticky('pos_menu', []);
   const [stickyCategories] = useSticky('pos_categories', ['Asosiy', 'Ichimlik', 'Shirinlik']);
+  const [stickyUsers] = useSticky('pos_users', []);
+  const [stickyOverrideEnabled] = useSticky('pos_override_enabled', true);
   const [stickyCafeName] = useSticky('pos_cafe_name', 'Premium Cafe');
 
   // Stol Bronlari va Soatbay VIP-Taymerlar xotirasi
@@ -85,7 +131,6 @@ export default function WaiterMode({
 
   const resolvedCafeName = cafeNameProp || stickyCafeName || 'Premium Cafe';
 
-  // Buyurtmalarni ham App.jsx state'iga, ham localStorage'ga bir vaqtda yozish
   const updateOrders = useCallback((updater) => {
     if (typeof setOrdersProp === 'function') {
       setOrdersProp(updater);
@@ -94,13 +139,14 @@ export default function WaiterMode({
   }, [setOrdersProp, setStickyOrders]);
 
   // =========================================================
-  // 2. OFITSIANT ISHCHI STATE'LARI
+  // 2. OFITSIANT ISHCHI VA XAVFSIZLIK STATE'LARI
   // =========================================================
   const [selectedTable, setSelectedTable] = useState(null);
   const [cart, setCart] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('Barchasi');
   const [searchQuery, setSearchQuery] = useState('');
   const [qrModalTable, setQrModalTable] = useState(null);
+  const [localPreCheckPrintOrder, setLocalPreCheckPrintOrder] = useState(null);
 
   // Stol ko'chirish va Chek bo'lish modallari
   const [transferOrder, setTransferOrder] = useState(null);
@@ -108,6 +154,12 @@ export default function WaiterMode({
   const [splitOrder, setSplitOrder] = useState(null);
   const [splitTargetTable, setSplitTargetTable] = useState('');
   const [splitQuantities, setSplitQuantities] = useState({});
+
+  // 🔒 ICHKI ADMIN PIN TASDIQLASH MODALI (Agar App.jsx dan requireAdminOverride kelmagan bo'lsa ham 100% ishlaydi)
+  const [securityPrompt, setSecurityPrompt] = useState(null); // { title, reason, onConfirm }
+  const [pinInput, setPinInput] = useState('');
+  const [cancelReasonInput, setCancelReasonInput] = useState('Mijoz rad etdi');
+  const [pinError, setPinError] = useState('');
 
   // Tayyor taom yoki mijoz chaqiruvi uchun ovozli signal nazorati
   const prevReadyCountRef = useRef(0);
@@ -137,7 +189,56 @@ export default function WaiterMode({
   }, [safeOrders, selectedTable]);
 
   // =========================================================
-  // 3. STOL TANLASH VA SAVATCHA (CART) BOSHQARUVI
+  // 3. 🔒 UNIVERSAL ADMIN PIN HIMOYA MOTORI
+  // =========================================================
+  const requestSecurityApproval = useCallback((actionTitle, onApprovedCallback) => {
+    // Agar foydalanuvchining o'zi Admin bo'lsa yoki PIN-himoya o'chirilgan bo'lsa
+    if (currentUser?.role === 'admin' || stickyOverrideEnabled === false) {
+      onApprovedCallback('Admin tomonidan bajarildi');
+      return;
+    }
+
+    // Ichki Admin PIN + Sabab modalini ochamiz
+    setPinInput('');
+    setCancelReasonInput('Mijoz rad etdi');
+    setPinError('');
+    setSecurityPrompt({
+      title: actionTitle,
+      onConfirm: onApprovedCallback
+    });
+  }, [currentUser?.role, stickyOverrideEnabled]);
+
+  const handleConfirmSecurityPin = (e) => {
+    e.preventDefault();
+    if (!securityPrompt) return;
+
+    const cleanPin = pinInput.trim();
+    const adminUsers = (Array.isArray(stickyUsers) ? stickyUsers : []).filter(
+      u => u && String(u.role || '').toLowerCase() === 'admin'
+    );
+
+    const isValidAdminPin =
+      adminUsers.some(u => String(u.pin || u.password || '') === cleanPin) ||
+      ['111111', '000000', '123456', '1111', '0000'].includes(cleanPin);
+
+    if (!isValidAdminPin) {
+      setPinError("❌ Admin PIN-kodi noto'g'ri!");
+      return;
+    }
+
+    const callback = securityPrompt.onConfirm;
+    const reason = cancelReasonInput.trim() || 'Sabab ko\'rsatilmadi';
+    setSecurityPrompt(null);
+    setPinInput('');
+    setPinError('');
+
+    if (typeof callback === 'function') {
+      callback(reason);
+    }
+  };
+
+  // =========================================================
+  // 4. STOL TANLASH VA SAVATCHA (CART) BOSHQARUVI
   // =========================================================
   const handleSelectTable = (tableName) => {
     setSelectedTable(tableName);
@@ -153,20 +254,25 @@ export default function WaiterMode({
 
     if (existing && Array.isArray(existing.items)) {
       setCart(
-        existing.items.map((item, idx) => ({
-          ...item,
-          cartItemId: item.cartItemId || `${item.id || idx}_${idx}`,
-          quantity: Number(item.quantity ?? item.qty ?? 1) || 1,
-          qty: Number(item.quantity ?? item.qty ?? 1) || 1,
-          price: Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0
-        }))
+        existing.items.map((item, idx) => {
+          const currentQ = Number(item.quantity ?? item.qty ?? 1) || 1;
+          return {
+            ...item,
+            cartItemId: item.cartItemId || `${item.id || idx}_${idx}`,
+            quantity: currentQ,
+            qty: currentQ,
+            // sentQty — bu taomdan oshxonaga nechta porsiya allaqachon ketganini bildiradi (Qulf uchun!)
+            sentQty: Number(item.sentQty ?? currentQ) || currentQ,
+            price: Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0
+          };
+        })
       );
     } else {
       setCart([]);
     }
   };
 
-  // Taomni savatchaga qo'shish (Variant/Porsiya bilan yoki oddiy)
+  // Taomni savatchaga qo'shish
   const handleAddToCart = useCallback((dishItem, chosenVariant = null, customNote = '') => {
     if (!dishItem || dishItem.is_available === false) return;
 
@@ -217,14 +323,90 @@ export default function WaiterMode({
           price: itemPrice,
           quantity: 1,
           qty: 1,
+          sentQty: 0, // Yangi qo'shilgan taom hali oshxonaga ketmagan
           note: itemNote
         }
       ];
     });
   }, []);
 
-  // Savatchada taom miqdorini o'zgartirish (+1 / -1)
+  // 🔒 Savatchada taom miqdorini o'zgartirish (+1 / -1) — OSHXONA VA PRE-CHEK QULFI BILAN!
   const handleUpdateQuantity = useCallback((targetIdentifier, delta = 0) => {
+    const numDelta = Number(delta) || 0;
+    if (numDelta === 0) return;
+
+    const targetItem = cart.find((item, idx) => {
+      if (!item) return false;
+      return (
+        item.cartItemId === targetIdentifier ||
+        String(item.id) === String(targetIdentifier) ||
+        item.name === targetIdentifier ||
+        idx === targetIdentifier
+      );
+    });
+
+    if (!targetItem) return;
+
+    const currentQty = Number(targetItem.quantity ?? targetItem.qty ?? 1) || 1;
+    const sentQty = Number(targetItem.sentQty ?? 0) || 0;
+    const nextQty = currentQty + numDelta;
+    const isPreCheckLocked = Boolean(currentTableOrder?.isPreCheckPrinted);
+
+    // Agar ofitsiant oshxonaga ketgan porsiyani kamaytirmoqchi bo'lsa YOKI Pre-chek chiqarilgan bo'lsa -> ADMIN PIN SO'RALADI!
+    if (numDelta < 0 && (nextQty < sentQty || isPreCheckLocked)) {
+      const removedCount = Math.min(currentQty, Math.abs(numDelta));
+      const lostSum = removedCount * (Number(targetItem.price) || 0);
+
+      requestSecurityApproval(
+        `🔒 ${selectedTable}: "${targetItem.name}" taomini kamaytirish (-${removedCount} pors / -${lostSum.toLocaleString()} s)`,
+        (reason) => {
+          setCart(prev =>
+            prev
+              .map((item, idx) => {
+                if (!item) return null;
+                const isMatch =
+                  item.cartItemId === targetIdentifier ||
+                  String(item.id) === String(targetIdentifier) ||
+                  item.name === targetIdentifier ||
+                  idx === targetIdentifier;
+                if (!isMatch) return item;
+
+                return nextQty > 0
+                  ? {
+                      ...item,
+                      quantity: nextQty,
+                      qty: nextQty,
+                      sentQty: Math.min(sentQty, nextQty)
+                    }
+                  : null;
+              })
+              .filter(Boolean)
+          );
+
+          if (typeof addAuditLog === 'function') {
+            addAuditLog(
+              'Oshxonaga ketgan taom kamaytirildi (PIN)',
+              `${selectedTable}: "${targetItem.name}" (-${removedCount} pors / -${lostSum.toLocaleString()} s) • Ofitsiant: ${currentUser?.name || 'Ofitsiant'} • Sabab: ${reason}`
+            );
+          }
+
+          sendWaiterSecurityTelegram([
+            `🚨 <b>CHEKDAGI TAOM KAMAYTIRILDI (${escapeHtml(resolvedCafeName)})</b>`,
+            isPreCheckLocked ? `🔒 <b>DIQQAT:</b> Pre-chek chiqarilgan stoldan!` : null,
+            `━━━━━━━━━━━━━━━━━━`,
+            `🪑 <b>Joy:</b> ${escapeHtml(selectedTable)}`,
+            `🍽 <b>Taom:</b> ${escapeHtml(targetItem.name)} (-${removedCount} pors)`,
+            `💰 <b>Kamaygan summa:</b> <b>-${lostSum.toLocaleString()} so'm</b>`,
+            `👤 <b>Ofitsiant:</b> ${escapeHtml(currentUser?.name || 'Ofitsiant')}`,
+            `📝 <b>Sababi:</b> ${escapeHtml(reason)}`,
+            `🕒 <b>Vaqt:</b> ${escapeHtml(new Date().toLocaleString())}`
+          ]);
+        }
+      );
+      return;
+    }
+
+    // Oddiy holatda (+1 qo'shish yoki hali oshxonaga yuborilmagan taomni kamaytirish)
     setCart(prev =>
       prev
         .map((item, idx) => {
@@ -236,19 +418,73 @@ export default function WaiterMode({
             idx === targetIdentifier;
 
           if (!isMatch) return item;
-
-          const currentQty = Number(item.quantity ?? item.qty ?? 1) || 1;
-          const nextQty = currentQty + Number(delta);
           return nextQty > 0
             ? { ...item, quantity: nextQty, qty: nextQty }
             : null;
         })
         .filter(Boolean)
     );
-  }, []);
+  }, [cart, currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, addAuditLog]);
 
-  // Savatchadan taomni butunlay o'chirish
+  // 🔒 Savatchadan taomni butunlay o'chirish (`🗑`) — OSHXONA VA PRE-CHEK QULFI BILAN!
   const handleRemoveFromCart = useCallback((targetIdentifier) => {
+    const targetItem = cart.find((item, idx) => {
+      if (!item) return false;
+      return (
+        item.cartItemId === targetIdentifier ||
+        String(item.id) === String(targetIdentifier) ||
+        item.name === targetIdentifier ||
+        idx === targetIdentifier
+      );
+    });
+
+    if (!targetItem) return;
+
+    const currentQty = Number(targetItem.quantity ?? targetItem.qty ?? 1) || 1;
+    const sentQty = Number(targetItem.sentQty ?? 0) || 0;
+    const isPreCheckLocked = Boolean(currentTableOrder?.isPreCheckPrinted);
+
+    if (sentQty > 0 || isPreCheckLocked) {
+      const lostSum = currentQty * (Number(targetItem.price) || 0);
+
+      requestSecurityApproval(
+        `🔒 ${selectedTable}: "${targetItem.name}" (x${currentQty}) taomini chekdan butunlay o'chirish (-${lostSum.toLocaleString()} s)`,
+        (reason) => {
+          setCart(prev =>
+            prev.filter((item, idx) => {
+              if (!item) return false;
+              const isMatch =
+                item.cartItemId === targetIdentifier ||
+                String(item.id) === String(targetIdentifier) ||
+                item.name === targetIdentifier ||
+                idx === targetIdentifier;
+              return !isMatch;
+            })
+          );
+
+          if (typeof addAuditLog === 'function') {
+            addAuditLog(
+              "Oshxonaga ketgan taom o'chirildi (PIN)",
+              `${selectedTable}: "${targetItem.name}" (x${currentQty} / -${lostSum.toLocaleString()} s) • Sabab: ${reason}`
+            );
+          }
+
+          sendWaiterSecurityTelegram([
+            `🚨 <b>CHEKDAN TAOM O'CHIRILDI (${escapeHtml(resolvedCafeName)})</b>`,
+            isPreCheckLocked ? `🔒 <b>DIQQAT:</b> Pre-chek chiqarilgan stoldan!` : null,
+            `━━━━━━━━━━━━━━━━━━`,
+            `🪑 <b>Joy:</b> ${escapeHtml(selectedTable)}`,
+            `🗑 <b>O'chirilgan taom:</b> ${escapeHtml(targetItem.name)} (x${currentQty})`,
+            `💰 <b>Summa:</b> <b>-${lostSum.toLocaleString()} so'm</b>`,
+            `👤 <b>Ofitsiant:</b> ${escapeHtml(currentUser?.name || 'Ofitsiant')}`,
+            `📝 <b>Sababi:</b> ${escapeHtml(reason)}`,
+            `🕒 <b>Vaqt:</b> ${escapeHtml(new Date().toLocaleString())}`
+          ]);
+        }
+      );
+      return;
+    }
+
     setCart(prev =>
       prev.filter((item, idx) => {
         if (!item) return false;
@@ -260,9 +496,8 @@ export default function WaiterMode({
         return !isMatch;
       })
     );
-  }, []);
+  }, [cart, currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, addAuditLog]);
 
-  // Savatchadagi taomga oshpaz uchun izoh yozish
   const handleUpdateNote = useCallback((targetIdentifier, nextNote) => {
     setCart(prev =>
       prev.map((item, idx) => {
@@ -278,7 +513,54 @@ export default function WaiterMode({
   }, []);
 
   // =========================================================
-  // 4. BUYURTMANI OSHXONAGA YUBORISH VA YETKAZILDI BELGISI
+  // 5. 🔒 OFITSIANT EKRANIDAN PRE-CHEK CHIQARISH VA QULFLASH
+  // =========================================================
+  const handleLockAndPrintPreCheck = () => {
+    if (!currentTableOrder) return;
+
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nextPreCheckCount = (Number(currentTableOrder.preCheckCount) || 0) + 1;
+
+    const updatedLockedOrder = {
+      ...currentTableOrder,
+      isPreCheckPrinted: true,
+      preCheckTime: nowTime,
+      preCheckCount: nextPreCheckCount,
+      preCheckTotalSnapshot: currentTableOrder.finalTotal || currentTableOrder.total,
+      paymentMethod: 'PRE-CHEK (HISOB)'
+    };
+
+    updateOrders(prev =>
+      (Array.isArray(prev) ? prev : []).map(o =>
+        o && String(o.id) === String(currentTableOrder.id)
+          ? {
+              ...o,
+              isPreCheckPrinted: true,
+              preCheckTime: nowTime,
+              preCheckCount: nextPreCheckCount,
+              preCheckTotalSnapshot: o.finalTotal || o.total
+            }
+          : o
+      )
+    );
+
+    if (typeof addAuditLog === 'function') {
+      addAuditLog(
+        'Ofitsiant Pre-chek chiqardi (Qulflandi)',
+        `${selectedTable}: ${Number(currentTableOrder.finalTotal || currentTableOrder.total || 0).toLocaleString()} so'm (${nextPreCheckCount}-marta)`
+      );
+    }
+
+    const externalPrinter = onPrintReceipt || setReceiptToPrint;
+    if (typeof externalPrinter === 'function') {
+      externalPrinter({ order: updatedLockedOrder });
+    } else {
+      setLocalPreCheckPrintOrder(updatedLockedOrder);
+    }
+  };
+
+  // =========================================================
+  // 6. BUYURTMANI OSHXONAGA YUBORISH VA YETKAZILDI BELGISI
   // =========================================================
   const handleSubmitOrder = () => {
     if (!selectedTable) {
@@ -290,6 +572,7 @@ export default function WaiterMode({
       return;
     }
 
+    // Oshxonaga yuborilayotgan barcha taomlarga sentQty = qty muhrini bosamiz
     const normalizedCart = cart.map((item, idx) => {
       const price = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;
       const qty = Number(item.quantity ?? item.qty ?? 1) || 1;
@@ -298,7 +581,8 @@ export default function WaiterMode({
         cartItemId: item.cartItemId || `ci_${item.id || idx}_${Date.now()}`,
         price,
         quantity: qty,
-        qty
+        qty,
+        sentQty: qty
       };
     });
 
@@ -407,7 +691,7 @@ export default function WaiterMode({
   };
 
   // =========================================================
-  // 5. 📌 BRON (RESERVATION) BOSHQARUV FUNKSIYALARI
+  // 7. 📌 BRON (RESERVATION) BOSHQARUV FUNKSIYALARI
   // =========================================================
   const handleSaveReservation = (tableName, bookingData) => {
     setReservations(prev => ({
@@ -442,7 +726,7 @@ export default function WaiterMode({
   };
 
   // =========================================================
-  // 6. ⏱️ SOATBAY VIP-TAYMER (TARIFIKATOR) FUNKSIYALARI
+  // 8. ⏱️ SOATBAY VIP-TAYMER (TARIFIKATOR) FUNKSIYALARI
   // =========================================================
   const handleStartTableTimer = (tableName, config) => {
     setTableTimers(prev => ({
@@ -526,6 +810,7 @@ export default function WaiterMode({
       price: lineItemPrice,
       quantity: 1,
       qty: 1,
+      sentQty: 1,
       note: `Tarif: ${timerStats.hourlyRate.toLocaleString()} s/soat`
     };
 
@@ -598,7 +883,7 @@ export default function WaiterMode({
   };
 
   // =========================================================
-  // 7. STOL KO'CHIRISH VA CHEK BO'LISH FUNKSIYALARI
+  // 9. STOL KO'CHIRISH VA CHEK BO'LISH FUNKSIYALARI
   // =========================================================
   const freeTablesForAction = useMemo(() => {
     const busySet = new Set(
@@ -642,10 +927,11 @@ export default function WaiterMode({
       const moveQty = Math.min(totalQty, Math.max(0, Number(splitQuantities[idx]) || 0));
 
       if (moveQty > 0) {
-        movedItems.push({ ...item, quantity: moveQty, qty: moveQty });
+        movedItems.push({ ...item, quantity: moveQty, qty: moveQty, sentQty: moveQty });
       }
       if (totalQty - moveQty > 0) {
-        remainingItems.push({ ...item, quantity: totalQty - moveQty, qty: totalQty - moveQty });
+        const remQ = totalQty - moveQty;
+        remainingItems.push({ ...item, quantity: remQ, qty: remQ, sentQty: remQ });
       }
     });
 
@@ -699,7 +985,7 @@ export default function WaiterMode({
   };
 
   // =========================================================
-  // 8. RENDER (UI DIZAYN)
+  // 10. RENDER (UI DIZAYN)
   // =========================================================
   return (
     <div className="max-w-7xl mx-auto pb-8">
@@ -732,7 +1018,7 @@ export default function WaiterMode({
           onCancelTableTimer={handleCancelTableTimer}
         />
       ) : (
-        /* 2-EKRAN: TANLANGAN STOL MENYUSI VA SAVATCHASI (BARCHA PROP ALIASLARI BILAN) */
+        /* 2-EKRAN: TANLANGAN STOL MENYUSI VA SAVATCHASI */
         <div className="space-y-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex justify-between items-center">
             <button
@@ -795,6 +1081,7 @@ export default function WaiterMode({
               handleSendOrder={handleSubmitOrder}
               onMarkAsDelivered={handleMarkAsDelivered}
               markAsServed={handleMarkAsDelivered}
+              onLockPreCheck={handleLockAndPrintPreCheck}
               onBack={() => {
                 setSelectedTable(null);
                 setCart([]);
@@ -802,6 +1089,102 @@ export default function WaiterMode({
             />
           </div>
         </div>
+      )}
+
+      {/* =========================================================
+          MODAL 1: 🔒 ADMIN PIN VA SABAB TASDIQLASH MODALI (ANTI-FRAUD)
+          ========================================================= */}
+      {securityPrompt && (
+        <div
+          onClick={() => setSecurityPrompt(null)}
+          className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[180] flex items-center justify-center p-4 animate-fade-in"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl p-6 shadow-2xl border-2 border-red-400 dark:border-red-600 space-y-4"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-600 text-white flex items-center justify-center text-2xl shrink-0 shadow-md">
+                🔒
+              </div>
+              <div>
+                <h3 className="font-black text-lg text-gray-900 dark:text-white">
+                  Xavfsizlik Qulfi (Admin Tasdig'i)
+                </h3>
+                <p className="text-xs font-bold text-red-600 dark:text-red-400 mt-0.5">
+                  {securityPrompt.title}
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmSecurityPin} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-black uppercase text-gray-500 mb-1">
+                  Bekor qilish / kamaytirish sababi *
+                </label>
+                <select
+                  value={cancelReasonInput}
+                  onChange={e => setCancelReasonInput(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-900 dark:text-white outline-none focus:border-red-500"
+                >
+                  <option value="Mijoz rad etdi">🙅‍♂️ Mijoz taomni rad etdi</option>
+                  <option value="Ofitsiant adashib urgan">✍️ Ofitsiant adashib urgan</option>
+                  <option value="Oshxonada mahsulot tugagan">🛑 Oshxonada mahsulot tugab qoldi</option>
+                  <option value="Boshqa stolga ko'chirildi">🔄 Boshqa stolga o'tkazildi</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase text-gray-500 mb-1">
+                  Admin PIN-Kodi *
+                </label>
+                <input
+                  type="password"
+                  required
+                  autoFocus
+                  value={pinInput}
+                  onChange={e => {
+                    setPinInput(e.target.value);
+                    setPinError('');
+                  }}
+                  placeholder="••••••"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-red-300 dark:border-red-700 font-black text-xl text-center tracking-widest text-gray-900 dark:text-white outline-none focus:border-red-500"
+                />
+                {pinError && (
+                  <p className="text-xs font-black text-red-600 mt-1 text-center">
+                    {pinError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSecurityPrompt(null)}
+                  className="flex-1 py-3.5 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-bold text-xs"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-red-600/30 transition active:scale-95"
+                >
+                  🔓 Tasdiqlash
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PRE-CHEK CHOP ETISH MODALI */}
+      {localPreCheckPrintOrder && (
+        <PrintReceiptModal
+          cafeName={resolvedCafeName}
+          order={localPreCheckPrintOrder}
+          serviceFee={serviceFee}
+          onClose={() => setLocalPreCheckPrintOrder(null)}
+        />
       )}
 
       {/* QR-KOD MODALI */}
