@@ -6,7 +6,8 @@ export default function CashierReceipt({
   serviceFee = 10,
   matchedCustomer = null,
   earnedCashback = 0,
-  cashbackPercent = 5
+  cashbackPercent = 5,
+  onPrintPreCheck
 }) {
   if (!selectedOrder) return null;
 
@@ -18,16 +19,28 @@ export default function CashierReceipt({
   const usedBonusAmount = Number(totals.usedBonusAmount) || 0;
   const finalTotal = Number(totals.finalTotal) || 0;
 
+  const isLockedPreCheck = Boolean(selectedOrder.isPreCheckPrinted);
+  const preCheckCount = Number(selectedOrder.preCheckCount) || 0;
+
   return (
     <div className="flex-1 bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 md:p-6 flex flex-col justify-between min-h-0 overflow-hidden">
       
       {/* CHEK TEPASI */}
       <div>
-        <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-700 pb-4 mb-4">
+        <div className="flex flex-wrap justify-between items-start gap-2 border-b border-gray-100 dark:border-gray-700 pb-4 mb-3">
           <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-lg">
-              Chek #{String(selectedOrder.id).slice(-4)}
-            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-lg">
+                Chek #{String(selectedOrder.id).slice(-4)}
+              </span>
+
+              {isLockedPreCheck && (
+                <span className="text-[10px] font-black uppercase tracking-wider bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-800 flex items-center gap-1">
+                  <span>🔒</span> Pre-chek ({preCheckCount}x • {selectedOrder.preCheckTime || ''})
+                </span>
+              )}
+            </div>
+
             <h3 className="text-2xl font-black text-gray-900 dark:text-white mt-1.5">
               🪑 {selectedOrder.table}
             </h3>
@@ -36,24 +49,51 @@ export default function CashierReceipt({
             </p>
           </div>
 
-          {matchedCustomer && (
-            <div className="text-right bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-2xl border border-amber-200 dark:border-amber-800/50">
-              <span className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-300 block">
-                🎁 VIP Mijoz ({cashbackPercent}%)
-              </span>
-              <span className="font-black text-xs text-gray-900 dark:text-white block">
-                {matchedCustomer.name}
-              </span>
-              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                Balans: {Number(matchedCustomer.bonusBalance || 0).toLocaleString()} s
-              </span>
-            </div>
-          )}
+          {/* O'ng taraf: Pre-chek chiqarish tugmasi va VIP mijoz kartasi */}
+          <div className="flex flex-col items-end gap-2">
+            {typeof onPrintPreCheck === 'function' && (
+              <button
+                type="button"
+                onClick={onPrintPreCheck}
+                className={`px-3.5 py-2 rounded-xl font-black text-xs transition active:scale-95 flex items-center gap-1.5 shadow-sm border ${
+                  isLockedPreCheck
+                    ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 hover:bg-amber-100'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-indigo-500/20'
+                }`}
+                title="Mijozga to'lovdan oldin hisob varaqasi (Pre-chek) chiqarish va chekni o'zgarishlardan qulflash"
+              >
+                <span>🧾</span>
+                <span>{isLockedPreCheck ? 'Pre-chekni qayta chiqarish' : 'Pre-chek chiqarish (Qulflash)'}</span>
+              </button>
+            )}
+
+            {matchedCustomer && (
+              <div className="text-right bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-2xl border border-amber-200 dark:border-amber-800/50">
+                <span className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-300 block">
+                  🎁 VIP Mijoz ({cashbackPercent}%)
+                </span>
+                <span className="font-black text-xs text-gray-900 dark:text-white block">
+                  {matchedCustomer.name}
+                </span>
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                  Balans: {Number(matchedCustomer.bonusBalance || 0).toLocaleString()} s
+                </span>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Qulflangan chek haqida ogohlantirish */}
+        {isLockedPreCheck && (
+          <div className="mb-3 px-3.5 py-2 rounded-xl bg-red-50/80 dark:bg-red-900/20 border border-red-200 dark:border-red-800/60 flex items-center justify-between gap-2 text-[11px] font-bold text-red-700 dark:text-red-300">
+            <span>🛡️ Mijozga Pre-chek chiqarilgan. Chegirma berish yoki o'chirish Admin PIN-kodi bilan nazorat qilinadi.</span>
+            <span className="font-black shrink-0">🔒 HIMOYADA</span>
+          </div>
+        )}
       </div>
 
       {/* TAOMLAR RO'YXATI */}
-      <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 my-2">
+      <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 my-1">
         {items.length === 0 ? (
           <p className="text-center text-gray-400 font-bold py-8">
             Chek ichida taomlar yo'q
