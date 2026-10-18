@@ -29,7 +29,8 @@ export default function WaiterCart({
   submitOrder,
   handleSendOrder,
   onMarkAsDelivered,
-  markAsServed
+  markAsServed,
+  onLockPreCheck
 }) {
   const [expandedNoteId, setExpandedNoteId] = useState(null);
 
@@ -43,6 +44,8 @@ export default function WaiterCart({
   const handleDeliver = onMarkAsDelivered || markAsServed;
 
   const safeCart = Array.isArray(cart) ? cart : [];
+  const isPreCheckLocked = Boolean(resolvedOrder?.isPreCheckPrinted);
+  const preCheckCount = Number(resolvedOrder?.preCheckCount) || 0;
 
   // Savatcha matematikasi
   const cartSummary = useMemo(() => {
@@ -72,7 +75,7 @@ export default function WaiterCart({
     };
   }, [safeCart, resolvedTable, serviceFee]);
 
-  // Agar prop funksiya kelmagan bo'lsa, setCart orqali to'g'ridan-to'g'ri miqdorni o'zgartirish
+  // Miqdorni o'zgartirish (WaiterMode dagi Pre-chek / Oshxona qulfi orqali o'tadi)
   const changeItemQty = (itemKey, delta) => {
     if (typeof handleQtyChange === 'function') {
       handleQtyChange(itemKey, delta);
@@ -118,35 +121,77 @@ export default function WaiterCart({
   return (
     <div className="w-full lg:w-96 bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 sm:p-5 flex flex-col justify-between min-h-0 overflow-hidden shrink-0">
       
-      {/* 1. SAVATCHA TEPASI */}
-      <div className="pb-3.5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center shrink-0">
-        <div>
-          <h3 className="font-black text-lg text-gray-900 dark:text-white flex items-center gap-2">
-            <span>🛒</span> Buyurtma Savatchasi
-          </h3>
-          <p className="text-xs font-bold text-gray-400">
-            🪑 {resolvedTable} • {cartSummary.totalPortions} porsiya taom
-          </p>
+      {/* 1. SAVATCHA TEPASI VA PRE-CHEK QULF INDIKATORI */}
+      <div className="pb-3 border-b border-gray-100 dark:border-gray-700 space-y-2 shrink-0">
+        <div className="flex justify-between items-start gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-black text-lg text-gray-900 dark:text-white flex items-center gap-1.5">
+                <span>🛒</span> Buyurtma Savatchasi
+              </h3>
+              {isPreCheckLocked && (
+                <span className="px-2 py-0.5 rounded-lg bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300 font-black text-[10px] uppercase border border-red-200 dark:border-red-800">
+                  🔒 Pre-chek ({preCheckCount}x)
+                </span>
+              )}
+            </div>
+            <p className="text-xs font-bold text-gray-400 mt-0.5">
+              🪑 {resolvedTable} • {cartSummary.totalPortions} porsiya taom
+            </p>
+          </div>
+
+          {/* Agar hali oshxonaga yuborilmagan yangi buyurtma bo'lsa, Tozalash tugmasi chiqadi */}
+          {safeCart.length > 0 && typeof setCart === 'function' && !resolvedOrder && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Savatchadagi barcha taomlarni tozalaymizmi?")) {
+                  setCart([]);
+                }
+              }}
+              className="text-xs font-black text-red-500 hover:underline"
+            >
+              Tozalash
+            </button>
+          )}
+
+          {/* Agar stolda ochiq buyurtma bo'lsa — Pre-chek (Hisob) chiqarish va qulflash tugmasi */}
+          {resolvedOrder && typeof onLockPreCheck === 'function' && (
+            <button
+              type="button"
+              onClick={onLockPreCheck}
+              className={`px-3 py-1.5 rounded-xl font-black text-[11px] transition active:scale-95 flex items-center gap-1 border shrink-0 ${
+                isPreCheckLocked
+                  ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 border-red-200 dark:border-red-800'
+                  : 'bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+              }`}
+              title="Mijozga hisob (Pre-chek) chiqarish va chekni qulflash"
+            >
+              <span>{isPreCheckLocked ? '🔒' : '🧾'}</span>
+              <span>{isPreCheckLocked ? 'Qayta Pre-chek' : 'Pre-chek (Qulflash)'}</span>
+            </button>
+          )}
         </div>
 
-        {safeCart.length > 0 && typeof setCart === 'function' && !resolvedOrder && (
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm("Savatchadagi barcha taomlarni tozalaymizmi?")) {
-                setCart([]);
-              }
-            }}
-            className="text-xs font-black text-red-500 hover:underline"
-          >
-            Tozalash
-          </button>
+        {/* Qulflangan chek eslatmasi */}
+        {resolvedOrder && (
+          <div className={`px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center justify-between ${
+            isPreCheckLocked
+              ? 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/60'
+              : 'bg-amber-50/70 dark:bg-gray-900 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-gray-700'
+          }`}>
+            <span>
+              {isPreCheckLocked
+                ? '🔒 Pre-chek chiqarilgan! Taomni kamaytirish faqat Admin PIN bilan.'
+                : '🛡️ Oshxonaga ketgan taomni kamaytirish/o\'chirish Admin PIN talab qiladi.'}
+            </span>
+          </div>
         )}
       </div>
 
       {/* AGAR OSHXONADA TAOM TAYYOR BO'LGAN BO'LSA — TEZKOR TOPSHIRISH TUGMASI */}
       {resolvedOrder && resolvedOrder.status === 'Tayyor' && (
-        <div className="my-3 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-400 dark:border-emerald-600 space-y-2 shrink-0 animate-fade-in">
+        <div className="my-2.5 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-400 dark:border-emerald-600 space-y-2 shrink-0 animate-fade-in">
           <p className="text-xs font-black text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
             <span>🔔</span> Oshxonada taomlar tayyor bo'ldi!
           </p>
@@ -161,7 +206,7 @@ export default function WaiterCart({
       )}
 
       {/* 2. SAVATCHADAGI TAOMLAR RO'YXATI */}
-      <div className="flex-1 overflow-y-auto my-3 pr-1 space-y-2.5">
+      <div className="flex-1 overflow-y-auto my-2.5 pr-1 space-y-2.5">
         {safeCart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center py-12 text-gray-400">
             <span className="text-5xl mb-2 opacity-60">🍽️</span>
@@ -176,19 +221,39 @@ export default function WaiterCart({
             const itemKey = item.cartItemId || item.id || item.name || idx;
             const price = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;
             const qty = Number(item.quantity ?? item.qty ?? 1) || 1;
+            const sentQty = Number(item.sentQty ?? 0) || 0;
             const lineTotal = price * qty;
             const isNoteOpen = expandedNoteId === itemKey;
+
+            // Agar taom oshxonaga yuborilgan bo'lsa va hozirgi miqdor sentQty ga teng bo'lsa, "-" va "🗑" tugmalari qulflangan (PIN so'raydi)
+            const isReductionProtected = isPreCheckLocked || (sentQty > 0 && qty <= sentQty);
+            const isDeleteProtected = isPreCheckLocked || sentQty > 0;
 
             return (
               <div
                 key={itemKey}
-                className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-700 space-y-2.5"
+                className={`p-3.5 rounded-2xl border space-y-2.5 transition ${
+                  sentQty > 0
+                    ? 'bg-gray-50/90 dark:bg-gray-900/70 border-gray-200 dark:border-gray-700'
+                    : 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50'
+                }`}
               >
                 <div className="flex justify-between items-start gap-2">
                   <div className="min-w-0">
-                    <h4 className="font-black text-sm text-gray-900 dark:text-white leading-snug">
-                      {item.name}
-                    </h4>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <h4 className="font-black text-sm text-gray-900 dark:text-white leading-snug">
+                        {item.name}
+                      </h4>
+                      {sentQty > 0 ? (
+                        <span className="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-black text-[9px] uppercase">
+                          🔒 Oshxonada: {sentQty}
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-black text-[9px] uppercase">
+                          🆕 Yangi
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs font-bold text-amber-600 dark:text-amber-400 block mt-0.5">
                       {price.toLocaleString()} s × {qty} = <strong>{lineTotal.toLocaleString()} s</strong>
                     </span>
@@ -199,25 +264,38 @@ export default function WaiterCart({
                     <button
                       type="button"
                       onClick={() => changeItemQty(itemKey, -1)}
-                      className="w-8 h-8 rounded-xl bg-white dark:bg-gray-800 hover:bg-red-50 border border-gray-200 dark:border-gray-600 font-black text-base text-gray-800 dark:text-white flex items-center justify-center transition active:scale-90"
+                      className={`w-8 h-8 rounded-xl border font-black text-sm flex items-center justify-center transition active:scale-90 ${
+                        isReductionProtected
+                          ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
+                          : 'bg-white dark:bg-gray-800 hover:bg-red-50 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-white'
+                      }`}
+                      title={isReductionProtected ? "Oshxonaga ketgan taomni kamaytirish (Admin PIN talab qilinadi)" : "Kamaytirish (-1)"}
                     >
-                      −
+                      {isReductionProtected ? '🔒' : '−'}
                     </button>
+
                     <span className="w-7 text-center font-black text-sm text-gray-900 dark:text-white">
                       {qty}
                     </span>
+
                     <button
                       type="button"
                       onClick={() => changeItemQty(itemKey, 1)}
                       className="w-8 h-8 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-base flex items-center justify-center shadow-sm transition active:scale-90"
+                      title="Qo'shish (+1)"
                     >
                       +
                     </button>
+
                     <button
                       type="button"
                       onClick={() => removeItem(itemKey)}
-                      className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-900/30 hover:bg-red-100 text-red-500 font-black text-xs flex items-center justify-center transition ml-0.5"
-                      title="O'chirish"
+                      className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center transition ml-0.5 ${
+                        isDeleteProtected
+                          ? 'bg-red-100 dark:bg-red-900/40 text-red-600 border border-red-200 dark:border-red-800'
+                          : 'bg-red-50 dark:bg-red-900/30 hover:bg-red-100 text-red-500'
+                      }`}
+                      title={isDeleteProtected ? "Oshxonaga ketgan taomni o'chirish (Admin PIN talab qilinadi)" : "O'chirish"}
                     >
                       🗑
                     </button>
