@@ -15,6 +15,7 @@ import ManagerOverrideModal from './components/ManagerOverrideModal';
 import StatsMode from './components/StatsMode';
 import PrintReceiptModal from './components/PrintReceiptModal';
 import CustomerMode from './components/CustomerMode';
+import AutoLockControl from './components/AutoLockControl';
 
 const initialMenuItems = [
   { 
@@ -52,12 +53,11 @@ const initialUsers = [
 ];
 
 export default function App() {
-  const cafeName = "Premium Cafe";
-  const serviceFee = 10; 
-
   // ==========================================
   // 1. ASOSIY STATE'LAR (Baza - LocalStorage Sync)
   // ==========================================
+  const [cafeName, setCafeName] = useSticky('pos_cafe_name', 'Premium Cafe');
+  const [serviceFee, setServiceFee] = useSticky('pos_service_fee', 10);
   const [isDarkMode, setIsDarkMode] = useSticky('pos_theme', false);
   const [tables, setTables] = useSticky('pos_tables', initialTables);
   const [orders, setOrders] = useSticky('pos_orders', []);
@@ -67,6 +67,8 @@ export default function App() {
   const [users, setUsers] = useSticky('pos_users', initialUsers);
   const [inventory, setInventory] = useSticky('pos_inventory', []);
   const [inventoryLogs, setInventoryLogs] = useSticky('pos_inv_logs', []);
+  const [expenses, setExpenses] = useSticky('pos_expenses', []);
+  const [customers, setCustomers] = useSticky('pos_customers', []);
   
   // Xavfsizlik va Nazorat Statelari
   const [auditLogs, setAuditLogs] = useSticky('pos_audit_logs', []);
@@ -141,7 +143,6 @@ export default function App() {
   }, [currentUser, setAuditLogs]);
 
   const requireAdminOverride = (actionName, onSuccessCallback) => {
-    // Agar birinchi argument funksiya bo'lib kelsa (masalan WaiterMode'dan faqat callback yuborilsa)
     const normalizedAction = typeof actionName === 'function' ? 'Tasdiqlangan amal' : actionName;
     const normalizedCallback = typeof actionName === 'function' ? actionName : onSuccessCallback;
 
@@ -172,37 +173,6 @@ export default function App() {
     }
   };
 
-  // AVTOMATIK QULFLASH (AUTO-LOCK: 2 daqiqa harakatsizlikdan so'ng)
-  useEffect(() => {
-    if (!currentUser || view !== 'app') return;
-
-    let timeoutId;
-
-    const resetTimer = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        addAuditLog("Avtomatik Qulflash", "Xodim 2 daqiqa harakatsiz bo'ldi.");
-        setCurrentUser(null);
-        setView('login');
-      }, 120000); // 2 daqiqa (120 000 ms)
-    };
-
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keydown', resetTimer);
-    window.addEventListener('click', resetTimer);
-    window.addEventListener('touchstart', resetTimer);
-
-    resetTimer();
-
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keydown', resetTimer);
-      window.removeEventListener('click', resetTimer);
-      window.removeEventListener('touchstart', resetTimer);
-    };
-  }, [currentUser, view, addAuditLog]);
-
   // ==========================================
   // 4. KIRISH VA CHIQISH (AUTH & QR MENU)
   // ==========================================
@@ -223,7 +193,7 @@ export default function App() {
     setView('login');
   };
 
-  // LockScreen dagi "Bo'sh stollar ro'yxati" modalidan tanlangan stolni ochish (prompt'siz!)
+  // LockScreen dagi "Bo'sh stollar ro'yxati" modalidan tanlangan stolni ochish
   const handleGuestLogin = (selectedTableName) => {
     const targetTable = typeof selectedTableName === 'string' && selectedTableName.trim() !== ''
       ? selectedTableName
@@ -256,10 +226,10 @@ export default function App() {
         const itemQty = Number(orderItem.quantity || orderItem.qty || 1);
         recipe.forEach(ing => {
           const invIdx = newInventory.findIndex(
-            i => i.id === ing.productId || i.id === ing.id || i.name === ing.name
+            i => String(i.id) === String(ing.inventoryId ?? ing.productId ?? ing.id) || i.name === ing.name
           );
           if (invIdx !== -1) {
-            const deductAmount = Number(ing.amount || ing.quantity || 0) * itemQty;
+            const deductAmount = Number(ing.qty ?? ing.amount ?? ing.quantity ?? 0) * itemQty;
             newInventory[invIdx] = {
               ...newInventory[invIdx],
               quantity: Math.max(0, Number(newInventory[invIdx].quantity || 0) - deductAmount)
@@ -268,10 +238,13 @@ export default function App() {
             newLogs.push({
               id: `${Date.now()}_${Math.random()}`,
               date: new Date().toLocaleString(),
+              itemName: newInventory[invIdx].name,
               productName: newInventory[invIdx].name,
               type: 'chiqim_avto',
+              diffAmount: `-${deductAmount}`,
               amount: deductAmount,
               unit: newInventory[invIdx].unit || 'dona',
+              note: `Sotuv (${tableLabel}: ${orderItem.name} x${itemQty})`,
               reason: `Sotuv (${tableLabel}: ${orderItem.name} x${itemQty})`,
               user: currentUser?.name || 'QR-Mijoz'
             });
@@ -293,8 +266,6 @@ export default function App() {
     let targetTable = guestTable || '1-Stol';
     let incomingItems = [];
 
-    // WaiterMode: onOrderSubmit(selectedTable, cart) -> arg1 = string, arg2 = array
-    // CustomerQRView: onSubmitOrder(cart, table) -> arg1 = array, arg2 = string
     if (Array.isArray(arg1)) {
       incomingItems = arg1;
       if (typeof arg2 === 'string' && arg2.trim() !== '') {
@@ -310,23 +281,25 @@ export default function App() {
 
     if (incomingItems.length === 0) return;
 
-    const normalizedItems = incomingItems.map(item => ({
-      ...item,
-      cartItemId: item.cartItemId || `${Date.now()}_${Math.random()}`,
-      price: Number(item.price ?? item.variants?.[0]?.price ?? 0),
-      quantity: Number(item.quantity ?? item.qty ?? 1),
-      qty: Number(item.quantity ?? item.qty ?? 1)
-    }));
+    const normalizedItems = incomingItems.map(item => {
+      const q = Number(item.quantity ?? item.qty ?? 1) || 1;
+      return {
+        ...item,
+        cartItemId: item.cartItemId || `${Date.now()}_${Math.random()}`,
+        price: Number(item.price ?? item.variants?.[0]?.price ?? 0),
+        quantity: q,
+        qty: q,
+        sentQty: q
+      };
+    });
 
-    // Ombordan mahsulotlarni avtomatik ayirish
     deductInventoryForItems(normalizedItems, targetTable);
 
     setOrders(prevOrders => {
       const safeOrders = Array.isArray(prevOrders) ? prevOrders : [];
       
-      // Shu stolda hali to'lanmagan aktiv buyurtma bormi?
       const existingOrderIndex = safeOrders.findIndex(
-        o => o && o.table === targetTable && o.status !== "To'langan" && o.status !== 'Qarz'
+        o => o && o.table === targetTable && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
       );
 
       if (existingOrderIndex !== -1 && targetTable !== 'Olib ketish') {
@@ -344,17 +317,18 @@ export default function App() {
         updatedOrders[existingOrderIndex] = {
           ...existingOrder,
           items: combinedItems,
+          subTotal: newSubtotal,
           subtotal: newSubtotal,
           serviceFeeAmount: newServiceFeeAmount,
           total: newTotal,
-          status: 'Yangi', // Qo'shimcha buyurtma tushganda oshxonaga yana "Yangi" bo'lib ko'rinadi
+          finalTotal: newTotal,
+          status: 'Yangi',
           updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
 
         return updatedOrders;
       }
 
-      // Yangi chek ochish
       const subtotal = normalizedItems.reduce(
         (sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || it.qty || 1)),
         0
@@ -364,14 +338,19 @@ export default function App() {
       const total = subtotal + serviceFeeAmount;
 
       const newOrder = {
-        id: Date.now(),
+        id: Date.now().toString(),
+        createdAt: Date.now(),
         table: targetTable,
         waiter: currentUser?.name || 'QR-Menyu (Mijoz)',
+        waiterName: currentUser?.name || 'QR-Menyu (Mijoz)',
         items: normalizedItems,
+        subTotal: subtotal,
         subtotal,
         serviceFee: isTakeaway ? 0 : serviceFee,
+        serviceFeePercent: isTakeaway ? 0 : serviceFee,
         serviceFeeAmount,
         total,
+        finalTotal: total,
         status: 'Yangi',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         date: new Date().toLocaleDateString()
@@ -383,12 +362,12 @@ export default function App() {
     addAuditLog("Buyurtma yaratildi", `${targetTable} uchun ${normalizedItems.length} xil taom qo'shildi`);
   };
 
-  // Buyurtma statusini yangilash ('Yangi' -> 'Tayyorlanmoqda' -> 'Tayyor' -> 'Yetkazildi' -> "To'langan")
+  // Buyurtma statusini yangilash
   const handleUpdateStatus = (orderId, newStatus, extraData = {}) => {
     setOrders(prev => {
       const safePrev = Array.isArray(prev) ? prev : [];
       return safePrev.map(o => {
-        if (o.id === orderId) {
+        if (String(o.id) === String(orderId)) {
           return {
             ...o,
             ...extraData,
@@ -411,7 +390,7 @@ export default function App() {
     setOrders(prev => {
       const safePrev = Array.isArray(prev) ? prev : [];
       return safePrev.map(o => {
-        if (o.table === fromTable && o.status !== "To'langan" && o.status !== 'Qarz') {
+        if (o.table === fromTable && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)) {
           return { ...o, table: toTable };
         }
         return o;
@@ -426,7 +405,7 @@ export default function App() {
 
     setOrders(prev => {
       const safePrev = Array.isArray(prev) ? [...prev] : [];
-      const sourceIndex = safePrev.findIndex(o => o.id === orderId);
+      const sourceIndex = safePrev.findIndex(o => String(o.id) === String(orderId));
       if (sourceIndex === -1) return safePrev;
 
       const sourceOrder = safePrev[sourceIndex];
@@ -435,7 +414,6 @@ export default function App() {
         i => !movedIds.has(i.cartItemId || i.id)
       );
 
-      // Asosiy stolda qolgan taomlar hisobi
       const remSubtotal = remainingItems.reduce(
         (s, it) => s + (Number(it.price || 0) * Number(it.quantity || it.qty || 1)),
         0
@@ -445,12 +423,13 @@ export default function App() {
       safePrev[sourceIndex] = {
         ...sourceOrder,
         items: remainingItems,
+        subTotal: remSubtotal,
         subtotal: remSubtotal,
         serviceFeeAmount: remService,
-        total: remSubtotal + remService
+        total: remSubtotal + remService,
+        finalTotal: remSubtotal + remService
       };
 
-      // Yangi stolga o'tkazilgan taomlar hisobi
       const moveSubtotal = itemsToMove.reduce(
         (s, it) => s + (Number(it.price || 0) * Number(it.quantity || it.qty || 1)),
         0
@@ -458,14 +437,19 @@ export default function App() {
       const moveService = Math.round((moveSubtotal * serviceFee) / 100);
 
       const newSplitOrder = {
-        id: Date.now(),
+        id: Date.now().toString(),
+        createdAt: Date.now(),
         table: targetTable,
         waiter: sourceOrder.waiter,
+        waiterName: sourceOrder.waiterName || sourceOrder.waiter,
         items: itemsToMove,
+        subTotal: moveSubtotal,
         subtotal: moveSubtotal,
         serviceFee,
+        serviceFeePercent: serviceFee,
         serviceFeeAmount: moveService,
         total: moveSubtotal + moveService,
+        finalTotal: moveSubtotal + moveService,
         status: sourceOrder.status,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         date: new Date().toLocaleDateString()
@@ -601,8 +585,16 @@ export default function App() {
           </nav>
         )}
 
-        {/* O'ng taraf: Tungi rejim va Chiqish */}
+        {/* O'ng taraf: Avto-Qulf sozlamasi (Telefon/Kompyuter uslubida), Tungi rejim va Chiqish */}
         <div className="flex items-center gap-2">
+          <AutoLockControl
+            currentUser={currentUser}
+            users={users}
+            cafeName={cafeName}
+            onSwitchUser={handleLogin}
+            onLogout={handleLogout}
+          />
+
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
             className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-lg transition active:scale-90"
@@ -631,17 +623,20 @@ export default function App() {
             tables={tables}
             orders={orders}
             setOrders={setOrders}
+            cafeName={cafeName}
             onOrderSubmit={handleOrderSubmit}
             onUpdateStatus={handleUpdateStatus}
             onTransferTable={handleTransferTable}
             onSplitOrder={handleSplitOrder}
             onShowQrTable={handleShowQrTable}
+            onPrintReceipt={(orderObj) => setReceiptToPrint(orderObj)}
             waiterCalls={waiterCalls}
             onClearCall={handleClearCall}
             currentUser={currentUser}
             waiterCanSeeSales={currentUser.role === 'admin' || currentUser.canSeeSales}
             serviceFee={serviceFee}
             requireAdminOverride={requireAdminOverride}
+            addAuditLog={addAuditLog}
           />
         )}
 
@@ -651,10 +646,21 @@ export default function App() {
             orders={orders}
             setOrders={setOrders}
             tables={tables}
+            menuItems={menuItems}
+            inventory={inventory}
+            setInventory={setInventory}
+            inventoryLogs={inventoryLogs}
+            setInventoryLogs={setInventoryLogs}
+            expenses={expenses}
+            setExpenses={setExpenses}
+            customers={customers}
+            setCustomers={setCustomers}
+            cafeName={cafeName}
             serviceFee={serviceFee}
             currentUser={currentUser}
             onUpdateStatus={handleUpdateStatus}
             onPrintReceipt={(orderObj) => setReceiptToPrint(orderObj)}
+            setReceiptToPrint={setReceiptToPrint}
             requireAdminOverride={requireAdminOverride}
             addAuditLog={addAuditLog}
           />
@@ -665,8 +671,12 @@ export default function App() {
           <KitchenMode
             orders={orders}
             setOrders={setOrders}
+            menuItems={menuItems}
+            setMenuItems={setMenuItems}
+            menuCategories={menuCategories}
             onUpdateStatus={handleUpdateStatus}
             currentUser={currentUser}
+            addAuditLog={addAuditLog}
           />
         )}
 
@@ -689,17 +699,28 @@ export default function App() {
         {currentActiveView === 'stats' && (
           <StatsMode
             orders={orders}
+            setOrders={setOrders}
             menuItems={menuItems}
             users={users}
             inventory={inventory}
             inventoryLogs={inventoryLogs}
+            expenses={expenses}
+            setExpenses={setExpenses}
+            serviceFee={serviceFee}
+            currentUser={currentUser}
             auditLogs={auditLogs}
+            setAuditLogs={setAuditLogs}
+            addAuditLog={addAuditLog}
           />
         )}
 
         {/* 6. ADMIN BOSHQARUV PANELI */}
         {currentActiveView === 'admin' && (
           <AdminPanel
+            cafeName={cafeName}
+            setCafeName={setCafeName}
+            serviceFee={serviceFee}
+            setServiceFee={setServiceFee}
             menuItems={menuItems}
             setMenuItems={setMenuItems}
             menuCategories={menuCategories}
@@ -713,16 +734,18 @@ export default function App() {
             inventory={inventory}
             setInventory={setInventory}
             inventoryLogs={inventoryLogs}
+            setInventoryLogs={setInventoryLogs}
             auditLogs={auditLogs}
+            setAuditLogs={setAuditLogs}
             isOverrideEnabled={isOverrideEnabled}
             setIsOverrideEnabled={setIsOverrideEnabled}
-            serviceFee={serviceFee}
             currentUser={currentUser}
+            requireAdminOverride={requireAdminOverride}
             addAuditLog={addAuditLog}
           />
         )}
 
-        {/* Zaxira: Agar biror joyda currentActiveView === 'customer' bo'lib qolsa */}
+        {/* Zaxira: CustomerMode */}
         {currentActiveView === 'customer' && (
           <CustomerMode
             cafeName={cafeName}
@@ -757,6 +780,7 @@ export default function App() {
         <PrintReceiptModal
           order={receiptToPrint}
           receipt={receiptToPrint}
+          receiptData={receiptToPrint}
           cafeName={cafeName}
           serviceFee={serviceFee}
           onClose={() => setReceiptToPrint(null)}
