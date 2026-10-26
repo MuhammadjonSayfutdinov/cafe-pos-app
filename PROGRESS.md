@@ -3,16 +3,57 @@
 Oxirgi yangilanish: 2026-10-26
 Joriy bosqich: **0-bosqich (tozalash)**. Kod hali o'zgartirilmagan, audit tugagan.
 
+> Bu fayl Claude uchun yozilgan. Barcha kodni faqat Claude yozadi (Gemini ishlatilmaydi).
+> Yangi chatda birinchi navbatda shu faylni va `ai-context.txt` ni o'qi.
+
+## Claude uchun ko'rsatmalar
+
+**Foydalanuvchi:** o'zbek tilida, qisqa javob yoz. Butun faylni qayta yozma: faqat o'zgargan funksiyani yoz.
+
+**Cheklovlar:** dasturni ishga tushira olmayman va GitHub'ga yoza olmayman. Foydalanuvchi kodni VS Code'ga ko'chiradi, sinaydi, xato bo'lsa konsol matnini (5–10 qator) yuboradi.
+
+**Sessiya boshida:**
+1. Bu fayl va `ai-context.txt` ni o'qi.
+2. "Joriy vazifa" dagi fayllarni so'ra yoki GitHub'dan o'qi. Butun repoga, zipga va `node_modules` ga tegma.
+3. Katta fayllarda (`CashierMode`, `StatsMode`, `WaiterMode`) faqat kerakli funksiyani so'ra yoki qatorlar oralig'ini o'qi.
+
+**Javob formati (har vazifa):**
+1. Nima o'zgaradi: 1–2 jumla.
+2. Har fayl uchun: fayl nomi, funksiya nomi, to'liq yangi funksiya (yoki "eski → yangi" bloki).
+3. "Sinab ko'rish": 2–3 qadam.
+4. "PROGRESS.md da yangila": qaysi qatorni `[x]` qilish va commit xabari.
+
+**Token tejash:** bitta vazifa = bitta chat. Tahlilni uzaytirma, tuzatishni ber. Kod yozish qoidalari: `ai-context.txt` 2-bo'lim.
+
 ## Ish tartibi
 
-1. Gemini bitta vazifani bajaradi va bitta commit qiladi ("<bosqich>: <vazifa>").
-2. Commit havolasini `.diff` bilan **yangi Claude chatiga** yuborasiz:
-   `https://github.com/MuhammadjonSayfutdinov/cafe-pos-app/commit/<hash>.diff`
-3. Claude diffni tekshiradi, xato topsa tuzatish promtini yozadi.
-4. Vazifa qabul qilingach, quyidagi jadvalga hash yoziladi va keyingisiga o'tiladi.
+1. Foydalanuvchi yangi chat ochadi va "Joriy vazifa" ni yozadi (pastdagi andoza).
+2. Claude kerakli fayllarni o'qiydi va tuzatishni beradi.
+3. Foydalanuvchi VS Code'da qo'llaydi, sinaydi va commit qiladi ("<bosqich>: <vazifa>").
+4. Xato chiqsa, shu chatda konsol matnini yuboradi, Claude tuzatadi.
+5. Qabul qilingach, jadvaldagi `[ ]` → `[x]` va commit hash yoziladi.
 
-Bosqich tugaganda tekshirish havolasi:
-`https://github.com/MuhammadjonSayfutdinov/cafe-pos-app/compare/<eski-hash>...<yangi-hash>.diff`
+Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zgarishni o'qiydi:
+`https://github.com/MuhammadjonSayfutdinov/cafe-pos-app/commit/<hash>.diff`
+
+## Joriy vazifa
+
+**0-bosqich, 1-qadam:** `.gitignore` qo'shish, `node_modules` ni indeksdan chiqarish, `autosync.cjs` va `gitdoc` ni o'chirish.
+Fayllar: `package.json`, `index.html`, `src/index.css`, `.vscode/settings.json`, `.vscode/tasks.json`.
+Tugagach shu bo'limni keyingi vazifaga almashtiring.
+
+## Vazifa → kerakli fayllar
+
+Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
+
+| Vazifa | Fayl va funksiyalar |
+|--------|---------------------|
+| 0 Tozalash | `.gitignore`, `package.json`, `index.html`, `src/index.css`, `.vscode/*`, `autosync.cjs` |
+| 1 Ombor (B1) | `App.jsx`: `deductInventoryForItems` (214), `handleOrderSubmit` (265). `CashierMode.jsx`: `deductOrderIngredientsFromStock` (647, chaqiruv 874), `handleDeleteOrder` (1009) |
+| 2 Jami summa (B10) | `App.jsx`: `handleOrderSubmit`, `handleSplitOrder` (403). `CashierMode.jsx`: jami hisob (~325–400) |
+| 3 Sana va qarz (B4, B7, B8) | `AdminDashboard.jsx` (~52), `WaiterMode.jsx` (~688), `CashierMode.jsx`: `handlePaymentSubmit` (766), `handlePayOffDebt` (983) |
+| 4 Xavfsizlik (B5, B6) | `LockScreen.jsx`, `ManagerOverrideModal.jsx`, `AdminSettingsTab.jsx`: `handleExportBackup` (254), `handleImportBackup` (284), `handleClearOrdersOnly` (318) |
+| 5 Dozakaz va bo'lish (B3, B9) | `App.jsx`: `handleOrderSubmit`, `handleUpdateStatus` (366), `handleSplitOrder`. `KitchenMode.jsx`, `WaiterTableGrid.jsx` |
 
 ## Ma'lum xatolar
 
@@ -96,6 +137,6 @@ Bosqich tugaganda tekshirish havolasi:
 
 ```text
 Loyiha: https://github.com/MuhammadjonSayfutdinov/cafe-pos-app
-ai-context.txt va PROGRESS.md ni o'qi. Vazifa: <bitta vazifa>.
-Diff: <commit .diff havolasi>. Faqat o'zgargan funksiyalarni yoz.
+PROGRESS.md va ai-context.txt ni o'qi (Claude uchun ko'rsatmalar bor).
+Vazifa: PROGRESS.md dagi "Joriy vazifa". Kodni sen yoz.
 ```
