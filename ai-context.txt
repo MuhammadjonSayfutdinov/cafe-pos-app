@@ -1,551 +1,172 @@
-# ============================================================================
-
-# 🍽️ CAFE POS APP — MASTER AI CONTEXT & ENTERPRISE ARCHITECTURE BLUEPRINT
-
-# ============================================================================
-
-# Ushbu fayl Cline AI (yoki Cursor/VS Code AI agentlari) uchun loyihaning
-
-# yagona va qat'iy qonun-qoidalar kitobi (Single Source of Truth) hisoblanadi.
-
-# Har qanday kod yozish, tahlil qilish yoki bug tuzatishda ushbu fayldagi
-
-# arxitektura, prop nomlari va ma'lumot turlariga 100% amal qilish SHART!
-
-# ============================================================================
-
-
-
-## 1. AI AGENT (CLINE) UCHUN QAT'IY "OLTIN QOIDALAR" (SYSTEM RULES)
-
-
-
-1. **KODNI QISQARTIRISH QAT'IYAN MAN ETILADI (NO MINIFICATION / NO OMISSION):**
-
-   - Hech qachon kod ichida `// ... qolgan kod shu yerda`, `// ... existing code` kabi qisqartmalar ishlatma.
-
-   - Har bir funksiya, `useEffect`, `useMemo` va JSX bloklarini to'liq, o'qishga qulay va kengaytirilgan (Enterprise Senior Level) holatda yoz.
-
-2. **MODULLI ARXITEKTURANI BUZMA:**
-
-   - Loyiha 31 ta UI komponent va 1 ta maxsus hook (`useSticky.js`) ga bo'lingan.
-
-   - Ota komponent (masalan: `WaiterMode.jsx`, `AdminPanel.jsx`, `CashierMode.jsx`, `WarehouseMode.jsx`, `StatsMode.jsx`) o'zining ichki bola komponentlarini (Tab va Sub-komponentlarni) chaqirishi va barcha kerakli prop'larni uzluksiz uzatishi shart.
-
-3. **OQ OYNA (WHITE SCREEN OF DEATH) DAN 100% HIMOYA:**
-
-   - Bazadan keladigan har qanday massivni `.map()`, `.filter()`, `.find()`, `.reduce()` qilishdan oldin `Array.isArray(data) ? data : []` orqali xavfsiz holatga keltir.
-
-   - Narx va miqdorlarni `.toLocaleString()` qilishdan oldin albatta `Number(val || 0).toLocaleString()` ichiga ol.
-
-   - JSX ichida obyektlarni to'g'ridan-to'g'ri `{item}` deb ekranga chiqarma (React Error #31: Objects are not valid as a React child). Har doim `typeof item === 'object'` tekshiruvini qo'y.
-
-   - Ko'paytirish (`*`) va ayirish (`-`) amallarida sintaksis uzilishlariga yo'l qo'yma (`Number(item.price || 0) * Number(item.quantity || 1)`).
-
-4. **CROSS-DEVICE (RESPONSIVE) VA DARK MODE:**
-
-   - Barcha ekranlar Telefon (Mobile), Sensorli Planshet (Tablet POS) va Kompyuter (Desktop) ekranlariga 100% moslashuvchan (`sm:`, `md:`, `lg:`, `xl:`) bo'lishi shart.
-
-   - Har bir elementda kunduzgi va tungi rejim (`dark:bg-gray-800`, `dark:text-white`, `dark:border-gray-700`) sinxron ishlashi kerak.
-
-5. **MULOQOT TILI:**
-
-   - Foydalanuvchi bilan muloqot va dastur interfeysidagi barcha yozuvlar qat'iy **O'zbek tilida** bo'lishi shart.
-
-
-
----
-
-
-
-## 2. LOYIHANING TO'LIQ FAYLLAR XARITASI (FILE TREE)
-
-
-
-Loyiha ildizi (`cafe-pos-app/`):
-
-├── `.vscode/`
-
-│   ├── `settings.json`          # VS Code va Git avtomatik sozlamalari
-
-│   └── `tasks.json`             # autosync.cjs ni avtomatik ishga tushiruvchi task
-
-├── `src/`
-
-│   ├── `hooks/`
-
-│   │   └── `useSticky.js`       # LocalStorage + Real-Time Cross-Tab Sync (F5 siz sinxronizatsiya)
-
-│   ├── `components/`
-
-│   │   ├── **1. AVTORIZATSIYA VA GLOBAL MODALLAR:**
-
-│   │   │   ├── `LockScreen.jsx`             # Boshqaruv (6-PIN), Xodimlar (4-PIN) va QR Bo'sh stollar modali
-
-│   │   │   ├── `ManagerOverrideModal.jsx`   # Xavfli amallar uchun Admin 6-xonali PIN ruxsat oynasi
-
-│   │   │   ├── `Modals.jsx`                 # Umumiy yordamchi modal oynalar
-
-│   │   │   └── `PrintReceiptModal.jsx`      # Chek chiqarish (58mm/80mm termoprinter dizayni)
-
-│   │   │
-
-│   │   ├── **2. MIJOZ (QR-MENYU) BO'LIMI:**
-
-│   │   │   ├── `CustomerQRView.jsx`         # Mijoz asosiy QR menyusi (Porsiya, Izoh chiplari, Anti-spam 🔔, Buyurtmalarim)
-
-│   │   │   └── `CustomerMode.jsx`           # Universal adapter / mustaqil mijoz ekrani
-
-│   │   │
-
-│   │   ├── **3. OFITSIANT (WAITER) BO'LIMI:**
-
-│   │   │   ├── `WaiterMode.jsx`             # Ofitsiant asosiy karkasi (3 ustun: Xarita, Menyu, Savat + Ko'chirish/Bo'lish)
-
-│   │   │   ├── `WaiterTableGrid.jsx`        # Stollar xaritasi, 🔔 chaqiruv banneri va "TAYYOR 🥘 -> QABUL QILDIM"
-
-│   │   │   ├── `WaiterMenu.jsx`             # Tezkor qidiruv, kategoriyalar va variants[0].price asosidagi menyu
-
-│   │   │   └── `WaiterCart.jsx`             # Tanlangan stol savati va oshxonaga jo'natish
-
-│   │   │
-
-│   │   ├── **4. ADMIN PANEL BO'LIMI:**
-
-│   │   │   ├── `AdminPanel.jsx`             # Admin chap menyusi va ichki tablarni boshqaruvchi markaz
-
-│   │   │   ├── `AdminDashboard.jsx`         # Admin tezkor ko'rsatkichlar (Kunlik savdo, faol stollar, ogohlantirishlar)
-
-│   │   │   ├── `AdminMenuTab.jsx`           # Taomlar, Multi-variant porsiyalar, 1-bosishda Stop-List va Texnologik karta
-
-│   │   │   ├── `AdminCategoriesTab.jsx`     # Kategoriyalar qo'shish, tahrirlash, o'chirish (taomlarni ko'chirish bilan)
-
-│   │   │   ├── `AdminUsersTab.jsx`          # Xodimlar va PIN-kodlar (Boshqaruv: 6 xonali, Xodimlar: 4 xonali)
-
-│   │   │   ├── `AdminEmployeesTab.jsx`      # Xodimlar samaradorligi, rollar va ruxsatlar (`canSeeSales`)
-
-│   │   │   ├── `AdminAuditLogsTab.jsx`      # Xavfsizlik tarixi (qidiruv, rol va sana filtri bilan)
-
-│   │   │   └── `AdminSettingsTab.jsx`       # PIN-himoya (`isOverrideEnabled`), Stollar boshqaruvi, Baza zaxirasi (JSON)
-
-│   │   │
-
-│   │   ├── **5. KASSA (CASHIER) BO'LIMI:**
-
-│   │   │   ├── `CashierMode.jsx`            # Kassa asosiy ekrani
-
-│   │   │   ├── `CashierOrderList.jsx`       # Aktiv va yopilmagan stollar/cheklar ro'yxati
-
-│   │   │   ├── `CashierPaymentControls.jsx` # Naqd, Plastik, Click/Payme, Aralash to'lov, Chegirma, Qarzga yozish, Qaytim
-
-│   │   │   └── `CashierReceipt.jsx`         # Tanlangan stolning batafsil cheki va hisob-kitobi
-
-│   │   │
-
-│   │   ├── **6. OSHXONA (KITCHEN KDS) BO'LIMI:**
-
-│   │   │   └── `KitchenMode.jsx`            # Oshpaz ekrani (Taymer, Izohlar, "Tayyorlanmoqda" -> "Tayyor" statusi)
-
-│   │   │
-
-│   │   ├── **7. OMBORXONA (WAREHOUSE) BO'LIMI:**
-
-│   │   │   ├── `WarehouseMode.jsx`          # Ombor asosiy ekrani
-
-│   │   │   ├── `WarehouseStockTab.jsx`      # Xomashyo qoldiqlari, Kirim/Chiqim/Spisanie, Kam qolganlar signali
-
-│   │   │   ├── `WarehousePrepTab.jsx`       # Yarim tayyor mahsulotlar va tayyorlov aktlari (Masalan: Qiyma, Sous)
-
-│   │   │   └── `WarehouseHistoryTab.jsx`    # Ombor amallari tarixi (`inventoryLogs` filtri bilan)
-
-│   │   │
-
-│   │   └── **8. STATISTIKA VA ANALITIKA (STATS) BO'LIMI:**
-
-│   │       ├── `StatsMode.jsx`              # Analitika asosiy ekrani (Kunlik, Haftalik, Oylik, Z-Hisobot)
-
-│   │       ├── `StatsOverviewCards.jsx`     # Jami tushum, Sof foyda, Cheklar soni, O'rtacha chek kartalari
-
-│   │       ├── `StatsPaymentBreakdown.jsx`  # To'lov turlari (Naqd, Karta, Click, Qarz) va Ofitsiantlar ulushi
-
-│   │       └── `StatsPopularItems.jsx`      # Eng ko'p sotilgan TOP taomlar va foydali pozitsiyalar
-
-│   │
-
-│   ├── `App.jsx`                # Global state'lar, routing va biznes-logika markazi
-
-│   ├── `main.jsx`               # React root entry
-
-│   └── `index.css`              # Tailwind CSS va custom scrollbar klasslari
-
-├── `ai-context.txt`             # Ushbu arxitektura hujjati
-
-├── `autosync.cjs`               # GitHub 5-soniyalik avtopilot skripti
-
-└── `package.json`
-
-
-
----
-
-
-
-## 3. MA'LUMOTLAR BAZASI SXEMASI (`useSticky` / `localStorage` KEYS)
-
-
-
-Barcha ma'lumotlar `App.jsx` da `useSticky(key, initialValue)` orqali saqlanadi va oynalararo jonli sinxronlanadi:
-
-
-
-1. **`pos_menu` (`menuItems`) — Taomlar tuzilmasi:**
-
-   - MUHIM: Taom narxi `item.variants[0].price` ichida turadi!
-
-   ```json
-
-   {
-
-     "id": 17150001,
-
-     "name": "Osh (To'y oshi)",
-
-     "category": "Asosiy",
-
-     "is_available": true,
-
-     "price": 35000,
-
-     "variants": [
-
-       { "id": "v1", "name": "1 porsiya", "price": 35000 },
-
-       { "id": "v2", "name": "0.7 porsiya", "price": 28000 }
-
-     ],
-
-     "recipe": [
-
-       { "inventoryId": 101, "productId": 101, "name": "Guruch", "unit": "kg", "qty": 0.2, "amount": 0.2 }
-
-     ]
-
-   }
-
-   ```
-
-
-
-2. **`pos_orders` (`orders`) — Buyurtmalar va Cheklar tuzilmasi:**
-
-   - MUHIM: Statuslar faqat o'zbek tilida: `'Yangi'`, `'Tayyorlanmoqda'`, `'Tayyor'`, `'Yetkazildi'`, `"To'langan"`, `'Qarz'`, `'Bekor qilindi'`.
-
-   ```json
-
-   {
-
-     "id": 17150099,
-
-     "table": "1-Stol",
-
-     "waiter": "Ali",
-
-     "items": [
-
-       {
-
-         "cartItemId": "1715001_1 porsiya",
-
-         "id": 17150001,
-
-         "name": "Osh (1 porsiya)",
-
-         "baseName": "Osh",
-
-         "variantName": "1 porsiya",
-
-         "price": 35000,
-
-         "quantity": 2,
-
-         "qty": 2,
-
-         "note": "Piyozsiz, achchiq bo'lmasin"
-
-       }
-
-     ],
-
-     "subtotal": 70000,
-
-     "serviceFee": 10,
-
-     "serviceFeeAmount": 7000,
-
-     "discount": 0,
-
-     "total": 77000,
-
-     "status": "Yangi",
-
-     "paymentMethod": "Naqd",
-
-     "paymentDetails": { "cash": 77000, "card": 0, "online": 0 },
-
-     "time": "14:30",
-
-     "date": "15.10.2026"
-
-   }
-
-   ```
-
-
-
-3. **`pos_calls` (`waiterCalls`) — Ofitsiant chaqiruvlari:**
-
-   ```json
-
-   [
-
-     { "id": 17150088, "table": "1-Stol", "time": "14:32" }
-
-   ]
-
-   ```
-
-
-
-4. **`pos_users` (`users`) — Xodimlar va PIN-kod qoidasi:**
-
-   - **QAT'IY QOIDA:** `role === 'admin'` va `role === 'warehouse'` uchun PIN-kod **6 xonali** (`777777`, `444444`).
-
-   - `role === 'cashier'`, `'waiter'`, `'kitchen'` uchun PIN-kod **4 xonali** (`1111`, `2222`, `3333`).
-
-
-
-5. **`pos_inventory` (`inventory`) — Ombor mahsulotlari:**
-
-   ```json
-
-   {
-
-     "id": 101,
-
-     "name": "Lazer Guruch",
-
-     "unit": "kg",
-
-     "quantity": 45.5,
-
-     "minLimit": 10,
-
-     "costPrice": 22000,
-
-     "updatedAt": "15.10.2026 12:00"
-
-   }
-
-   ```
-
-
-
----
-
-
-
-## 4. QOLGAN BARCHA BO'LIMLAR UCHUN TEXNIK TOPSHIRIQ VA YECHIMLAR
-
-
-
-### A) ADMIN PANELNING QOLGAN TABLARI (`AdminCategoriesTab`, `AdminUsersTab`, `AdminEmployeesTab`, `AdminAuditLogsTab`, `AdminSettingsTab`, `AdminDashboard`)
-
-1. **`AdminCategoriesTab.jsx`:**
-
-   - Kategoriya nomi tahrirlanganda (`oldName` -> `newName`), `menuItems` ichidagi shu kategoriyaga tegishli barcha taomlarning `category` maydoni ham avtomatik `newName` ga yangilanishi shart (aks holda taomlar menyuda yo'qolib qoladi!).
-
-   - Kategoriya o'chirilayotganda, agar uning ichida taomlar bo'lsa, ularni `"Asosiy"` yoki `"Boshqalar"` toifasiga avtomatik o'tkazish haqida ogohlantirish chiqishi va `addAuditLog` ga yozilishi kerak.
-
-   - Har bir kategoriya kartochkasida uning ichida nechta taom borligi ko'rsatilishi kerak.
-
-2. **`AdminUsersTab.jsx` va `AdminEmployeesTab.jsx`:**
-
-   - Xodim qo'shish/tahrirlashda lavozim (`role`) `'admin'` yoki `'warehouse'` tanlansa, PIN-kod inputi **qat'iy 6 ta raqam** (`^\d{6}$`) talab qilsin.
-
-   - Lavozim `'waiter'`, `'cashier'`, `'kitchen'` tanlansa, PIN-kod inputi **qat'iy 4 ta raqam** (`^\d{4}$`) talab qilsin.
-
-   - Bir xil PIN-kod ikkita xodimga berilishining oldini oluvchi tekshiruv (`duplicate PIN check`) bo'lishi shart (chunki `LockScreen` PIN-kod orqali xodimni avtomatik taniydi!).
-
-   - Ofitsiantlar uchun `"Shaxsiy savdoni ko'ra oladimi?"` (`canSeeSales: true/false`) kaliti (toggle) bo'lishi kerak.
-
-   - Oxirgi yagona Adminni o'chirib yuborishdan himoya bo'lishi shart.
-
-3. **`AdminAuditLogsTab.jsx`:**
-
-   - Barcha xavfsizlik yozuvlarini qidirish (`searchQuery`), xodim roli bo'yicha filtrlash (`admin`, `waiter`, `cashier`, `warehouse`) va turiga qarab rangli badge'lar bilan ko'rsatish.
-
-4. **`AdminSettingsTab.jsx`:**
-
-   - `isOverrideEnabled` (Admin PIN-ruxsat himoyasini yoqish/o'chirish) kaliti.
-
-   - **Stollar boshqaruvi (`tables` va `setTables`):** Yangi stol qo'shish (masalan: `6-Stol`, `Kabina-1`) va bo'sh stolni o'chirish imkoniyati.
-
-   - **Baza Zaxirasi (Backup & Restore):** Barcha `localStorage` ma'lumotlarini `.json` fayl sifatida yuklab olish (Export) va tiklash (Import) hamda faqat test buyurtmalarini tozalash tugmasi.
-
-5. **`AdminDashboard.jsx`:**
-
-   - Bugungi tushum, faol stollar soni, omborda kam qolgan (`quantity <= minLimit`) mahsulotlar ogohlantirishi va Stop-listdagi taomlar ro'yxati.
-
-
-
-### B) KASSA BO'LIMI (`CashierMode`, `CashierOrderList`, `CashierReceipt`, `CashierPaymentControls`)
-
-1. **Prop va Statuslar sinxronizatsiyasi:**
-
-   - Faqat to'lanmagan (`status !== "To'langan"` va `status !== 'Bekor qilindi'`) buyurtmalar faol ro'yxatda ko'rinadi.
-
-2. **Professional To'lov Mexanizmi (`CashierPaymentControls.jsx`):**
-
-   - To'lov turlari: **💵 Naqd**, **💳 Plastik karta**, **📱 Click / Payme**, **🔀 Aralash to'lov (Split Payment: qisman naqd + qisman karta)** va **📓 Qarzga (Nasiya — mijoz ismi va telefoni bilan)**.
-
-   - **Qaytim hisoblagich (Cash Change Calculator):** Mijoz bergan naqd pul kiritilganda (yoki `50,000`, `100,000`, `200,000` tezkor tugmalari bosilganda) qaytim summasini avtomatik hisoblash.
-
-   - **Chegirma (Discount):** Foizda (`5%`, `10%`, `15%`) yoki aniq summada chegirma berish (agar `requireAdminOverride` yoqilgan bo'lsa, Admin ruxsati bilan).
-
-   - Chekni chop etish (`onPrintReceipt`) va to'lovdan so'ng stolni bo'shatish (`status: "To'langan"`).
-
-
-
-### C) OSHXONA BO'LIMI (`KitchenMode.jsx` — KDS)
-
-1. **Jonli Taymer va Rangli Signal:**
-
-   - Har bir buyurtma kelgan vaqtdan boshlab necha daqiqa o'tganini ko'rsatuvchi indikator (0-10 daqiqa yashil, 10-20 daqiqa sariq, 20+ daqiqa qizil).
-
-2. **Mijoz va Ofitsiant Izohlari:**
-
-   - Taom ostidagi `item.note` (`💬 Piyozsiz`) katta va yorqin rangda ko'rinishi shart.
-
-3. **2 Bosqichli Status Boshqaruvi:**
-
-   - `'Yangi'` -> **"🔥 Tayyorlashni boshlash"** (`'Tayyorlanmoqda'`) -> **"✅ TAYYOR BO'LDI!"** (`'Tayyor'`).
-
-   - `'Tayyor'` bosilishi bilan Ofitsiantning `WaiterTableGrid.jsx` ekranida stol sariq bo'lib `"TAYYOR 🥘"` signali yonadi!
-
-
-
-### D) OMBORXONA BO'LIMI (`WarehouseMode`, `WarehouseStockTab`, `WarehousePrepTab`, `WarehouseHistoryTab`)
-
-1. **`WarehouseStockTab.jsx`:**
-
-   - Yangi xomashyo qo'shish (`name`, `unit`: kg/litr/dona/gr, `quantity`, `minLimit`, `costPrice`).
-
-   - **Kirim (+)** va **Spisanie / Chiqim (-)** modallari (sababi ko'rsatilgan holda `inventoryLogs` ga yoziladi).
-
-   - Qoldig'i `minLimit` dan kam qolgan mahsulotlarni qizil `"⚠️ Kam qoldi!"` belgisi bilan ajratish.
-
-2. **`WarehousePrepTab.jsx` (Tayyorlov aktlari):**
-
-   - Yarim tayyor mahsulot (masalan, qiyma yoki sous) tayyorlanganda tarkibidagi xomashyolarni ombordan ayirib, tayyor mahsulot qoldig'iga qo'shish.
-
-3. **`WarehouseHistoryTab.jsx`:**
-
-   - `inventoryLogs` ni sana, amal turi (`kirim`, `chiqim_avto`, `spisanie`) va mahsulot nomi bo'yicha filtrlash.
-
-
-
-### E) STATISTIKA BO'LIMI (`StatsMode`, `StatsOverviewCards`, `StatsPaymentBreakdown`, `StatsPopularItems`)
-
-1. Faqat `status === "To'langan"` (va alohida blokda `'Qarz'`) buyurtmalarni hisoblash.
-
-2. Vaqt filtri: **Bugun**, **Barcha vaqt**, hamda **Z-Hisobot (Smena yopish)** ko'rinishi.
-
-3. Eng ko'p sotilgan taomlar (`StatsPopularItems.jsx`) da `item.quantity` va tushum summasini aniq hisoblash (`NaN` xatolarisiz).
-
-
-
----
-
-
-
-## 5. CLINE PLAGINIDA ISHLATISH UCHUN TAYYOR BUYRUQLAR (COPY-PASTE PROMPTS)
-
-
-
-Cline oynasida avval **`Plan`** rejimini yoqib, quyidagi tayyor buyruqlardan keraklisini nusxalab tashlang. Reja ma'qul bo'lgach, **`Act`** rejimiga o'tkazing:
-
-
-
-### 🔹 1-BUYRUQ: Admin Panelning qolgan tablarini mukammallashtirish
-
-```text
-
-@ai-context.txt @src/components/AdminPanel.jsx @src/components/AdminCategoriesTab.jsx @src/components/AdminUsersTab.jsx @src/components/AdminAuditLogsTab.jsx @src/components/AdminSettingsTab.jsx @src/components/AdminDashboard.jsx 
-
-DIQQAT: @ai-context.txt faylidagi 1- va 4-bo'lim qoidalariga qat'iy amal qilgan holda Admin panelning ushbu modullarini tahlil qil va barcha buglarni tuzat:
-
-1. AdminCategoriesTab.jsx: Kategoriya nomi o'zgarganda menuItems ichidagi taomlar kategoriyasi ham yangilansin, har bir kategoriyada taomlar soni ko'rinsin.
-
-2. AdminUsersTab.jsx: Xodim qo'shish va tahrirlashda Admin/Omborchi (management) uchun qat'iy 6 xonali PIN, qolgan xodimlar (staff) uchun 4 xonali PIN talab qilinsin. Takroriy (dublikat) PIN-kod kiritish bloklansin. Ofitsiant uchun canSeeSales kaliti qo'shilsin.
-
-3. AdminSettingsTab.jsx: PIN-himoya (isOverrideEnabled) bilan birga Stollarni qo'shish/o'chirish (tables, setTables) va Baza zaxirasi (JSON Export/Import) qo'shilsin.
-
-4. AdminAuditLogsTab.jsx va AdminDashboard.jsx: Qidiruv, filtr va jonli statistika xatosiz ishlasin.
-
-Kodni hech qayerini qisqartirmasdan to'liq yoz!
-
-```
-
-
-
-### 🔹 2-BUYRUQ: Kassa (Cashier) va Chek chiqarish bo'limini mukammallashtirish
-
-```text
-
-@ai-context.txt @src/components/CashierMode.jsx @src/components/CashierOrderList.jsx @src/components/CashierReceipt.jsx @src/components/CashierPaymentControls.jsx @src/components/PrintReceiptModal.jsx
-
-DIQQAT: @ai-context.txt faylidagi qoidalarga asosan Kassa bo'limidagi barcha fayllarni tahlil qil va buglarni tuzat:
-
-1. Ko'paytirish (*) va ayirish (-) belgilaridagi barcha sintaksis xatolarni va NaN holatlarini bartaraf et.
-
-2. Naqd (qaytim hisoblagichi bilan), Plastik, Click/Payme, Aralash to'lov va Qarzga yozish (mijoz ismi/telefoni bilan) funksiyalarini to'liq ishga tushir.
-
-3. Chegirma (Discount) berishda requireAdminOverride himoyasini ula.
-
-4. PrintReceiptModal.jsx da 80mm termoprinter uchun chiroyli chek dizayni va window.print() ishlashini ta'minla.
-
-Hech bir qatorni qisqartirmasdan to'liq yoz!
-
-```
-
-
-
-### 🔹 3-BUYRUQ: Oshxona (Kitchen) va Omborxona (Warehouse) bo'limlarini mukammallashtirish
-
-```text
-
-@ai-context.txt @src/components/KitchenMode.jsx @src/components/WarehouseMode.jsx @src/components/WarehouseStockTab.jsx @src/components/WarehousePrepTab.jsx @src/components/WarehouseHistoryTab.jsx
-
-DIQQAT: @ai-context.txt qoidalari asosida Oshxona va Omborxona modullarini to'liq tekshirib yangila:
-
-1. KitchenMode.jsx: Taom izohlari (item.note) katta ko'rinsin, statuslar 'Yangi' -> 'Tayyorlanmoqda' -> 'Tayyor' zanjirida ishlasin.
-
-2. WarehouseStockTab.jsx, WarehousePrepTab.jsx, WarehouseHistoryTab.jsx: Xomashyo kirim/chiqim/spisanie amallari, kam qolgan mahsulotlar (minLimit) ogohlantirishi va tarix filtri bexato ishlasin.
-
-Hech qanday kodni qisqartirma!
-
-```
-
-
-
-### 🔹 4-BUYRUQ: Statistika (Stats) va Override Modalni mukammallashtirish
-
-```text
-
-@ai-context.txt @src/components/StatsMode.jsx @src/components/StatsOverviewCards.jsx @src/components/StatsPaymentBreakdown.jsx @src/components/StatsPopularItems.jsx @src/components/ManagerOverrideModal.jsx
-
-DIQQAT: @ai-context.txt qoidalari asosida Statistika modullari va ManagerOverrideModal.jsx faylini tekshir:
-
-1. ManagerOverrideModal.jsx: Adminning 6 xonali PIN-kodini tekshirib ruxsat beradigan zamonaviy numpad modal bo'lsin.
-
-2. Stats bo'limidagi barcha 4 ta faylda to'langan cheklar, to'lov turlari ulushi va eng ko'p sotilgan taomlar hisob-kitobi NaN va undefined xatolarisiz ishlasin.
+# CAFE POS APP — AI KONTEKST (yangilangan: 2026-10-26)
+
+Bu fayl AI agentlar (Gemini, Claude, Cline va boshqalar) uchun loyihaning yagona
+haqiqat manbai. Har bir vazifadan oldin shu faylni va PROGRESS.md ni o'qing.
+Hozirgi vazifa va ma'lum xatolar ro'yxati PROGRESS.md da.
+
+---------------------------------------------------------------------------
+1. LOYIHA
+---------------------------------------------------------------------------
+Kafe uchun POS tizimi: ofitsiant, kassa, oshxona (KDS), ombor, admin, statistika
+va mijozning QR-menyusi.
+
+Stek: React 19, Vite, Tailwind CSS 4 (CDN emas, npm orqali), JSX.
+Ma'lumotlar: hozircha faqat brauzer localStorage (backend yo'q).
+Til: dastur interfeysi va muloqot faqat O'ZBEK tilida.
+
+MUHIM CHEKLOV: localStorage bitta qurilmaga bog'liq. Qurilmalararo sinxron
+(ofitsiant <-> oshxona) va mijozning QR buyurtmasi faqat backend qo'shilgach
+haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
+
+---------------------------------------------------------------------------
+2. AI AGENT UCHUN QOIDALAR
+---------------------------------------------------------------------------
+1. FAQAT SO'RALGAN fayl va funksiyalarga teging. Boshqa kodni qayta yozmang,
+   qayta formatlamang, qayta nomlamang.
+2. O'zgartirilayotgan funksiyani TO'LIQ yozing (ichida "// ... qolgan kod"
+   qoldirmang), lekin tegilmagan funksiyalar va butun faylni qayta yozmang.
+   Natija: diff kichik va o'qiladigan bo'lsin.
+3. Yangi npm kutubxona qo'shishdan oldin so'rang.
+4. Bitta vazifa = bitta commit. Xabar formati: "<bosqich raqami>: <vazifa>".
+5. Maxfiy ma'lumotni (token, PIN, parol, .env) hech qachon commit qilmang.
+6. Yangi kodda ESKI (takroriy) maydon nomlarini yozmang:
+     quantity (qty emas), subTotal (subtotal emas), total (finalTotal emas),
+     waiter (waiterName emas), serviceFee (serviceFeePercent emas).
+   O'qishda eski nomlarni qo'llab-quvvatlang (eski ma'lumotlar buzilmasin).
+7. Sanani matn sifatida solishtirmang (toLocaleDateString() bilan ==).
+   Vaqt filtri uchun createdAt (millisekund) dan foydalaning.
+8. Pulni butun so'mda hisoblang. Jami summani qo'lda qayta yozmang: yagona
+   hisob funksiyasi (src/utils/orderTotals.js -> calcOrderTotals) bo'lsa,
+   shundan foydalaning; hali yo'q bo'lsa, uni yarating.
+9. Omborni (xomashyo) ayirish faqat BITTA joyda bo'ladi. Qaysi joyda
+   ekanligi PROGRESS.md dagi "Qarorlar" bo'limida yozilgan. Boshqa joyda
+   qayta ayirmang.
+10. Himoya: massivni .map/.filter/.reduce qilishdan oldin
+    Array.isArray(x) ? x : [], sonlarni Number(x || 0) bilan oling,
+    obyektni to'g'ridan-to'g'ri JSX ichida chiqarmang (React Error #31).
+    Bu xatoni YASHIRADI, tuzatmaydi: asl sababni ham toping.
+11. Interfeys Telefon, Planshet va Kompyuterga moslashuvchan (sm:, md:, lg:)
+    va dark: klasslari bilan kunduzgi/tungi rejimda ishlashi shart.
+12. alert/confirm/prompt o'rniga modal yoki bildirishnoma (toast) ishlating
+    (yangi kodda).
+13. Vazifa oxirida qisqa hisobot bering: o'zgargan fayllar, nima qilindi,
+    qanday sinab ko'rish kerak.
+
+---------------------------------------------------------------------------
+3. FAYLLAR XARITASI (34 komponent, 1 hook, 1 util)
+---------------------------------------------------------------------------
+Qatorlar soni taxminiy. Katta fayllar (>800) bo'lishga mo'ljallanmagan:
+tegayotganda kerakli funksiyani toping, butun faylni o'qimang.
+
+src/App.jsx (791)       Global state, routing, biznes-logika markazi
+src/main.jsx            React root
+src/index.css           Tailwind va scrollbar klasslari
+src/hooks/useSticky.js  localStorage + oynalararo (tablararo) sinxron
+src/utils/telegramNotifier.js  Telegram xabarlari (hozir ishlatilmaydi!)
+
+Avtorizatsiya va umumiy:
+  LockScreen (408)            PIN orqali kirish
+  ManagerOverrideModal (306)  Xavfli amal uchun admin PIN
+  AutoLockControl (487)       Avto-qulf
+  Modals (485)                Umumiy modallar
+  PrintReceiptModal (582)     Chek (58/80 mm)
+
+Mijoz (QR):
+  CustomerQRView (915), CustomerMode (926)
+
+Ofitsiant:
+  WaiterMode (1164)           Asosiy karkas (xarita, menyu, savat)
+  WaiterTableGrid (889)       Stollar xaritasi, chaqiruv, "TAYYOR"
+  WaiterMenu (238), WaiterCart (402), WaiterActionModals (302)
+
+Admin:
+  AdminPanel (319), AdminDashboard (453), AdminMenuTab (893),
+  AdminCategoriesTab (350), AdminUsersTab (563), AdminEmployeesTab (466),
+  AdminAuditLogsTab (381), AdminSettingsTab (683)
+
+Kassa:
+  CashierMode (1549)          Asosiy ekran va to'lov mantig'i
+  CashierOrderList (113), CashierPaymentControls (327), CashierReceipt (184)
+
+Oshxona:
+  KitchenMode (1088)
+
+Ombor:
+  WarehouseMode (502), WarehouseStockTab (1136), WarehousePrepTab (583),
+  WarehouseHistoryTab (413)
+
+Statistika:
+  StatsMode (2497), StatsOverviewCards (218), StatsPaymentBreakdown (141),
+  StatsPopularItems (557), StatsWaiterPayroll (1033)
+
+Loyiha ildizi: ai-context.txt, PROGRESS.md, package.json, vite.config.js,
+index.html, .gitignore (qo'shilishi kerak).
+
+---------------------------------------------------------------------------
+4. MA'LUMOTLAR (localStorage kalitlari, App.jsx da useSticky orqali)
+---------------------------------------------------------------------------
+pos_menu          taomlar         pos_orders       buyurtmalar
+pos_categories    kategoriyalar   pos_tables       stollar
+pos_users         xodimlar        pos_calls        ofitsiant chaqiruvlari
+pos_inventory     ombor           pos_inv_logs     ombor tarixi
+pos_customers     mijozlar (bonus) pos_expenses    xarajatlar
+pos_audit_logs    audit jurnali   pos_service_fee  xizmat foizi (10)
+pos_cafe_name     kafe nomi       pos_theme        dark/light (boolean)
+pos_override_enabled  admin PIN himoyasi yoqilganmi (boolean)
+
+pos_menu (taom):
+  { id, name, category, is_available, variants: [{id, name, price}],
+    recipe: [{inventoryId, name, unit, qty}] }
+  Narx manbai: variants[n].price. Retseptda yangi kodda faqat
+  inventoryId va qty ishlating (productId, amount eski nomlar).
+
+pos_orders (buyurtma):
+  { id (string, Date.now()), createdAt (ms), table, waiter,
+    items: [{cartItemId, id, name, baseName, variantName, price,
+             quantity, note}],
+    subTotal, serviceFee (foiz), serviceFeeAmount, discount, total,
+    status, paymentMethod, paymentDetails, time ("14:30"), date (matn) }
+  "date" va "time" faqat ko'rsatish uchun; hisob-kitob uchun createdAt.
+
+Statuslar (haqiqatda ishlatiladiganlar):
+  'Yangi' -> 'Tayyorlanmoqda' -> 'Tayyor' -> 'Yetkazildi' -> "To'langan"
+  Qo'shimcha: 'Qarz', 'Arxiv'. 'Bekor qilindi' hozircha kodda ishlatilmaydi.
+  Yangi holat qo'shsangiz, constants fayliga kiriting (qo'lda yozmang).
+
+pos_users (xodim): { id, name, role, pin, canSeeSales? }
+  role: 'admin' | 'warehouse' | 'cashier' | 'waiter' | 'kitchen'
+  PIN: admin va warehouse uchun 6 xonali, qolganlari uchun 4 xonali.
+  Ikki xodimda bir xil PIN bo'lishi mumkin emas (LockScreen PIN bo'yicha
+  xodimni topadi).
+  Oxirgi yagona adminni o'chirib bo'lmaydi.
+
+pos_inventory: { id, name, unit, quantity, minLimit, costPrice, updatedAt }
+pos_inv_logs: ombor amallari, turlari: 'kirim', 'chiqim_avto', 'spisanie'
+pos_customers: { name, phone, bonusBalance, ... } (CRM, bonus/keshbek)
+pos_audit_logs: { id, date, action, details, userName, role }
+pos_calls: [{ id, table, time }]
+
+---------------------------------------------------------------------------
+5. BIZNES QOIDALARI (kutilgan xatti-harakat)
+---------------------------------------------------------------------------
+- Kategoriya nomi o'zgarsa, menyudagi taomlarning category maydoni ham
+  yangilanadi. Taomi bor kategoriyani o'chirishda ogohlantirish + audit log.
+- To'lov turlari: Naqd (qaytim bilan), Plastik, Click/Payme, Aralash
+  (summalar yig'indisi jamiga teng bo'lishi shart), Qarz (mijoz ismi VA
+  telefoni majburiy).
+- Chegirma jami summadan oshmasligi kerak; katta chegirma admin PIN so'raydi
+  (isOverrideEnabled yoqilgan bo'lsa).
+- Oshxona: 0-10 daq yashil, 10-20 sariq, 20+ qizil; izoh (note) yorqin.
+- Ombor: quantity <= minLimit bo'lsa "Kam qoldi" belgisi.
+- Statistika: faqat "To'langan" (va alohida blokda 'Qarz') hisoblanadi.
+- Xavfsiz amallar (o'chirish, zaxira tiklash, bazani tozalash) admin PIN
+  tasdig'ini talab qiladi.
+
+---------------------------------------------------------------------------
+6. MA'LUM MUAMMOLAR
+---------------------------------------------------------------------------
+To'liq ro'yxat va bajarilganlik holati: PROGRESS.md ("Ma'lum xatolar").
+Asosiylari: ombor ikki marta ayiriladi, Tailwind CDN ga bog'liq, dozakaz
+butun buyurtma holatini 'Yangi' ga qaytaradi, sana matn bo'yicha
+solishtiriladi, zaxira faylida PIN va token ochiq, LockScreen da urinishlar
+cheklanmagan.
