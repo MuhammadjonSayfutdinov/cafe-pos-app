@@ -5,10 +5,4 @@
   "git.autofetch": true,
   "git.autorefresh": true,
   "git.confirmSync": false,
-  "gitdoc.enabled": true,
-  "gitdoc.autoCommitDelay": 1000,
-  "gitdoc.autoPush": "onCommit",
-  "gitdoc.autoPull": "off",
-  "gitdoc.commitValidationLevel": "none",
-  "gitdoc.commitOnClose": true
-}
+ 
