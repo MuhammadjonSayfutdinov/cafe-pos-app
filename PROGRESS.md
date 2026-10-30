@@ -120,7 +120,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | Ombor qachon ayiriladi | Buyurtma yuborilganda (`App.jsx`); to'lovda ayirilmaydi | taklif, tasdiqlang |
 | Taom statusi | Taom darajasida; buyurtma statusi undan hisoblanadi | taklif |
 | Backend | Supabase (tez) yoki Node + SQLite/PostgreSQL + WebSocket | tanlanmagan |
-| Autosync | O'chiriladi; commit qo'lda yoki `wip` branchda | taklif |
+| Autosync |qabul qilindi | taklif |
 
 ## Commit jurnali
 
