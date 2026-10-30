@@ -138,5 +138,5 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 ```text
 Loyiha: https://github.com/MuhammadjonSayfutdinov/cafe-pos-app
 PROGRESS.md va ai-context.txt ni o'qi (Claude uchun ko'rsatmalar bor).
-Vazifa: PROGRESS.md dagi "". Kodni sen yoz.
+Vazifa: PROGRESS.md dagi "Joriy vazifa". Kodni sen yoz.
 ```
