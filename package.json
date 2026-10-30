@@ -1,23 +1,107 @@
-{
-  "name": "cafe-pos-app",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite --host",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.1.13",
-    "@vitejs/plugin-react": "^5.0.2",
-    "autoprefixer": "^10.6.1",
-    "postcss": "^8.5.28",
-    "tailwindcss": "^3.4.19",
-    "vite": "^7.1.5"
-  }
-}
+Revise the architecture specification again. Do not write application code yet.
+
+The current document is improved, but it still contains inconsistencies and unresolved rules. Fix the following issues before requesting product-owner approval.
+
+**1. Correct the role distribution matrix**
+
+Correct the Civilian counts for player counts 13–20:
+
+13 players: 2 Civilians  
+14 players: 2 Civilians  
+15 players: 2 Civilians  
+16 players: 2 Civilians  
+17 players: 3 Civilians  
+18 players: 4 Civilians  
+19 players: 4 Civilians  
+20 players: 5 Civilians
+
+Verify every row programmatically or mathematically so that the sum of all assigned roles exactly equals the player count.
+
+**2. Preserve the original game rules**
+
+- Remove `mistress_grants_day_immunity`. A player visited by Mistress cannot act at night or vote the next day, but remains eligible for nomination and execution.
+- Preserve the original Lawyer secrecy rule: Mafia members must not know the Lawyer's identity. Define clearly whether the Lawyer knows the identities of the other Mafia members.
+- Clarify whether Don has final authority on every night or only when Mafia members cannot agree. The original rule gives Don final authority when the family disagrees.
+- Clarify exactly when a daytime-voted Kamikaze's selected target dies. Preserve the original wording that the target is taken during that night unless the product owner approves a different mechanic.
+- Define whether Doctor protection can prevent a Kamikaze's retaliation against an attacker.
+- Define the interaction between Mistress and a subordinate Mafia member when Don is alive, including whether the subordinate's proposal/vote is ignored.
+
+**3. Resolve all random and simultaneous-action rules**
+
+Use one 50% Lucky survival roll per night, regardless of how many lethal attacks hit Lucky, unless the product owner explicitly chooses otherwise.
+
+For an unhealed Kamikaze hit by multiple lethal attackers, apply the approved all-attackers retaliation rule consistently. A Doctor saving Kamikaze must prevent the explosion.
+
+Use an injectable random provider so deterministic unit tests can verify all outcomes.
+
+**4. Complete the voting algorithm**
+
+Keep the recommended two-stage voting system.
+
+Define explicitly:
+- Who can vote in the nomination round.
+- How abstentions are counted.
+- How ties are resolved.
+- Who can vote in confirmation.
+- Whether Hang must strictly exceed Spare.
+- What happens when confirmation votes are tied or nobody votes.
+- What happens when the 20-second timer expires.
+- How the game transitions when a candidate is spared.
+
+Recommended confirmation outcome: execute only when Hang votes strictly exceed Spare votes. A tie, zero votes, or timeout without a leading Hang result means the candidate is spared.
+
+Add a separate `GameVote` database entity for nomination and confirmation ballots.
+
+**5. Rewrite all win conditions**
+
+The mathematical expressions in the current document are missing or incomplete. Rewrite every condition in plain, explicit English and Uzbek.
+
+Define exact victory conditions for CITY, MAFIA, KILLER, SUICIDE, DRAW, and CONTINUE.
+
+Evaluate victory only after all simultaneous deaths, Kamikaze retaliation, and promotions have completed. Define the exact precedence for simultaneous outcomes.
+
+Use the persistent `faction` field consistently for faction membership rather than relying on ambiguous initial/current role comparisons.
+
+**6. Fix the database and callback architecture**
+
+- Make PostgreSQL the sole authoritative mechanism for consuming one-time callback tokens.
+- Consume the token, validate phase version, validate the actor and target, and persist the action in one atomic database transaction.
+- Redis may cache tokens but must not independently consume the authoritative token.
+- Correct the stated token byte length and character length.
+- Add database constraints for unique game membership and seat numbers.
+- Add a transactional outbox for Telegram messages and phase notifications.
+- Make all relevant uniqueness constraints phase-version aware.
+- Add tests for two different target buttons being clicked concurrently by the same actor.
+- Add cleanup policies for expired callback tokens and old ephemeral data.
+- Include `CANCELLED` in the official state machine if it remains in the partial unique index.
+
+**7. Add Telegram platform requirements**
+
+- Every player must start the bot in a private chat before role distribution.
+- Add a secure deep-link onboarding flow for players who have not started the bot.
+- Do not begin a game until every participant can receive private messages, or define an explicit cancellation/replacement flow.
+- Document required group administrator permissions: `can_restrict_members` and `can_delete_messages`.
+- Define fallback behavior when the bot lacks moderation permissions or the group is not a supergroup.
+- Document the required Privacy Mode behavior.
+
+**8. Correct role interaction inconsistencies**
+
+The Commissioner investigation must return the target's exact current role unless Lawyer has masked that target. Do not replace the exact role with a generic faction label unless that is an explicitly approved UI presentation rule.
+
+Ensure the interaction matrix, ActionValidator, NightResolutionEngine, and automated tests all describe identical behavior.
+
+**9. Prove role distribution balance**
+
+Do not call the role matrix balanced merely because the role counts add up. Use the shared domain engine to simulate many games under documented player-strategy assumptions. Report win rates for City, Mafia, Killer, Suicide, and draws for each relevant player count. Mark the matrix as a preliminary proposal until playtesting validates it.
+
+**10. Documentation language**
+
+All architecture explanations, implementation plans, database documentation, testing instructions, and development instructions must be written in Uzbek.
+
+Keep Python identifiers, class names, function names, database fields, and technical terms in English. The Telegram interface must support Uzbek and Russian.
+
+**Final deliverables**
+
+Return a corrected architecture specification, corrected ER diagram, role distribution matrix, complete role interaction matrix, precise night resolution order, precise voting algorithm, complete win-condition table, Telegram permission and onboarding requirements, concurrency design, and automated test plan.
+
+Do not implement code. Do not silently invent missing game rules. List every remaining unresolved product decision separately and wait for explicit product-owner approval.
