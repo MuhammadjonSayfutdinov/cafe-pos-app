@@ -4,5 +4,5 @@
   "terminal.integrated.defaultProfile.windows": "Command Prompt",
   "git.autofetch": true,
   "git.autorefresh": true,
-  "git.confirmSync": false,
+  "git.confirmSync": false
  
