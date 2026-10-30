@@ -77,8 +77,8 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 
 ### 0-bosqich. Tozalash (~1 kun)
 - [x] `.gitignore` (node_modules, dist, .env) va `git rm -r --cached node_modules`
-- [x ] `autosync.cjs`, `tasks.json` dagi task va `gitdoc` sozlamalarini o'chirish
-- [ x] Tailwind 4 ga to'liq o'tish, CDN ni olib tashlash (B2)
+- [ ] `autosync.cjs`, `tasks.json` dagi task va `gitdoc` sozlamalarini o'chirish
+- [ ] Tailwind 4 ga to'liq o'tish, CDN ni olib tashlash (B2)
 - [ ] `index.html` da `lang="uz"`
 - [ ] README
 - [ ] `ai-context.txt` va `PROGRESS.md` ni repoga qo'shish
