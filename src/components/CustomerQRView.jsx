@@ -319,7 +319,7 @@ export default function CustomerQRView({
       )}
 
       {/* --- 6.1. HEADER (YUQORI PANEL) --- */}
-      <header className="sticky top-0 z-30 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shadow-sm px-4 py-3.5 border-b border-gray-200 dark:border-gray-700">
+      <header className="sticky top-0 z-30 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shadow-xs px-4 py-3.5 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-5xl mx-auto flex justify-between items-center gap-2">
           <div>
             <h1 className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-500 leading-tight">
@@ -372,7 +372,7 @@ export default function CustomerQRView({
             onClick={() => setActiveTab('menu')}
             className={`flex-1 py-2 rounded-xl font-black text-xs sm:text-sm transition ${
               activeTab === 'menu'
-                ? 'bg-white dark:bg-gray-700 text-amber-600 dark:text-amber-400 shadow-sm'
+                ? 'bg-white dark:bg-gray-700 text-amber-600 dark:text-amber-400 shadow-xs'
                 : 'text-gray-500 dark:text-gray-400'
             }`}
           >
@@ -384,7 +384,7 @@ export default function CustomerQRView({
             onClick={() => setActiveTab('my_orders')}
             className={`flex-1 py-2 rounded-xl font-black text-xs sm:text-sm transition flex items-center justify-center gap-1.5 ${
               activeTab === 'my_orders'
-                ? 'bg-white dark:bg-gray-700 text-amber-600 dark:text-amber-400 shadow-sm'
+                ? 'bg-white dark:bg-gray-700 text-amber-600 dark:text-amber-400 shadow-xs'
                 : 'text-gray-500 dark:text-gray-400'
             }`}
           >
@@ -404,7 +404,7 @@ export default function CustomerQRView({
       {activeTab === 'menu' && (
         <>
           {/* Qidiruv va Kategoriyalar */}
-          <div className="bg-white dark:bg-gray-800 shadow-sm mb-4 border-b border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 shadow-xs mb-4 border-b border-gray-100 dark:border-gray-700">
             <div className="max-w-5xl mx-auto px-4 pt-3">
               <div className="relative">
                 <input
@@ -412,7 +412,7 @@ export default function CustomerQRView({
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="🔍 Sevimli taomingizni qidiring..."
-                  className="w-full pl-4 pr-10 py-2.5 rounded-2xl bg-gray-100 dark:bg-gray-700/70 text-gray-900 dark:text-white text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500 transition"
+                  className="w-full pl-4 pr-10 py-2.5 rounded-2xl bg-gray-100 dark:bg-gray-700/70 text-gray-900 dark:text-white text-sm font-bold outline-hidden focus:ring-2 focus:ring-amber-500 transition"
                 />
                 {searchQuery && (
                   <button
@@ -469,14 +469,14 @@ export default function CustomerQRView({
                     <div 
                       key={item.id} 
                       onClick={() => handleOpenAddModal(item)}
-                      className={`bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border-2 cursor-pointer active:scale-[0.98] transition flex justify-between items-center relative ${
+                      className={`bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-xs border-2 cursor-pointer active:scale-[0.98] transition flex justify-between items-center relative ${
                         inCartCount > 0
                           ? 'border-amber-400 dark:border-amber-500/70'
                           : 'border-gray-100 dark:border-gray-700'
                       }`}
                     >
                       {inCartCount > 0 && (
-                        <span className="absolute -top-2.5 right-4 bg-amber-500 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow">
+                        <span className="absolute -top-2.5 right-4 bg-amber-500 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-sm">
                           Savatda: {inCartCount} ta
                         </span>
                       )}
@@ -497,7 +497,7 @@ export default function CustomerQRView({
                       
                       <button 
                         type="button"
-                        className="w-12 h-12 shrink-0 bg-amber-50 dark:bg-gray-700 hover:bg-amber-500 hover:text-white rounded-2xl flex items-center justify-center text-amber-600 dark:text-amber-400 text-2xl font-black shadow-sm transition"
+                        className="w-12 h-12 shrink-0 bg-amber-50 dark:bg-gray-700 hover:bg-amber-500 hover:text-white rounded-2xl flex items-center justify-center text-amber-600 dark:text-amber-400 text-2xl font-black shadow-xs transition"
                       >
                         +
                       </button>
@@ -546,7 +546,7 @@ export default function CustomerQRView({
                 return (
                   <div
                     key={ord.id || idx}
-                    className="bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 space-y-4"
+                    className="bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-xs border border-gray-100 dark:border-gray-700 space-y-4"
                   >
                     <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-3">
                       <div>
@@ -668,7 +668,7 @@ export default function CustomerQRView({
           MODAL 1: TAOM QO'SHISH, PORSIYA VA IZOH TANLASH
           ======================================================= */}
       {selectedItemForAdd && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             
             <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-700 pb-4">
@@ -771,7 +771,7 @@ export default function CustomerQRView({
                 value={addNote}
                 onChange={e => setAddNote(e.target.value)}
                 placeholder="Yoki o'zingiz izoh yozing..."
-                className="w-full p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-amber-500 text-gray-900 dark:text-white text-sm font-bold"
+                className="w-full p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-hidden focus:border-amber-500 text-gray-900 dark:text-white text-sm font-bold"
               />
             </div>
 
@@ -792,7 +792,7 @@ export default function CustomerQRView({
           MODAL 2: SAVATNI KO'RISH VA BUYURTMANI TASDIQLASH
           ======================================================= */}
       {isCartModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
             
             <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center shrink-0">
@@ -851,7 +851,7 @@ export default function CustomerQRView({
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-3 bg-white dark:bg-gray-800 p-1.5 rounded-xl w-max shadow-sm border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3 bg-white dark:bg-gray-800 p-1.5 rounded-xl w-max shadow-xs border border-gray-200 dark:border-gray-700">
                     <button 
                       type="button"
                       onClick={() => handleUpdateCartQty(item.cartItemId, -1)}

@@ -40,7 +40,7 @@ export default function CashierPaymentControls({
   const availableBonus = Number(matchedCustomer?.bonusBalance || 0);
 
   return (
-    <div className="w-full lg:w-96 bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 flex flex-col justify-between overflow-y-auto space-y-5">
+    <div className="w-full lg:w-96 bg-white dark:bg-gray-800 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 p-5 flex flex-col justify-between overflow-y-auto space-y-5">
       
       <div className="space-y-5">
         
@@ -70,7 +70,7 @@ export default function CashierPaymentControls({
               value={customerPhone}
               onChange={(e) => typeof setCustomerPhone === 'function' && setCustomerPhone(e.target.value)}
               placeholder="📞 Tel: 90 123 45 67 (yoki ism)"
-              className="w-full pl-3.5 pr-9 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-300 dark:border-gray-700 text-xs sm:text-sm font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+              className="w-full pl-3.5 pr-9 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-300 dark:border-gray-700 text-xs sm:text-sm font-black text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
             />
             {customerPhone && (
               <button
@@ -90,10 +90,10 @@ export default function CashierPaymentControls({
 
           {/* Agar mijoz bazadan topilsa */}
           {matchedCustomer ? (
-            <div className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-emerald-300 dark:border-emerald-700/70 space-y-2.5 shadow-sm">
+            <div className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-emerald-300 dark:border-emerald-700/70 space-y-2.5 shadow-xs">
               <div className="flex justify-between items-start gap-2">
                 <div>
-                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
                     ✓ Doimiy mijoz ({cashbackPercent}% Cashback)
                   </span>
                   <p className="font-black text-sm text-gray-900 dark:text-white mt-1">
@@ -129,7 +129,7 @@ export default function CashierPaymentControls({
                       value={useBonusAmount}
                       onChange={(e) => typeof setUseBonusAmount === 'function' && setUseBonusAmount(e.target.value)}
                       placeholder="Bonus summasi..."
-                      className="flex-1 p-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-black text-indigo-600 dark:text-indigo-400 outline-none focus:border-indigo-500"
+                      className="flex-1 p-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-black text-indigo-600 dark:text-indigo-400 outline-hidden focus:border-indigo-500"
                     />
                     <button
                       type="button"
@@ -157,7 +157,7 @@ export default function CashierPaymentControls({
                   value={customerName}
                   onChange={(e) => typeof setCustomerName === 'function' && setCustomerName(e.target.value)}
                   placeholder="Mijoz ismini kiriting (Masalan: Jasur aka)"
-                  className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-amber-500"
+                  className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
                 />
               </div>
             )
@@ -194,7 +194,7 @@ export default function CashierPaymentControls({
                 }}
                 className={`py-2.5 rounded-xl font-black text-xs transition ${
                   discountType === tab.id
-                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-xs'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >
@@ -212,7 +212,7 @@ export default function CashierPaymentControls({
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
                 placeholder={discountType === 'percent' ? 'Necha foiz? (Masalan: 10)' : 'Necha so\'m? (Masalan: 15000)'}
-                className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-indigo-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+                className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-indigo-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
               />
 
               {/* Tezkor chegirma tugmalari */}
@@ -275,7 +275,7 @@ export default function CashierPaymentControls({
                 value={mixedCash}
                 onChange={(e) => setMixedCash(e.target.value)}
                 placeholder="Naqd summa..."
-                className="w-full p-3 rounded-xl bg-white dark:bg-gray-900 border border-purple-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                className="w-full p-3 rounded-xl bg-white dark:bg-gray-900 border border-purple-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-purple-500"
               />
             </div>
             <div>
@@ -288,7 +288,7 @@ export default function CashierPaymentControls({
                 value={mixedCard}
                 onChange={(e) => setMixedCard(e.target.value)}
                 placeholder="Plastik summa..."
-                className="w-full p-3 rounded-xl bg-white dark:bg-gray-900 border border-purple-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                className="w-full p-3 rounded-xl bg-white dark:bg-gray-900 border border-purple-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-purple-500"
               />
             </div>
           </div>
@@ -306,7 +306,7 @@ export default function CashierPaymentControls({
               value={debtorName}
               onChange={(e) => setDebtorName(e.target.value)}
               placeholder="Masalan: Rustam aka (90 123-45-67)"
-              className="w-full p-3 rounded-xl bg-white dark:bg-gray-900 border border-orange-300 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-orange-500"
+              className="w-full p-3 rounded-xl bg-white dark:bg-gray-900 border border-orange-300 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-orange-500"
             />
           </div>
         )}

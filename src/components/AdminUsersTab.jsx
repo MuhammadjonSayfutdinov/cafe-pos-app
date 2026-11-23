@@ -277,7 +277,7 @@ export default function AdminUsersTab({
     <div className="space-y-6 md:space-y-8 animate-fade-in">
       
       {/* 1. XODIM QO'SHISH YOKI TAHRIRLASH FORMASI */}
-      <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700">
         
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div>
@@ -314,7 +314,7 @@ export default function AdminUsersTab({
                 onChange={handleInputChange} 
                 placeholder="Masalan: Alisher" 
                 required
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-none focus:border-indigo-500 text-gray-900 dark:text-white font-bold transition"
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white font-bold transition"
               />
             </div>
             
@@ -327,7 +327,7 @@ export default function AdminUsersTab({
                 name="role"
                 value={formData.role} 
                 onChange={handleInputChange}
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-none focus:border-indigo-500 text-gray-900 dark:text-white font-bold transition cursor-pointer"
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white font-bold transition cursor-pointer"
               >
                 {roleOptions.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -358,7 +358,7 @@ export default function AdminUsersTab({
                 onChange={handleInputChange} 
                 placeholder={`${requiredLenForForm} ta raqam...`}
                 required
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-none focus:border-indigo-500 text-gray-900 dark:text-white font-black tracking-[0.25em] transition"
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white font-black tracking-[0.25em] transition"
               />
             </div>
 
@@ -406,7 +406,7 @@ export default function AdminUsersTab({
       </div>
 
       {/* 2. MAVJUD XODIMLAR RO'YXATI */}
-      <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
+      <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 space-y-6">
         
         {/* Sarlavha, Filtr Tablar va Qidiruv */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-gray-100 dark:border-gray-700 pb-4">
@@ -425,7 +425,7 @@ export default function AdminUsersTab({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="🔍 Ism bo'yicha qidirish..."
-              className="flex-1 sm:w-48 px-3.5 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+              className="flex-1 sm:w-48 px-3.5 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
             />
 
             <div className="flex bg-gray-100 dark:bg-gray-900 p-1 rounded-xl">
@@ -440,7 +440,7 @@ export default function AdminUsersTab({
                   onClick={() => setFilterGroup(tab.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
                     filterGroup === tab.id
-                      ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
                       : 'text-gray-500 dark:text-gray-400'
                   }`}
                 >
@@ -475,7 +475,7 @@ export default function AdminUsersTab({
                 >
                   <div>
                     <div className="flex justify-between items-start mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-black flex items-center justify-center text-xl shadow-sm">
+                      <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-black flex items-center justify-center text-xl shadow-xs">
                         {safeName.charAt(0).toUpperCase()}
                       </div>
 
@@ -511,7 +511,7 @@ export default function AdminUsersTab({
                       <button 
                         type="button"
                         onClick={() => togglePinVisibility(user.id)}
-                        className="ml-1 text-gray-400 hover:text-indigo-500 transition focus:outline-none"
+                        className="ml-1 text-gray-400 hover:text-indigo-500 transition focus:outline-hidden"
                         title="Parolni ko'rsatish/yashirish"
                       >
                         {showPins[user.id] ? '🙈' : '👁️'}

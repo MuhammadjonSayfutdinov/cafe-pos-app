@@ -242,7 +242,7 @@ export default function WarehouseHistoryTab({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="🔍 Mahsulot, xodim, sana yoki izohni qidiring..."
-              className="w-full pl-4 pr-9 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-emerald-500"
+              className="w-full pl-4 pr-9 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-hidden focus:border-emerald-500"
             />
             {searchQuery && (
               <button
@@ -269,7 +269,7 @@ export default function WarehouseHistoryTab({
                 onClick={() => setTypeFilter(tab.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition ${
                   typeFilter === tab.id
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >
@@ -312,7 +312,7 @@ export default function WarehouseHistoryTab({
             {filteredLogs.map(log => (
               <div 
                 key={log.id} 
-                className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden"
+                className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xs relative overflow-hidden"
               >
                 <div className={`absolute top-0 left-0 w-1.5 h-full ${log.barColor}`}></div>
                 
@@ -354,7 +354,7 @@ export default function WarehouseHistoryTab({
           </div>
 
           {/* PLANSHET VA KOMPYUTER UCHUN JADVAL (History) */}
-          <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+          <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xs">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-900/50 border-b dark:border-gray-700">

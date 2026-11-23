@@ -165,7 +165,7 @@ export default function AdminAuditLogsTab({
   // 5. RENDER (UI DIZAYN)
   // ==========================================
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 animate-fade-in space-y-6">
+    <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 animate-fade-in space-y-6">
       
       {/* 5.1. SARLAVHA VA AMALLAR TUGMALARI */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -263,7 +263,7 @@ export default function AdminAuditLogsTab({
             placeholder="🔍 Xodim, sana, harakat yoki tafsilotni qidiring..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-bold outline-none focus:border-indigo-500 text-gray-900 dark:text-white transition"
+            className="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-bold outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white transition"
           />
           {searchTerm && (
             <button
@@ -279,7 +279,7 @@ export default function AdminAuditLogsTab({
         <select
           value={filterRole}
           onChange={e => setFilterRole(e.target.value)}
-          className="px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-700 dark:text-gray-200 outline-none cursor-pointer"
+          className="px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-700 dark:text-gray-200 outline-hidden cursor-pointer"
         >
           <option value="all">👥 Barcha rollar</option>
           <option value="admin">👑 Admin</option>

@@ -35,7 +35,7 @@ export default function StatsPaymentBreakdown({
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 mt-4 md:mt-6">
       
       {/* CHAP TOMON: To'lov turlari jadvali */}
-      <div className="xl:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between space-y-5">
+      <div className="xl:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col justify-between space-y-5">
         
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div>
@@ -121,7 +121,7 @@ export default function StatsPaymentBreakdown({
         </div>
         
         <div className="relative z-10 w-full">
-          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 backdrop-blur-sm shadow-inner">
+          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 backdrop-blur-xs shadow-inner">
             📊
           </div>
           <p className="text-indigo-100 font-black uppercase tracking-widest mb-2 text-xs sm:text-sm">

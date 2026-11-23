@@ -166,7 +166,7 @@ export default function AdminCategoriesTab({
   // ==========================================
   return (
     <>
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700 animate-fade-in max-w-4xl mx-auto space-y-5">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-xs border border-gray-100 dark:border-gray-700 animate-fade-in max-w-4xl mx-auto space-y-5">
         
         {/* SARLAVHA VA QO'SHISH TUGMASI */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -195,7 +195,7 @@ export default function AdminCategoriesTab({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="🔍 Toifa nomini qidiring..."
-              className="w-full pl-4 pr-10 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-emerald-500"
+              className="w-full pl-4 pr-10 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-900 dark:text-white outline-hidden focus:border-emerald-500"
             />
             {searchQuery && (
               <button
@@ -222,7 +222,7 @@ export default function AdminCategoriesTab({
               return (
                 <div 
                   key={`${cat}_${originalIndex}`} 
-                  className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 transition hover:shadow-sm"
+                  className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700 transition hover:shadow-xs"
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-8 h-8 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-xs font-black text-gray-500">
@@ -291,7 +291,7 @@ export default function AdminCategoriesTab({
 
       {/* TOIFALAR MODALI */}
       {isCatModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700">
               <h3 className="font-black text-lg text-gray-900 dark:text-white">
@@ -317,7 +317,7 @@ export default function AdminCategoriesTab({
                   autoFocus
                   value={catName} 
                   onChange={e => setCatName(e.target.value)} 
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-bold text-gray-900 dark:text-white outline-none focus:border-emerald-500 transition" 
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-bold text-gray-900 dark:text-white outline-hidden focus:border-emerald-500 transition" 
                   placeholder="Masalan: Milliy taomlar" 
                 />
                 {editingIndex !== null && (

@@ -1057,7 +1057,7 @@ export default function WaiterMode({
         />
       ) : (
         <div className="space-y-4 animate-fade-in">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex justify-between items-center">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex justify-between items-center">
             <button
               type="button"
               onClick={() => {

@@ -349,7 +349,7 @@ export default function AdminSettingsTab({
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
       
       {/* 1-BLOK: ASOSIY SOZLAMALAR */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-xs border border-gray-100 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
           <div>
             <h2 className="text-xl font-black text-gray-900 dark:text-white">
@@ -377,7 +377,7 @@ export default function AdminSettingsTab({
                 required
                 value={tempCafeName}
                 onChange={(e) => setTempCafeName(e.target.value)}
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-none focus:border-indigo-500 transition"
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500 transition"
                 placeholder="Masalan: Rayhon Milliy Taomlar"
               />
             </div>
@@ -395,7 +395,7 @@ export default function AdminSettingsTab({
                   required
                   value={tempServiceFee}
                   onChange={(e) => setTempServiceFee(e.target.value)}
-                  className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-none focus:border-indigo-500 transition text-lg"
+                  className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500 transition text-lg"
                 />
                 <div className="flex gap-2">
                   {[0, 5, 10, 12, 15, 20].map(pct => (
@@ -427,7 +427,7 @@ export default function AdminSettingsTab({
       </div>
 
       {/* 2-BLOK: TELEGRAM BOT XABARNOMA MARKAZI */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border-2 border-sky-100 dark:border-sky-900/40 space-y-6">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-xs border-2 border-sky-100 dark:border-sky-900/40 space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 dark:border-gray-700 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-sky-500 text-white flex items-center justify-center text-2xl shadow-md shadow-sky-500/30">
@@ -467,7 +467,7 @@ export default function AdminSettingsTab({
                 value={telegramConfig?.botToken || ''}
                 onChange={e => updateTgField('botToken', e.target.value)}
                 placeholder="Masalan: 7123456789:AAH..."
-                className="w-full pl-4 pr-11 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs sm:text-sm text-gray-900 dark:text-white outline-none focus:border-sky-500"
+                className="w-full pl-4 pr-11 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs sm:text-sm text-gray-900 dark:text-white outline-hidden focus:border-sky-500"
               />
               <button
                 type="button"
@@ -489,7 +489,7 @@ export default function AdminSettingsTab({
                 value={telegramConfig?.chatId || ''}
                 onChange={e => updateTgField('chatId', e.target.value)}
                 placeholder="Masalan: 123456789"
-                className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs sm:text-sm text-gray-900 dark:text-white outline-none focus:border-sky-500"
+                className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs sm:text-sm text-gray-900 dark:text-white outline-hidden focus:border-sky-500"
               />
               <button
                 type="button"
@@ -575,7 +575,7 @@ export default function AdminSettingsTab({
 
       {/* 3-BLOK: ZAL STOLLARINI BOSHQARISH */}
       {safeTables.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-xs border border-gray-100 dark:border-gray-700 space-y-5">
           <div>
             <h3 className="text-lg font-black text-gray-900 dark:text-white">
               🪑 Zal Stollari va Kabinalar Boshqaruvi ({safeTables.length} ta)
@@ -588,7 +588,7 @@ export default function AdminSettingsTab({
               value={newTableName}
               onChange={e => setNewTableName(e.target.value)}
               placeholder="Yangi stol yoki xona nomi (Masalan: 16-Stol yoki VIP-1)"
-              className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-amber-500"
+              className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
             />
             <button
               type="submit"
@@ -633,7 +633,7 @@ export default function AdminSettingsTab({
       )}
 
       {/* 4-BLOK: BACKUP & RESTORE */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-xs border border-gray-100 dark:border-gray-700 space-y-5">
         <h3 className="text-lg font-black text-gray-900 dark:text-white">
           💾 Ma'lumotlar Bazasini Zaxiralash (Backup & Restore)
         </h3>

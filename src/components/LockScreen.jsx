@@ -168,7 +168,7 @@ export default function LockScreen({
           onClick={() => handleSelectGroup('management')}
           className="w-full p-6 rounded-3xl border-2 border-gray-100 dark:border-gray-700 hover:border-indigo-500 dark:hover:border-indigo-500 bg-gray-50/50 dark:bg-gray-900/40 hover:bg-indigo-50/30 transition-all active:scale-[0.98] flex flex-col items-center text-center group"
         >
-          <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-sm flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition">
+          <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-xs flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition">
             👔
           </div>
           <h2 className="text-lg font-black tracking-wider uppercase text-gray-900 dark:text-white">
@@ -185,7 +185,7 @@ export default function LockScreen({
           onClick={() => handleSelectGroup('staff')}
           className="w-full p-6 rounded-3xl border-2 border-gray-100 dark:border-gray-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-gray-50/50 dark:bg-gray-900/40 hover:bg-emerald-50/30 transition-all active:scale-[0.98] flex flex-col items-center text-center group"
         >
-          <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-sm flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition">
+          <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-xs flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition">
             👥
           </div>
           <h2 className="text-lg font-black tracking-wider uppercase text-gray-900 dark:text-white">
@@ -214,7 +214,7 @@ export default function LockScreen({
           MODAL 1: PIN TERISH OYNASI (BOSHQARUV VA XODIMLAR)
           ======================================================= */}
       {selectedGroup && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-[32px] p-6 sm:p-8 shadow-2xl border border-gray-100 dark:border-gray-700">
             
             <div className="flex justify-between items-center mb-6">
@@ -304,7 +304,7 @@ export default function LockScreen({
           MODAL 2: MIJOZ STOLINI TANLASH (BO'SH STOLLAR RO'YXATI)
           ======================================================= */}
       {isTableModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full sm:max-w-lg rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl border border-gray-100 dark:border-gray-700 flex flex-col max-h-[85vh]">
             
             {/* Modal Header */}
@@ -333,7 +333,7 @@ export default function LockScreen({
                 onClick={() => setTableFilter('free')}
                 className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition ${
                   tableFilter === 'free'
-                    ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >
@@ -344,7 +344,7 @@ export default function LockScreen({
                 onClick={() => setTableFilter('all')}
                 className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition ${
                   tableFilter === 'all'
-                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >

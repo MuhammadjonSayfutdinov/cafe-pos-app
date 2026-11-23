@@ -1160,7 +1160,7 @@ export default function StatsMode({
     <div className="animate-fade-in max-w-7xl mx-auto pb-12 space-y-6">
       
       {/* YUQORI SARLAVHA, OFITSIANTLAR TUGMASI, CHEKLAR TUGMASI, TELEGRAM VA SMENA FILTRI */}
-      <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white flex items-center gap-3">
             <span className="text-3xl md:text-4xl">📈</span> Moliya, Cheklar va Z-Otchyot Markazi
@@ -1214,7 +1214,7 @@ export default function StatsMode({
               }}
               className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl font-black text-xs transition ${
                 viewScope === 'current' && periodPreset === 'shift_all'
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800'
               }`}
             >
@@ -1229,7 +1229,7 @@ export default function StatsMode({
               }}
               className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl font-black text-xs transition ${
                 viewScope === 'archived' && periodPreset === 'shift_all'
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800'
               }`}
             >
@@ -1244,7 +1244,7 @@ export default function StatsMode({
               }}
               className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl font-black text-xs transition ${
                 viewScope === 'all' && periodPreset === 'shift_all'
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800'
               }`}
             >
@@ -1255,7 +1255,7 @@ export default function StatsMode({
       </div>
 
       {/* TELEFON "MB SARFI / TRAFIK LIMITI" USLUBIDAGI SANALAR ORALIG'I FILTRI VA DAROMAD GRAFIGI */}
-      <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-sm border-2 border-indigo-100 dark:border-indigo-900/40 space-y-5">
+      <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-xs border-2 border-indigo-100 dark:border-indigo-900/40 space-y-5">
         
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
           <div className="flex items-center gap-2.5">
@@ -1310,7 +1310,7 @@ export default function StatsMode({
                 setStartDate(e.target.value);
                 setPeriodPreset('custom');
               }}
-              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
             />
           </div>
 
@@ -1325,7 +1325,7 @@ export default function StatsMode({
                 setEndDate(e.target.value);
                 setPeriodPreset('custom');
               }}
-              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
             />
           </div>
 
@@ -1337,7 +1337,7 @@ export default function StatsMode({
               type="month"
               value={selectedMonthPicker}
               onChange={e => handleMonthPickerChange(e.target.value)}
-              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
             />
           </div>
 
@@ -1345,7 +1345,7 @@ export default function StatsMode({
             <button
               type="button"
               onClick={() => handleOpenReceiptsExplorer('paid')}
-              className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5"
             >
               <span>👁</span> Shu davrdagi {completedOrders.length} ta chekni ochish
             </button>
@@ -1549,7 +1549,7 @@ export default function StatsMode({
           ========================================================================= */}
       <div
         ref={payrollSectionRef}
-        className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-sm border-2 border-amber-200 dark:border-amber-800/60 space-y-5"
+        className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-xs border-2 border-amber-200 dark:border-amber-800/60 space-y-5"
       >
         {/* Tepa sarlavha va boshqaruv tugmalari */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
@@ -1573,7 +1573,7 @@ export default function StatsMode({
               value={waiterSearchQuery}
               onChange={e => setWaiterSearchQuery(e.target.value)}
               placeholder="🔍 Ofitsiant ismi..."
-              className="px-3.5 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-amber-500 w-full sm:w-44"
+              className="px-3.5 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-amber-500 w-full sm:w-44"
             />
 
             <button
@@ -1581,7 +1581,7 @@ export default function StatsMode({
               onClick={() => setIsPayrollDateOpen(prev => !prev)}
               className={`px-3.5 py-2 rounded-xl font-black text-xs transition flex items-center gap-1.5 ${
                 payrollDateMode !== 'sync' || isPayrollDateOpen
-                  ? 'bg-amber-500 text-white shadow-sm'
+                  ? 'bg-amber-500 text-white shadow-xs'
                   : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
               }`}
             >
@@ -1633,7 +1633,7 @@ export default function StatsMode({
                   onClick={() => setPayrollDateMode(tab.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${
                     payrollDateMode === tab.id
-                      ? 'bg-indigo-600 text-white shadow-sm'
+                      ? 'bg-indigo-600 text-white shadow-xs'
                       : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
                   }`}
                 >
@@ -1871,7 +1871,7 @@ export default function StatsMode({
       />
 
       {/* 4. SMENA XARAJATLARI VA INKASSATSIYA TAFSILOTLARI JADVALI */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div>
             <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white">
@@ -1948,7 +1948,7 @@ export default function StatsMode({
       {editingWaiterName && (
         <div
           onClick={() => setEditingWaiterName(null)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[160] flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-[160] flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -2128,7 +2128,7 @@ export default function StatsMode({
       {inspectingWaiterRow && (
         <div
           onClick={() => setInspectingWaiterRow(null)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[160] flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-[160] flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -2168,7 +2168,7 @@ export default function StatsMode({
                         <span className="font-black text-sm text-gray-900 dark:text-white">
                           🪑 {ord.table}
                         </span>
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                           #{String(ord.id).slice(-4)}
                         </span>
                         <span className="text-xs font-bold text-gray-400">
@@ -2202,7 +2202,7 @@ export default function StatsMode({
       {isReceiptsModalOpen && (
         <div
           onClick={() => setIsReceiptsModalOpen(false)}
-          className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[150] flex items-center justify-center p-3 sm:p-5 animate-fade-in"
+          className="fixed inset-0 bg-black/75 backdrop-blur-xs z-[150] flex items-center justify-center p-3 sm:p-5 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -2221,7 +2221,7 @@ export default function StatsMode({
                 <button
                   type="button"
                   onClick={() => setIsReceiptsModalOpen(false)}
-                  className="w-9 h-9 rounded-full bg-white dark:bg-gray-800 text-gray-500 hover:text-red-600 font-black flex items-center justify-center shadow-sm"
+                  className="w-9 h-9 rounded-full bg-white dark:bg-gray-800 text-gray-500 hover:text-red-600 font-black flex items-center justify-center shadow-xs"
                 >
                   ✕
                 </button>
@@ -2243,7 +2243,7 @@ export default function StatsMode({
                       }}
                       className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${
                         receiptsModalCategory === cat.id
-                          ? 'bg-indigo-600 text-white shadow-sm'
+                          ? 'bg-indigo-600 text-white shadow-xs'
                           : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
                       }`}
                     >
@@ -2258,13 +2258,13 @@ export default function StatsMode({
                     value={receiptSearchQuery}
                     onChange={e => setReceiptSearchQuery(e.target.value)}
                     placeholder="🔍 #Chek ID, Stol, Ofitsiant, Taom..."
-                    className="px-3.5 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500 w-full sm:w-56"
+                    className="px-3.5 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500 w-full sm:w-56"
                   />
 
                   <select
                     value={receiptPaymentFilter}
                     onChange={e => setReceiptPaymentFilter(e.target.value)}
-                    className="px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-800 dark:text-white outline-none cursor-pointer"
+                    className="px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-800 dark:text-white outline-hidden cursor-pointer"
                   >
                     <option value="Barchasi">💳 Barcha to'lovlar</option>
                     <option value="Naqd">💵 Naqd</option>
@@ -2300,7 +2300,7 @@ export default function StatsMode({
                         onClick={() => setSelectedDetailOrder(ord)}
                         className={`p-4 rounded-2xl border-2 cursor-pointer transition flex justify-between items-center gap-3 ${
                           isSelected
-                            ? 'bg-indigo-50/90 dark:bg-indigo-900/30 border-indigo-500 shadow-sm'
+                            ? 'bg-indigo-50/90 dark:bg-indigo-900/30 border-indigo-500 shadow-xs'
                             : 'bg-gray-50 dark:bg-gray-900/50 border-gray-200/80 dark:border-gray-700 hover:border-indigo-300'
                         }`}
                       >
@@ -2309,10 +2309,10 @@ export default function StatsMode({
                             <span className="font-black text-sm text-gray-900 dark:text-white">
                               🪑 {ord.table}
                             </span>
-                            <span className="text-[10px] font-black px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                               #{String(ord.id).slice(-4)}
                             </span>
-                            <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-sm bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
                               {ord.paymentMethod || ord.status}
                             </span>
                           </div>
@@ -2362,7 +2362,7 @@ export default function StatsMode({
                     const orderProfit = finalAmt - foodCost;
 
                     return (
-                      <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-4">
+                      <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-xs space-y-4">
                         <div className="flex justify-between items-start border-b border-dashed border-gray-200 dark:border-gray-700 pb-4">
                           <div>
                             <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">

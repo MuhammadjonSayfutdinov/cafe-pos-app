@@ -554,7 +554,7 @@ export default function WarehouseStockTab({
     <div className="animate-fade-in space-y-4">
       
       {/* OMBOR MOLIYAVIY QIYMATI BANNERI */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-2xl shadow-sm flex flex-wrap justify-between items-center gap-3">
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-2xl shadow-xs flex flex-wrap justify-between items-center gap-3">
         <div className="flex items-center gap-3">
           <span className="text-3xl">💰</span>
           <div>
@@ -581,7 +581,7 @@ export default function WarehouseStockTab({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="🔍 Mahsulot nomini qidiring..."
-              className="w-full pl-4 pr-9 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-purple-500"
+              className="w-full pl-4 pr-9 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-900 dark:text-white outline-hidden focus:border-purple-500"
             />
             {searchQuery && (
               <button
@@ -597,7 +597,7 @@ export default function WarehouseStockTab({
           <select
             value={selectedCategory}
             onChange={e => setSelectedCategory(e.target.value)}
-            className="px-3.5 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-700 dark:text-gray-200 outline-none cursor-pointer"
+            className="px-3.5 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-700 dark:text-gray-200 outline-hidden cursor-pointer"
           >
             <option value="Barchasi">📁 Barcha toifalar ({safeInventory.length})</option>
             {inventoryCategories.map(cat => (
@@ -617,7 +617,7 @@ export default function WarehouseStockTab({
                 onClick={() => setStockFilter(f.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition ${
                   stockFilter === f.id
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >
@@ -656,7 +656,7 @@ export default function WarehouseStockTab({
               const isLow = qty <= min;
 
               return (
-                <div key={item.id} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div key={item.id} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xs">
                   <div className="flex justify-between items-start mb-3 gap-2">
                     <div>
                       <h3 className="font-black text-gray-900 dark:text-white text-lg">{item.name}</h3>
@@ -667,7 +667,7 @@ export default function WarehouseStockTab({
                         1 {item.unit} narxi: {cost.toLocaleString()} s (Jami: {totalVal.toLocaleString()} s)
                       </span>
                       {isLow && (
-                        <span className="mt-1 bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded uppercase font-black animate-pulse inline-block">
+                        <span className="mt-1 bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded-sm uppercase font-black animate-pulse inline-block">
                           {qty <= 0 ? 'Tugagan!' : 'Kam qoldi!'}
                         </span>
                       )}
@@ -715,7 +715,7 @@ export default function WarehouseStockTab({
           </div>
 
           {/* PLANSHET VA KOMPYUTER UCHUN JADVAL */}
-          <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+          <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xs">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-900/50 border-b dark:border-gray-700">
@@ -740,7 +740,7 @@ export default function WarehouseStockTab({
                         <div className="flex items-center gap-2">
                           <span className="text-base font-black">{item.name}</span>
                           {isLow && (
-                            <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded uppercase font-black animate-pulse">
+                            <span className="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded-sm uppercase font-black animate-pulse">
                               {qty <= 0 ? 'Tugagan!' : 'Kam qoldi!'}
                             </span>
                           )}
@@ -819,7 +819,7 @@ export default function WarehouseStockTab({
           MODAL 1: YANGI MAHSULOT QO'SHISH YOKI TAHRIRLASH
           ======================================================= */}
       {isItemModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full md:max-w-xl rounded-t-3xl md:rounded-3xl p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
             
             <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700">
@@ -846,7 +846,7 @@ export default function WarehouseStockTab({
                     required 
                     value={itemData.name} 
                     onChange={e => setItemData({ ...itemData, name: e.target.value })} 
-                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-purple-500 text-gray-900 dark:text-white transition font-bold" 
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-hidden focus:border-purple-500 text-gray-900 dark:text-white transition font-bold" 
                     placeholder="Masalan: Go'sht (Lahm)" 
                   />
                 </div>
@@ -858,7 +858,7 @@ export default function WarehouseStockTab({
                   <select 
                     value={itemData.category} 
                     onChange={e => setItemData({ ...itemData, category: e.target.value })} 
-                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none text-gray-900 dark:text-white cursor-pointer transition font-bold"
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-hidden text-gray-900 dark:text-white cursor-pointer transition font-bold"
                   >
                     {inventoryCategories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
@@ -875,7 +875,7 @@ export default function WarehouseStockTab({
                   <select 
                     value={itemData.unit} 
                     onChange={e => handleModalUnitChange(e.target.value)} 
-                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none text-gray-900 dark:text-white cursor-pointer transition font-bold text-xs"
+                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-hidden text-gray-900 dark:text-white cursor-pointer transition font-bold text-xs"
                   >
                     {UNIT_OPTIONS.map(u => (
                       <option key={u.value} value={u.value}>{u.label}</option>
@@ -894,7 +894,7 @@ export default function WarehouseStockTab({
                     step="any" 
                     value={itemData.quantity} 
                     onChange={e => setItemData({ ...itemData, quantity: e.target.value })} 
-                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-purple-500 text-gray-900 dark:text-white transition font-bold text-xs" 
+                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-hidden focus:border-purple-500 text-gray-900 dark:text-white transition font-bold text-xs" 
                     placeholder="Masalan: 10" 
                   />
                 </div>
@@ -910,7 +910,7 @@ export default function WarehouseStockTab({
                     step="any" 
                     value={itemData.minLimit} 
                     onChange={e => setItemData({ ...itemData, minLimit: e.target.value })} 
-                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-purple-500 text-gray-900 dark:text-white transition font-bold text-xs" 
+                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-hidden focus:border-purple-500 text-gray-900 dark:text-white transition font-bold text-xs" 
                     placeholder="Masalan: 5" 
                   />
                 </div>
@@ -925,7 +925,7 @@ export default function WarehouseStockTab({
                     step="any" 
                     value={itemData.costPrice} 
                     onChange={e => setItemData({ ...itemData, costPrice: e.target.value })} 
-                    className="w-full p-3 rounded-xl bg-emerald-50 dark:bg-gray-700 border border-emerald-300 dark:border-emerald-600 outline-none focus:border-emerald-500 text-gray-900 dark:text-white transition font-black text-xs" 
+                    className="w-full p-3 rounded-xl bg-emerald-50 dark:bg-gray-700 border border-emerald-300 dark:border-emerald-600 outline-hidden focus:border-emerald-500 text-gray-900 dark:text-white transition font-black text-xs" 
                     placeholder="Masalan: 95000" 
                   />
                 </div>
@@ -993,7 +993,7 @@ export default function WarehouseStockTab({
           MODAL 2: KIRIM, CHIQIM VA REVIZIYA
           ======================================================= */}
       {isUpdateModalOpen && selectedStockItem && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full md:max-w-md rounded-t-3xl md:rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700">
               <h3 className="font-black text-lg text-gray-900 dark:text-white">
@@ -1032,7 +1032,7 @@ export default function WarehouseStockTab({
                         onClick={() => handleUpdateUnitSwitch(u.value)}
                         className={`py-2 rounded-lg text-xs font-black transition ${
                           updateInputUnit === u.value
-                            ? 'bg-indigo-600 text-white shadow-sm'
+                            ? 'bg-indigo-600 text-white shadow-xs'
                             : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800'
                         }`}
                       >
@@ -1059,7 +1059,7 @@ export default function WarehouseStockTab({
                   value={updateAmount} 
                   onChange={e => setUpdateAmount(e.target.value)} 
                   autoFocus 
-                  className={`w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-700 border-2 outline-none font-black text-2xl text-center text-gray-900 dark:text-white transition ${
+                  className={`w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-700 border-2 outline-hidden font-black text-2xl text-center text-gray-900 dark:text-white transition ${
                     updateType === 'kirim' 
                       ? 'border-emerald-500 focus:ring-4 focus:ring-emerald-500/20' 
                       : updateType === 'chiqim'
@@ -1083,7 +1083,7 @@ export default function WarehouseStockTab({
                     value={updateUnitPrice}
                     onChange={e => setUpdateUnitPrice(e.target.value)}
                     placeholder="Masalan: 95000"
-                    className="w-full p-3.5 rounded-xl bg-emerald-50/60 dark:bg-gray-700 border border-emerald-200 dark:border-gray-600 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-emerald-500"
+                    className="w-full p-3.5 rounded-xl bg-emerald-50/60 dark:bg-gray-700 border border-emerald-200 dark:border-gray-600 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-emerald-500"
                   />
                   {Number(updateAmount) > 0 && Number(updateUnitPrice) > 0 && (
                     <p className="text-[11px] font-black text-emerald-600 mt-1">
@@ -1101,7 +1101,7 @@ export default function WarehouseStockTab({
                   type="text" 
                   value={updateNote} 
                   onChange={e => setUpdateNote(e.target.value)} 
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none text-gray-900 dark:text-white font-bold transition" 
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-hidden text-gray-900 dark:text-white font-bold transition" 
                   placeholder={updateType === 'kirim' ? "Yuk xati yoki yetkazib beruvchi..." : "Sababi..."} 
                 />
               </div>

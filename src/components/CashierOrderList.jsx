@@ -24,7 +24,7 @@ export default function CashierOrderList({
   };
 
   return (
-    <div className="w-full lg:w-1/3 bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-64 lg:h-full shrink-0">
+    <div className="w-full lg:w-1/3 bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col h-64 lg:h-full shrink-0">
       
       <div className="mb-4">
         <h2 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">

@@ -1064,7 +1064,7 @@ export default function CashierMode({
     <div className="max-w-7xl mx-auto flex flex-col gap-4 pb-6 animate-fade-in">
       
       {/* TEPADAGI JONLI KASSA SEYFI, XARAJAT VA CRM PANELI */}
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4">
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4">
         
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
           <div className="bg-emerald-50/70 dark:bg-emerald-900/20 px-4 py-2.5 rounded-2xl border border-emerald-200/70 dark:border-emerald-800/50 flex justify-between items-center">
@@ -1213,7 +1213,7 @@ export default function CashierMode({
       {isCrmModalOpen && (
         <div
           onClick={() => setIsCrmModalOpen(false)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -1247,7 +1247,7 @@ export default function CashierMode({
                 value={newCrmCustomer.name}
                 onChange={e => setNewCrmCustomer(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="👤 Mijoz ismi *"
-                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
               />
               <input
                 type="tel"
@@ -1255,7 +1255,7 @@ export default function CashierMode({
                 value={newCrmCustomer.phone}
                 onChange={e => setNewCrmCustomer(prev => ({ ...prev, phone: e.target.value }))}
                 placeholder="📞 Tel: 90 123 45 67 *"
-                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
               />
               <input
                 type="number"
@@ -1263,7 +1263,7 @@ export default function CashierMode({
                 value={newCrmCustomer.initialBonus}
                 onChange={e => setNewCrmCustomer(prev => ({ ...prev, initialBonus: e.target.value }))}
                 placeholder="🎁 Boshlang'ich bonus (s)"
-                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
               />
               <button
                 type="submit"
@@ -1278,7 +1278,7 @@ export default function CashierMode({
               value={crmSearch}
               onChange={e => setCrmSearch(e.target.value)}
               placeholder="🔍 Mijoz ismi yoki telefon raqami bo'yicha qidirish..."
-              className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+              className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
             />
 
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
@@ -1351,7 +1351,7 @@ export default function CashierMode({
       {isExpenseModalOpen && (
         <div
           onClick={() => setIsExpenseModalOpen(false)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -1378,7 +1378,7 @@ export default function CashierMode({
                 <select
                   value={expenseForm.category}
                   onChange={e => setExpenseForm(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-red-500 cursor-pointer"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-red-500 cursor-pointer"
                 >
                   {EXPENSE_CATEGORIES.map(c => (
                     <option key={c.id} value={c.id}>{c.label}</option>
@@ -1401,7 +1401,7 @@ export default function CashierMode({
                       onClick={() => setExpenseForm(prev => ({ ...prev, paymentSource: src.id }))}
                       className={`py-3 px-3 rounded-xl font-black text-xs border-2 transition ${
                         expenseForm.paymentSource === src.id
-                          ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                          ? 'bg-red-600 text-white border-red-600 shadow-xs'
                           : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
                       }`}
                     >
@@ -1425,7 +1425,7 @@ export default function CashierMode({
                     value={expenseForm.amount}
                     onChange={e => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
                     placeholder="Masalan: 50000"
-                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-red-300 dark:border-red-700 font-black text-lg text-gray-900 dark:text-white outline-none focus:border-red-500"
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-red-300 dark:border-red-700 font-black text-lg text-gray-900 dark:text-white outline-hidden focus:border-red-500"
                   />
                 </div>
 
@@ -1438,7 +1438,7 @@ export default function CashierMode({
                     value={expenseForm.recipient}
                     onChange={e => setExpenseForm(prev => ({ ...prev, recipient: e.target.value }))}
                     placeholder="Masalan: Oshpaz Ali"
-                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-red-500"
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-hidden focus:border-red-500"
                   />
                 </div>
               </div>
@@ -1453,7 +1453,7 @@ export default function CashierMode({
                   value={expenseForm.note}
                   onChange={e => setExpenseForm(prev => ({ ...prev, note: e.target.value }))}
                   placeholder="Masalan: Bozordan ko'kat va 30 ta non olindi"
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-red-500"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-hidden focus:border-red-500"
                 />
               </div>
 
@@ -1481,7 +1481,7 @@ export default function CashierMode({
       {isExpenseListModalOpen && (
         <div
           onClick={() => setIsExpenseListModalOpen(false)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}

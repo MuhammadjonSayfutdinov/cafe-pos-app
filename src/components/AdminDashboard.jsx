@@ -204,7 +204,7 @@ export default function AdminDashboard({
             onClick={() => setPeriodFilter('today')}
             className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-black transition ${
               periodFilter === 'today'
-                ? 'bg-indigo-600 text-white shadow-sm'
+                ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-gray-600 dark:text-gray-400'
             }`}
           >
@@ -215,7 +215,7 @@ export default function AdminDashboard({
             onClick={() => setPeriodFilter('all')}
             className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-black transition ${
               periodFilter === 'all'
-                ? 'bg-indigo-600 text-white shadow-sm'
+                ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-gray-600 dark:text-gray-400'
             }`}
           >
@@ -226,7 +226,7 @@ export default function AdminDashboard({
 
       {/* 1-QATOR: ASOSIY KPI KARTOCHKALAR */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-800/50 shadow-sm">
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-800/50 shadow-xs">
           <p className="text-emerald-600 dark:text-emerald-400 text-xs font-black uppercase tracking-wider mb-1">
             💰 Jami Sof Tushum
           </p>
@@ -238,7 +238,7 @@ export default function AdminDashboard({
           </p>
         </div>
         
-        <div className="bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-3xl border border-indigo-100 dark:border-indigo-800/50 shadow-sm">
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-3xl border border-indigo-100 dark:border-indigo-800/50 shadow-xs">
           <p className="text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase tracking-wider mb-1">
             🧾 Yopilgan Cheklar
           </p>
@@ -250,7 +250,7 @@ export default function AdminDashboard({
           </p>
         </div>
         
-        <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-800/50 shadow-sm">
+        <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-800/50 shadow-xs">
           <p className="text-amber-600 dark:text-amber-400 text-xs font-black uppercase tracking-wider mb-1">
             👨‍🍳 Xizmat Haqi (Foyda)
           </p>
@@ -262,7 +262,7 @@ export default function AdminDashboard({
           </p>
         </div>
         
-        <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-3xl border border-red-100 dark:border-red-800/50 shadow-sm">
+        <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-3xl border border-red-100 dark:border-red-800/50 shadow-xs">
           <p className="text-red-600 dark:text-red-400 text-xs font-black uppercase tracking-wider mb-1">
             🎁 Chegirma va Nasiya
           </p>
@@ -313,7 +313,7 @@ export default function AdminDashboard({
 
       {/* 3-QATOR: TO'LOV TURLARI VA O'RTACHA CHEK */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700">
           <h3 className="text-lg font-black text-gray-800 dark:text-gray-100 mb-4">
             💳 To'lov turlari bo'yicha tushum
           </h3>
@@ -362,7 +362,7 @@ export default function AdminDashboard({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Top-5 Taomlar */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700">
           <h3 className="text-lg font-black text-gray-800 dark:text-gray-100 mb-4">
             🔥 Top-5 Eng Ko'p Sotilgan Taomlar
           </h3>
@@ -404,7 +404,7 @@ export default function AdminDashboard({
         </div>
 
         {/* Top Ofitsiantlar va Xizmat Kanallari */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700">
           <h3 className="text-lg font-black text-gray-800 dark:text-gray-100 mb-4">
             🏆 Faol Ofitsiantlar va Savdo Kanallari
           </h3>

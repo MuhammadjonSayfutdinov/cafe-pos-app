@@ -327,7 +327,7 @@ export default function WarehousePrepTab({
   const targetCompatibleUnits = getCompatibleUnitsForItem(targetItem);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 p-6 md:p-8 max-w-4xl mx-auto animate-fade-in shadow-sm">
+    <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 p-6 md:p-8 max-w-4xl mx-auto animate-fade-in shadow-xs">
       
       <div className="mb-8">
         <h2 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
@@ -369,7 +369,7 @@ export default function WarehousePrepTab({
                   value={targetItemId} 
                   onChange={e => handleSelectTargetItem(e.target.value)} 
                   required
-                  className="w-full p-3.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-gray-900 dark:text-white outline-none focus:border-emerald-500 cursor-pointer"
+                  className="w-full p-3.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-gray-900 dark:text-white outline-hidden focus:border-emerald-500 cursor-pointer"
                 >
                   <option value="">-- Tanlang --</option>
                   {safeInventory.map(i => (
@@ -393,7 +393,7 @@ export default function WarehousePrepTab({
                   min="0.0001" 
                   step="any"
                   placeholder="Masalan: 5"
-                  className="w-full p-3.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-none focus:border-emerald-500"
+                  className="w-full p-3.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-emerald-500"
                 />
               </div>
 
@@ -406,7 +406,7 @@ export default function WarehousePrepTab({
                   value={produceUnit}
                   onChange={e => setProduceUnit(e.target.value)}
                   disabled={!targetItem}
-                  className="w-full p-3.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-emerald-600 dark:text-emerald-400 outline-none cursor-pointer disabled:opacity-50"
+                  className="w-full p-3.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-emerald-600 dark:text-emerald-400 outline-hidden cursor-pointer disabled:opacity-50"
                 >
                   {targetCompatibleUnits.map(u => (
                     <option key={u.value} value={u.value}>{u.label}</option>
@@ -476,7 +476,7 @@ export default function WarehousePrepTab({
                           value={ing.inventoryId}
                           onChange={e => handleIngredientChange(idx, 'inventoryId', e.target.value)}
                           required
-                          className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none cursor-pointer"
+                          className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-hidden cursor-pointer"
                         >
                           <option value="">-- Xomashyoni tanlang --</option>
                           {safeInventory
@@ -502,7 +502,7 @@ export default function WarehousePrepTab({
                           min="0.0001" 
                           step="any"
                           placeholder="Miqdor"
-                          className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-amber-500"
+                          className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
                         />
                       </div>
 
@@ -515,7 +515,7 @@ export default function WarehousePrepTab({
                           value={ing.inputUnit}
                           onChange={e => handleIngredientChange(idx, 'inputUnit', e.target.value)}
                           disabled={!selectedIngItem}
-                          className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-black text-sm text-amber-600 dark:text-amber-400 outline-none cursor-pointer disabled:opacity-50"
+                          className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-black text-sm text-amber-600 dark:text-amber-400 outline-hidden cursor-pointer disabled:opacity-50"
                         >
                           {compatibleIngUnits.map(u => (
                             <option key={u.value} value={u.value}>{u.label}</option>
@@ -565,7 +565,7 @@ export default function WarehousePrepTab({
               value={prepNote}
               onChange={e => setPrepNote(e.target.value)}
               placeholder="Masalan: Ertalabki smena uchun somsa xamiri..."
-              className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-amber-500"
+              className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
             />
           </div>
 

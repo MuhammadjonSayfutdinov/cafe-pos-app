@@ -544,7 +544,7 @@ export default function App() {
     }`}>
       
       {/* --- GLOBAL TOP NAVBAR --- */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 md:px-6 py-3 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-40 shadow-sm">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 md:px-6 py-3 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-40 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-md shadow-indigo-600/30">
             🍽️
@@ -575,7 +575,7 @@ export default function App() {
                 onClick={() => setAdminActiveView(tab.id)}
                 className={`px-3.5 py-2 rounded-xl font-black text-xs whitespace-nowrap transition active:scale-95 ${
                   adminActiveView === tab.id
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800'
                 }`}
               >

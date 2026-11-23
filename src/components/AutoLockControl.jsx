@@ -318,7 +318,7 @@ export default function AutoLockControl({
                 onClick={handleToggleMasterSwitch}
                 className={`px-3 py-1.5 rounded-xl font-black text-xs transition ${
                   settings.enabled && activeTimeoutSeconds > 0
-                    ? 'bg-emerald-500 text-white shadow-sm'
+                    ? 'bg-emerald-500 text-white shadow-xs'
                     : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                 }`}
               >
@@ -341,7 +341,7 @@ export default function AutoLockControl({
                       onClick={() => handleSelectTimeout(opt.seconds)}
                       className={`py-2 px-2.5 rounded-xl font-black text-xs text-left transition flex items-center justify-between ${
                         isSelected
-                          ? 'bg-indigo-600 text-white shadow-sm'
+                          ? 'bg-indigo-600 text-white shadow-xs'
                           : 'bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700'
                       } ${opt.seconds === 0 ? 'col-span-2 justify-center text-center' : ''}`}
                     >
@@ -427,7 +427,7 @@ export default function AutoLockControl({
                   setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6));
                 }}
                 placeholder="PIN-kodni tering..."
-                className="w-full py-3 px-4 rounded-2xl bg-black/40 border-2 border-white/20 focus:border-amber-400 text-center font-black text-2xl tracking-[0.5em] text-white outline-none"
+                className="w-full py-3 px-4 rounded-2xl bg-black/40 border-2 border-white/20 focus:border-amber-400 text-center font-black text-2xl tracking-[0.5em] text-white outline-hidden"
               />
               {pinError && (
                 <p className="text-xs font-black text-red-400 animate-pulse">
@@ -448,7 +448,7 @@ export default function AutoLockControl({
                       ? 'bg-red-500/25 hover:bg-red-500/40 text-red-300 text-sm'
                       : key === 'BACK'
                       ? 'bg-slate-700/60 hover:bg-slate-700 text-slate-200 text-sm'
-                      : 'bg-white/10 hover:bg-white/20 text-white shadow-sm'
+                      : 'bg-white/10 hover:bg-white/20 text-white shadow-xs'
                   }`}
                 >
                   {key === 'BACK' ? '⌫' : key}
