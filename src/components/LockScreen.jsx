@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
+import { ORDER_STATUS } from '../constants/orderStatus';
 
 const PIN_GUARD_SCOPE = 'login';
 
@@ -74,7 +75,7 @@ export default function LockScreen({
     return allTablesList.map(tableName => {
       const nameStr = typeof tableName === 'object' ? tableName.name : String(tableName);
       const hasActiveOrder = activeOrdersList.some(
-        o => o && o.table === nameStr && o.status !== "To'langan" && o.status !== 'Qarz'
+        o => o && o.table === nameStr && o.status !== ORDER_STATUS.PAID && o.status !== ORDER_STATUS.DEBT
       );
       return {
         name: nameStr,

@@ -5,6 +5,9 @@ import StatsPaymentBreakdown from './StatsPaymentBreakdown';
 import StatsPopularItems from './StatsPopularItems';
 import PrintReceiptModal from './PrintReceiptModal';
 import { getRecordTimeMs } from '../utils/dates';
+import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
+import { getTelegramConfig, sendTelegramMessage, escapeHtml } from '../utils/telegramNotifier';
+import { notify, confirmAsync } from '../utils/notify';
 
 // ===============================================
 // 1. O'LCHOV BIRLIKLARI KONVERTORI (TANNARX UCHUN)
@@ -57,12 +60,6 @@ const toDateInputStr = (dateObj) => {
   const d = String(dateObj.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
-
-const escapeHtml = (str) =>
-  String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 
 // ===============================================
 // 3. OFITSIANT MAOSH STAVKASI STANDART QOIDASI
@@ -380,20 +377,20 @@ export default function StatsMode({
   // 4. CHEKLAR VA XARAJATLARNI SMENA HAMDA SANA ORALIG'IGA QARAB AJRATISH
   // ===============================================
   const currentShiftPaidOrders = useMemo(() => {
-    return safeOrders.filter(o => o && o.status === "To'langan");
+    return safeOrders.filter(o => o && o.status === ORDER_STATUS.PAID);
   }, [safeOrders]);
 
   const archivedPaidOrders = useMemo(() => {
-    return safeOrders.filter(o => o && o.status === 'Arxiv');
+    return safeOrders.filter(o => o && o.status === ORDER_STATUS.ARCHIVED);
   }, [safeOrders]);
 
   const debtOrders = useMemo(() => {
-    return safeOrders.filter(o => o && o.status === 'Qarz');
+    return safeOrders.filter(o => o && o.status === ORDER_STATUS.DEBT);
   }, [safeOrders]);
 
   const openActiveOrders = useMemo(() => {
     return safeOrders.filter(
-      o => o && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
+      o => o && !CLOSED_ORDER_STATUSES.includes(o.status)
     );
   }, [safeOrders]);
 
@@ -422,11 +419,11 @@ export default function StatsMode({
   ]);
 
   const scopedExpenses = useMemo(() => {
-    let baseExp = safeExpenses.filter(e => e && e.status !== 'Arxiv');
+    let baseExp = safeExpenses.filter(e => e && e.status !== ORDER_STATUS.ARCHIVED);
     if (activeDateRange.isFiltered || viewScope === 'all') {
       baseExp = safeExpenses.filter(Boolean);
     } else if (viewScope === 'archived') {
-      baseExp = safeExpenses.filter(e => e && e.status === 'Arxiv');
+      baseExp = safeExpenses.filter(e => e && e.status === ORDER_STATUS.ARCHIVED);
     }
 
     if (!activeDateRange.isFiltered) return baseExp;
@@ -562,9 +559,9 @@ export default function StatsMode({
     let rawCashIn = 0;
     completedOrders.forEach(o => {
       const amt = getOrderFinalAmount(o);
-      if (o.paymentMethod === 'Naqd') {
+      if (o.paymentMethod === PAYMENT_METHOD.CASH) {
         rawCashIn += amt;
-      } else if (o.paymentMethod === 'Aralash') {
+      } else if (o.paymentMethod === PAYMENT_METHOD.MIXED) {
         rawCashIn += Number(o.paymentDetails?.cashAmount ?? o.mixedDetails?.cash ?? 0) || 0;
       }
     });
@@ -618,7 +615,7 @@ export default function StatsMode({
     }
 
     const matchingOrders = safeOrders.filter(o => {
-      if (!o || !["To'langan", 'Arxiv'].includes(o.status)) return false;
+      if (!o || ![ORDER_STATUS.PAID, ORDER_STATUS.ARCHIVED].includes(o.status)) return false;
       const t = parseRecordTimestamp(o);
       return t >= sMs && t <= eMs;
     });
@@ -945,13 +942,8 @@ export default function StatsMode({
   // ===============================================
   const sendReportToTelegram = async (customLabel = null) => {
     try {
-      const raw = window.localStorage.getItem('pos_telegram_config');
-      if (!raw) return { ok: false, error: 'Telegram Bot sozlanmagan!' };
-      const cfg = JSON.parse(raw);
-      const token = String(cfg?.botToken || '').trim();
-      const rawIds = String(cfg?.chatId || '').trim();
-
-      if (!token || !rawIds) {
+      const cfg = getTelegramConfig();
+      if (!String(cfg.botToken || '').trim() || !String(cfg.chatId || '').trim()) {
         return { ok: false, error: 'Admin Sozlamalarida Bot Token va Chat ID kiritilmagan!' };
       }
 
@@ -973,21 +965,9 @@ export default function StatsMode({
         ...Object.entries(paymentStats).map(([k, v]) => `  • ${escapeHtml(k)}: ${Number(v || 0).toLocaleString()} so'm`)
       ].join('\n');
 
-      const chatIds = rawIds.split(',').map(s => s.trim()).filter(Boolean);
-      await Promise.all(
-        chatIds.map(id =>
-          fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: id,
-              text: htmlMsg,
-              parse_mode: 'HTML'
-            })
-          })
-        )
-      );
-      return { ok: true };
+      // Qo'lda yuborilgan hisobot: Telegram xabarnomalari o'chiq bo'lsa ham ketadi (B12)
+      const res = await sendTelegramMessage(htmlMsg, 'manual', cfg);
+      return res.ok ? { ok: true } : { ok: false, error: res.error || 'Telegram xatosi' };
     } catch {
       return { ok: false, error: 'Internet xatosi!' };
     }
@@ -998,9 +978,9 @@ export default function StatsMode({
     const res = await sendReportToTelegram();
     setTgSending(false);
     if (res.ok) {
-      alert('✅ Hisobot Telegramga muvaffaqiyatli yuborildi!');
+      notify('✅ Hisobot Telegramga muvaffaqiyatli yuborildi!');
     } else {
-      alert(`❌ ${res.error}`);
+      notify(`❌ ${res.error}`);
     }
   };
 
@@ -1049,11 +1029,11 @@ export default function StatsMode({
     URL.revokeObjectURL(url);
   };
 
-  const handleCloseShift = () => {
-    const activeShiftExpenses = safeExpenses.filter(e => e && e.status !== 'Arxiv');
+  const handleCloseShift = async () => {
+    const activeShiftExpenses = safeExpenses.filter(e => e && e.status !== ORDER_STATUS.ARCHIVED);
 
     if (currentShiftPaidOrders.length === 0 && activeShiftExpenses.length === 0) {
-      alert("ℹ️ Hozirgi smenada yopilishi kerak bo'lgan yangi cheklar yoki xarajatlar yo'q!");
+      notify("ℹ️ Hozirgi smenada yopilishi kerak bo'lgan yangi cheklar yoki xarajatlar yo'q!");
       return;
     }
 
@@ -1077,15 +1057,15 @@ export default function StatsMode({
       `• Haqiqiy Sof Foyda: +${shiftNet.toLocaleString()} so'm\n\n` +
       `Tasdiqlasangiz, barcha cheklar va xarajatlar Arxivga o'tkaziladi hamda joriy kassa nollanadi.${openWarning}`;
 
-    if (!window.confirm(confirmMsg)) return;
+    if (!await confirmAsync(confirmMsg)) return;
 
     const archiveDateStr = new Date().toLocaleString();
 
     updateOrdersState(prev => {
       const list = Array.isArray(prev) && prev.length > 0 ? prev : safeOrders;
       return list.map(order => {
-        if (order && order.status === "To'langan") {
-          return { ...order, status: 'Arxiv', archiveDate: archiveDateStr };
+        if (order && order.status === ORDER_STATUS.PAID) {
+          return { ...order, status: ORDER_STATUS.ARCHIVED, archiveDate: archiveDateStr };
         }
         return order;
       });
@@ -1094,8 +1074,8 @@ export default function StatsMode({
     updateExpensesState(prev => {
       const list = Array.isArray(prev) ? prev : safeExpenses;
       return list.map(exp => {
-        if (exp && exp.status !== 'Arxiv') {
-          return { ...exp, status: 'Arxiv', archiveDate: archiveDateStr };
+        if (exp && exp.status !== ORDER_STATUS.ARCHIVED) {
+          return { ...exp, status: ORDER_STATUS.ARCHIVED, archiveDate: archiveDateStr };
         }
         return exp;
       });
@@ -1121,7 +1101,7 @@ export default function StatsMode({
       ]);
     }
 
-    alert(`✅ Smena muvaffaqiyatli yopildi!\nSof foyda: +${shiftNet.toLocaleString()} so'm`);
+    notify(`✅ Smena muvaffaqiyatli yopildi!\nSof foyda: +${shiftNet.toLocaleString()} so'm`);
   };
 
   // ===============================================

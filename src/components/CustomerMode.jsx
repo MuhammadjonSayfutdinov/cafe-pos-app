@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { ORDER_STATUS } from '../constants/orderStatus';
 
 const QUICK_NOTE_TAGS = [
   'Piyozsiz',
@@ -140,7 +141,7 @@ export default function CustomerMode({
   // Shu stolga tegishli faol buyurtmalar
   const myActiveOrders = useMemo(() => {
     const globalTableOrders = safeOrders.filter(
-      o => o && o.table === activeTable && o.status !== "To'langan" && o.status !== 'Qarz'
+      o => o && o.table === activeTable && o.status !== ORDER_STATUS.PAID && o.status !== ORDER_STATUS.DEBT
     );
     return globalTableOrders.length > 0 ? globalTableOrders : localSubmittedOrders;
   }, [safeOrders, activeTable, localSubmittedOrders]);
@@ -278,7 +279,7 @@ export default function CustomerMode({
     const newSubmittedOrder = {
       id: Date.now(),
       table: activeTable,
-      status: 'Yangi',
+      status: ORDER_STATUS.NEW,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       items: [...cart],
       subtotal: totalCartAmount,
@@ -571,15 +572,15 @@ export default function CustomerMode({
                       </div>
 
                       <span className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase ${
-                        ord.status === 'Tayyor'
+                        ord.status === ORDER_STATUS.READY
                           ? 'bg-emerald-500 text-white animate-pulse'
-                          : ord.status === 'Yetkazildi'
+                          : ord.status === ORDER_STATUS.DELIVERED
                           ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
                           : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
                       }`}>
-                        {ord.status === 'Tayyor' 
+                        {ord.status === ORDER_STATUS.READY 
                           ? '🥘 Tayyor!' 
-                          : ord.status === 'Yetkazildi' 
+                          : ord.status === ORDER_STATUS.DELIVERED 
                           ? '✅ Yetkazildi' 
                           : '⏳ Oshxonada tayyorlanmoqda'}
                       </span>

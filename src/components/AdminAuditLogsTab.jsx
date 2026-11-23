@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { notify, confirmAsync } from '../utils/notify';
 
 export default function AdminAuditLogsTab({ 
   auditLogs = [],
@@ -124,7 +125,7 @@ export default function AdminAuditLogsTab({
   // ==========================================
   const handleExportLogs = () => {
     if (filteredLogs.length === 0) {
-      alert("Yuklab olish uchun yozuvlar yo'q!");
+      notify("Yuklab olish uchun yozuvlar yo'q!");
       return;
     }
 
@@ -144,10 +145,10 @@ export default function AdminAuditLogsTab({
     URL.revokeObjectURL(url);
   };
 
-  const handleClearLogs = () => {
+  const handleClearLogs = async () => {
     if (typeof setAuditLogs !== 'function' || safeLogs.length === 0) return;
 
-    if (window.confirm("DIQQAT! Barcha harakatlar tarixini (Audit Logs) o'chirib tozalamoqchimisiz?")) {
+    if (await confirmAsync("DIQQAT! Barcha harakatlar tarixini (Audit Logs) o'chirib tozalamoqchimisiz?")) {
       setAuditLogs([
         {
           id: `${Date.now()}`,

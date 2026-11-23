@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { getRecordTimeMs, isTodayMs } from '../utils/dates';
+import { ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
 
 export default function AdminDashboard({ 
   orders = [],
@@ -58,18 +59,18 @@ export default function AdminDashboard({
 
   // To'langan cheklar, Qarz cheklar va Hozirgi faol (ochiq) cheklar
   const completedOrders = useMemo(() => {
-    return periodOrders.filter(o => o?.status === "To'langan");
+    return periodOrders.filter(o => o?.status === ORDER_STATUS.PAID);
   }, [periodOrders]);
 
   const debtOrders = useMemo(() => {
     return periodOrders.filter(
-      o => o?.status === 'Qarz' || o?.paymentMethod === 'Qarz'
+      o => o?.status === ORDER_STATUS.DEBT || o?.paymentMethod === PAYMENT_METHOD.DEBT
     );
   }, [periodOrders]);
 
   const activeOpenOrders = useMemo(() => {
     return safeOrders.filter(
-      o => o && o.status !== "To'langan" && o.status !== 'Qarz'
+      o => o && o.status !== ORDER_STATUS.PAID && o.status !== ORDER_STATUS.DEBT
     );
   }, [safeOrders]);
 
@@ -123,7 +124,7 @@ export default function AdminDashboard({
       const amount = getOrderAmount(order);
 
       // Agar aralash to'lov tafsilotlari bo'lsa (splitPayment / mixedDetails)
-      if (method === 'Aralash' && order?.mixedDetails) {
+      if (method === PAYMENT_METHOD.MIXED && order?.mixedDetails) {
         stats.Aralash += amount;
       } else if (stats[method] !== undefined) {
         stats[method] += amount;
@@ -323,7 +324,7 @@ export default function AdminDashboard({
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
             {['Naqd', 'Plastik', 'Payme', 'Click', 'Aralash', 'Qarz'].map(method => {
               const amount = paymentStats[method] || 0;
-              const isDebt = method === 'Qarz';
+              const isDebt = method === PAYMENT_METHOD.DEBT;
               return (
                 <div 
                   key={method} 

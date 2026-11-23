@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { ORDER_STATUS } from '../constants/orderStatus';
+import { confirmAsync } from '../utils/notify';
 
 const QUICK_CHEF_NOTES = [
   "Piyozsiz",
@@ -144,8 +146,8 @@ export default function WaiterCart({
           {safeCart.length > 0 && typeof setCart === 'function' && !resolvedOrder ? (
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm("Savatchadagi barcha taomlarni tozalaymizmi?")) {
+              onClick={async () => {
+                if (await confirmAsync("Savatchadagi barcha taomlarni tozalaymizmi?")) {
                   setCart([]);
                 }
               }}
@@ -204,7 +206,7 @@ export default function WaiterCart({
       </div>
 
       {/* AGAR OSHXONADA TAOM TAYYOR BO'LGAN BO'LSA — TEZKOR TOPSHIRISH TUGMASI */}
-      {resolvedOrder && resolvedOrder.status === 'Tayyor' && (
+      {resolvedOrder && resolvedOrder.status === ORDER_STATUS.READY && (
         <div className="my-2.5 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-400 dark:border-emerald-600 space-y-2 shrink-0 animate-fade-in">
           <p className="text-xs font-black text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
             <span>🔔</span> Oshxonada taomlar tayyor bo'ldi!

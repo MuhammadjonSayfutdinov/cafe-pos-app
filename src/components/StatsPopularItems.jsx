@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { getRecordTimeMs } from '../utils/dates';
+import { ORDER_STATUS } from '../constants/orderStatus';
 
 // =========================================================
 // BUYURTMA SANASINI HAR QANDAY FORMATDAN XAVFSIZ O'QISH
@@ -74,7 +75,7 @@ export default function StatsPopularItems({
     }
 
     const validOrders = orders.filter(o => {
-      if (!o || !["To'langan", 'Arxiv', 'Qarz'].includes(o.status)) return false;
+      if (!o || ![ORDER_STATUS.PAID, ORDER_STATUS.ARCHIVED, ORDER_STATUS.DEBT].includes(o.status)) return false;
       const tMs = parseOrderTimeMs(o);
       return tMs >= startMs && tMs <= endMs;
     });

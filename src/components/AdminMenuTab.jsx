@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { notify, confirmAsync } from '../utils/notify';
 
 // Birliklar konvertatsiyasi (Retseptdagi gr/kg/ml/litr ni ombordagi birlikka aniq o'girish)
 const RECIPE_UNITS = [
@@ -243,7 +244,7 @@ export default function AdminMenuTab({
 
   const handleRemoveVariantInput = (index) => {
     if (variantInputs.length <= 1) {
-      alert("Taomda kamida bitta narx (porsiya) bo'lishi shart!");
+      notify("Taomda kamida bitta narx (porsiya) bo'lishi shart!");
       return;
     }
     setVariantInputs(prev => prev.filter((_, i) => i !== index));
@@ -279,7 +280,7 @@ export default function AdminMenuTab({
     
     const safeName = newItemData.name.trim();
     if (!safeName) {
-      alert("Iltimos, taom nomini kiriting!");
+      notify("Iltimos, taom nomini kiriting!");
       return;
     }
 
@@ -292,7 +293,7 @@ export default function AdminMenuTab({
       .filter(v => !isNaN(v.price) && v.price > 0);
 
     if (cleanedVariants.length === 0) {
-      alert("Iltimos, taom narxini to'g'ri kiriting (0 dan katta raqam)!"); 
+      notify("Iltimos, taom narxini to'g'ri kiriting (0 dan katta raqam)!"); 
       return;
     }
 
@@ -382,8 +383,8 @@ export default function AdminMenuTab({
     }
   };
 
-  const handleDeleteMenuItem = (id, itemName) => {
-    if (window.confirm(`Rostdan ham "${itemName}" taomini menyudan butunlay o'chirmoqchimisiz?`)) {
+  const handleDeleteMenuItem = async (id, itemName) => {
+    if (await confirmAsync(`Rostdan ham "${itemName}" taomini menyudan butunlay o'chirmoqchimisiz?`)) {
       if (typeof setMenuItems === 'function') {
         setMenuItems(prev => prev.filter(item => item.id !== id));
       }

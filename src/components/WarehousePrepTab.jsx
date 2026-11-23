@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { notify, confirmAsync } from '../utils/notify';
 
 // O'lchov birliklari va konvertatsiya koeffitsiyentlari
 const UNIT_META = [
@@ -161,11 +162,11 @@ export default function WarehousePrepTab({
   // ==========================================
   // 3. TAYYORLOV AKTINI BAJARISH VA VALIDATSIYA
   // ==========================================
-  const handleProduce = (e) => {
+  const handleProduce = async (e) => {
     e.preventDefault();
 
     if (!targetItem || !produceQty || Number(produceQty) <= 0) {
-      alert("Iltimos, tayyorlanadigan mahsulotni va miqdorini to'g'ri kiriting!");
+      notify("Iltimos, tayyorlanadigan mahsulotni va miqdorini to'g'ri kiriting!");
       return;
     }
 
@@ -177,13 +178,13 @@ export default function WarehousePrepTab({
       const rawQty = Number(ing.qty);
 
       if (!ing.inventoryId || isNaN(rawQty) || rawQty <= 0) {
-        alert(`${i + 1}-qatordagi xomashyo va sarf miqdorini to'g'ri kiriting!`);
+        notify(`${i + 1}-qatordagi xomashyo va sarf miqdorini to'g'ri kiriting!`);
         return;
       }
 
       const invItem = safeInventory.find(inv => inv && String(inv.id) === String(ing.inventoryId));
       if (!invItem) {
-        alert(`${i + 1}-qatordagi xomashyo omborda topilmadi!`);
+        notify(`${i + 1}-qatordagi xomashyo omborda topilmadi!`);
         return;
       }
 
@@ -211,7 +212,7 @@ export default function WarehousePrepTab({
       const availableInBase = Number(req.item.quantity ?? req.item.qty ?? 0) || 0;
 
       if (availableInBase < req.totalNeededInBase) {
-        alert(
+        notify(
           `⛔️ Diqqat! "${req.item.name}" xomashyosi omborda yetarli emas!\n\n` +
           `Talab qilingan: ${req.totalNeededInBase} ${req.baseUnit} (${req.inputDetails.join(' + ')})\n` +
           `Ombordagi qoldiq: ${availableInBase} ${req.baseUnit}`
@@ -224,7 +225,7 @@ export default function WarehousePrepTab({
     const producedInTargetBase = convertUnits(produceQty, produceUnit, targetBaseUnit);
 
     if (
-      !window.confirm(
+      !await confirmAsync(
         `Tayyorlov aktini tasdiqlaysizmi?\n\n` +
         `➕ Kirim: +${producedInTargetBase} ${targetBaseUnit} "${targetItem.name}"\n` +
         `➖ Xomashyolar ombordan avtomatik yechiladi.`
@@ -318,7 +319,7 @@ export default function WarehousePrepTab({
     setProduceQty('');
     setPrepNote('');
     setIngredients([{ inventoryId: '', qty: '', inputUnit: 'kg' }]);
-    alert(`✅ Tayyorlov akti muvaffaqiyatli bajarildi!\n+${producedInTargetBase} ${targetBaseUnit} "${targetItem.name}" omborga kirim qilindi.`);
+    notify(`✅ Tayyorlov akti muvaffaqiyatli bajarildi!\n+${producedInTargetBase} ${targetBaseUnit} "${targetItem.name}" omborga kirim qilindi.`);
   };
 
   // ==========================================

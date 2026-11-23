@@ -1,26 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
+import { detectTelegramChatId, sendTelegramMessage, escapeHtml, getTelegramConfig, DEFAULT_TELEGRAM_CONFIG } from '../utils/telegramNotifier';
+import { notify, confirmAsync } from '../utils/notify';
 
-const DEFAULT_TELEGRAM_CONFIG = {
-  enabled: false,
-  botToken: '',
-  chatId: '',
-  notifyOnZReport: true,
-  notifyOnDebt: true,
-  notifyOnDiscount: true,
-  notifyOnLowStock: true,
-  notifyOnEverySale: false,
-  notifyOnSecurity: true
-};
-
-const readTelegramConfig = () => {
-  try {
-    const raw = window.localStorage.getItem('pos_telegram_config');
-    if (!raw) return DEFAULT_TELEGRAM_CONFIG;
-    return { ...DEFAULT_TELEGRAM_CONFIG, ...(JSON.parse(raw) || {}) };
-  } catch {
-    return DEFAULT_TELEGRAM_CONFIG;
-  }
-};
+// Telegram sozlamalari: yagona joy - src/utils/telegramNotifier.js (B12)
+const readTelegramConfig = getTelegramConfig;
 
 // ==========================================
 // ZAXIRA FAYLINI TEKSHIRISH (B5)
@@ -122,7 +106,7 @@ export default function AdminSettingsTab({
   const safeOrders = Array.isArray(orders) ? orders : [];
 
   const activeTableNames = safeOrders
-    .filter(o => o && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status))
+    .filter(o => o && !CLOSED_ORDER_STATUSES.includes(o.status))
     .map(o => o.table);
 
   const handleSaveSettings = (e) => {
@@ -131,12 +115,12 @@ export default function AdminSettingsTab({
     const feeNumber = Number(tempServiceFee);
 
     if (!cleanedName) {
-      alert("Iltimos, Kafe nomini kiriting!");
+      notify("Iltimos, Kafe nomini kiriting!");
       return;
     }
 
     if (isNaN(feeNumber) || feeNumber < 0 || feeNumber > 100) {
-      alert("Xizmat haqi 0% va 100% oralig'ida bo'lishi kerak!");
+      notify("Xizmat haqi 0% va 100% oralig'ida bo'lishi kerak!");
       return;
     }
 
@@ -174,45 +158,18 @@ export default function AdminSettingsTab({
 
     setTgStatus({ loading: true, message: 'Telegram bot tekshirilmoqda...', isError: false });
 
-    try {
-      const res = await fetch(`https://api.telegram.org/bot${cleanToken}/getUpdates`);
-      const data = await res.json();
-
-      if (!data.ok) {
-        setTgStatus({ loading: false, message: `❌ ${data.description || "Bot Token noto'g'ri!"}`, isError: true });
-        return;
-      }
-
-      const updates = Array.isArray(data.result) ? data.result : [];
-      let foundId = '';
-      let foundName = '';
-
-      for (let i = updates.length - 1; i >= 0; i--) {
-        const msg = updates[i].message || updates[i].my_chat_member || updates[i].channel_post;
-        if (msg && msg.chat && msg.chat.id) {
-          foundId = String(msg.chat.id);
-          foundName = msg.chat.title || `${msg.chat.first_name || ''} ${msg.chat.last_name || ''}`.trim() || msg.chat.username || 'Foydalanuvchi';
-          break;
-        }
-      }
-
-      if (foundId) {
-        updateTgField('chatId', foundId);
-        updateTgField('enabled', true);
-        setTgStatus({
-          loading: false,
-          message: `✅ Topildi! "${foundName}" (ID: ${foundId}) avtomatik ulandi.`,
-          isError: false
-        });
-      } else {
-        setTgStatus({
-          loading: false,
-          message: "❌ Xabarlar topilmadi! Telegramda botingizga kirib '/start' bosing va qayta urinib ko'ring.",
-          isError: true
-        });
-      }
-    } catch {
-      setTgStatus({ loading: false, message: '❌ Internet aloqasini tekshiring!', isError: true });
+    // Yagona joy: src/utils/telegramNotifier.js (B12)
+    const res = await detectTelegramChatId(cleanToken);
+    if (res.ok) {
+      updateTgField('chatId', res.chatId);
+      updateTgField('enabled', true);
+      setTgStatus({
+        loading: false,
+        message: `✅ Topildi! "${res.chatName}" (ID: ${res.chatId}) avtomatik ulandi.`,
+        isError: false
+      });
+    } else {
+      setTgStatus({ loading: false, message: `❌ ${res.error}`, isError: true });
     }
   };
 
@@ -230,37 +187,18 @@ export default function AdminSettingsTab({
     const testHtml = [
       `🚀 <b>TELEGRAM BOT MUVAFFAQIYATLI ULANDI!</b>`,
       `━━━━━━━━━━━━━━━━━━`,
-      `🏪 <b>Kafe:</b> ${cafeName}`,
-      `👤 <b>Tekshiruvchi:</b> ${currentUser?.name || 'Admin'}`,
+      `🏪 <b>Kafe:</b> ${escapeHtml(cafeName)}`,
+      `👤 <b>Tekshiruvchi:</b> ${escapeHtml(currentUser?.name || 'Admin')}`,
       `🕒 <b>Vaqt:</b> ${new Date().toLocaleString()}`,
       `━━━━━━━━━━━━━━━━━━`,
       `✅ Endi smena hisobotlari (Z-Otchyot), qarzlar, chegirmalar va ombor ogohlantirishlari shu yerga jonli kelib tushadi!`
     ].join('\n');
 
-    try {
-      const chatIds = rawChatIds.split(',').map(s => s.trim()).filter(Boolean);
-      const responses = await Promise.all(
-        chatIds.map(id =>
-          fetch(`https://api.telegram.org/bot${cleanToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: id,
-              text: testHtml,
-              parse_mode: 'HTML'
-            })
-          }).then(r => r.json())
-        )
-      );
-
-      const errObj = responses.find(r => !r.ok);
-      if (errObj) {
-        setTgStatus({ loading: false, message: `❌ Xatolik: ${errObj.description}`, isError: true });
-      } else {
-        setTgStatus({ loading: false, message: '✅ Sinov xabari Telegramingizga muvaffaqiyatli yuborildi!', isError: false });
-      }
-    } catch {
-      setTgStatus({ loading: false, message: '❌ Internet aloqasi yo\'q!', isError: true });
+    const res = await sendTelegramMessage(testHtml, 'test', telegramConfig);
+    if (res.ok) {
+      setTgStatus({ loading: false, message: '✅ Sinov xabari Telegramingizga muvaffaqiyatli yuborildi!', isError: false });
+    } else {
+      setTgStatus({ loading: false, message: `❌ Xatolik: ${res.error}`, isError: true });
     }
   };
 
@@ -273,7 +211,7 @@ export default function AdminSettingsTab({
     if (!trimmed) return;
 
     if (safeTables.some(t => t.toLowerCase() === trimmed.toLowerCase())) {
-      alert(`"${trimmed}" nomli stol allaqachon mavjud!`);
+      notify(`"${trimmed}" nomli stol allaqachon mavjud!`);
       return;
     }
 
@@ -286,13 +224,13 @@ export default function AdminSettingsTab({
     setNewTableName('');
   };
 
-  const handleDeleteTable = (tableName) => {
+  const handleDeleteTable = async (tableName) => {
     if (activeTableNames.includes(tableName)) {
-      alert(`⛔️ "${tableName}" da hozir yopilmagan faol buyurtma bor! Avval stol hisobini yoping.`);
+      notify(`⛔️ "${tableName}" da hozir yopilmagan faol buyurtma bor! Avval stol hisobini yoping.`);
       return;
     }
 
-    if (window.confirm(`Rostdan ham "${tableName}" ni zal ro'yxatidan o'chirmoqchimisiz?`)) {
+    if (await confirmAsync(`Rostdan ham "${tableName}" ni zal ro'yxatidan o'chirmoqchimisiz?`)) {
       if (typeof setTables === 'function') {
         setTables(prev => (Array.isArray(prev) ? prev : []).filter(t => t !== tableName));
       }
@@ -345,16 +283,16 @@ export default function AdminSettingsTab({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target?.result);
         const problems = validateBackup(parsed);
         if (problems.length > 0) {
-          alert(`❌ Zaxira fayli rad etildi:\n\n• ${problems.slice(0, 6).join('\n• ')}`);
+          notify(`❌ Zaxira fayli rad etildi:\n\n• ${problems.slice(0, 6).join('\n• ')}`);
           return;
         }
 
-        if (!window.confirm("⚠️ Diqqat! Tanlangan zaxira faylidagi ma'lumotlar hozirgi baza ustiga yoziladi. Tasdiqlaysizmi?")) {
+        if (!await confirmAsync("⚠️ Diqqat! Tanlangan zaxira faylidagi ma'lumotlar hozirgi baza ustiga yoziladi. Tasdiqlaysizmi?")) {
           return;
         }
 
@@ -396,7 +334,7 @@ export default function AdminSettingsTab({
           if (typeof addAuditLog === 'function') {
             addAuditLog('Zaxira tiklandi', `Fayl: ${file.name} (${parsed.exportedAt || "sana noma'lum"})`);
           }
-          alert("✅ Zaxira nusxa muvaffaqiyatli tiklandi!");
+          notify("✅ Zaxira nusxa muvaffaqiyatli tiklandi!");
         };
 
         if (typeof requireAdminOverride === 'function') {
@@ -405,7 +343,7 @@ export default function AdminSettingsTab({
           applyRestore();
         }
       } catch {
-        alert("❌ Xatolik! Tanlangan fayl yaroqsiz yoki buzilgan.");
+        notify("❌ Xatolik! Tanlangan fayl yaroqsiz yoki buzilgan.");
       }
     };
     reader.readAsText(file);
@@ -413,18 +351,18 @@ export default function AdminSettingsTab({
   };
 
   const handleClearOrdersOnly = () => {
-    const performClear = () => {
+    const performClear = async () => {
       // Ochiq cheklar va qarzlar saqlanadi: faqat yopilgan (to'langan/arxiv) cheklar o'chiriladi
-      if (window.confirm("⚠️ To'langan va arxivdagi cheklar tarixi o'chiriladi. Ochiq cheklar va qarzlar saqlanadi. Tasdiqlaysizmi?")) {
+      if (await confirmAsync("⚠️ To'langan va arxivdagi cheklar tarixi o'chiriladi. Ochiq cheklar va qarzlar saqlanadi. Tasdiqlaysizmi?")) {
         if (typeof setOrders === 'function') {
           setOrders(prev => (Array.isArray(prev) ? prev : []).filter(
-            o => o && !["To'langan", 'Arxiv'].includes(o.status)
+            o => o && ![ORDER_STATUS.PAID, ORDER_STATUS.ARCHIVED].includes(o.status)
           ));
         }
         if (typeof addAuditLog === 'function') {
           addAuditLog('Cheklar tarixi tozalandi', "To'langan va arxivdagi cheklar o'chirildi");
         }
-        alert("✅ Cheklar tarixi tozalandi!");
+        notify("✅ Cheklar tarixi tozalandi!");
       }
     };
 
@@ -436,8 +374,8 @@ export default function AdminSettingsTab({
   };
 
   const handleFactoryReset = () => {
-    const performReset = () => {
-      if (window.confirm("🛑 Barcha ma'lumotlar o'chirilib, dastur zavod holatiga qaytadi. Davom etamizmi?")) {
+    const performReset = async () => {
+      if (await confirmAsync("🛑 Barcha ma'lumotlar o'chirilib, dastur zavod holatiga qaytadi. Davom etamizmi?")) {
         window.localStorage.clear();
         window.location.reload();
       }

@@ -17,6 +17,7 @@ import StatsMode from './components/StatsMode';
 import PrintReceiptModal from './components/PrintReceiptModal';
 import CustomerMode from './components/CustomerMode';
 import AutoLockControl from './components/AutoLockControl';
+import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from './constants/orderStatus';
 
 const initialMenuItems = [
   { 
@@ -41,11 +42,6 @@ const initialMenuItems = [
     ] 
   }
 ];
-
-// Yopilgan (to'langan, qarzga yozilgan, arxivlangan) buyurtmalar statusi
-const CLOSED_STATUSES = ["To'langan", 'Qarz', 'Arxiv'];
-// Oshxona hali ishlayotgan statuslar
-const KITCHEN_STATUSES = ['Yangi', 'Tayyorlanmoqda'];
 
 const initialCategories = ['Asosiy', 'Ichimlik', 'Shirinlik', 'Boshqalar'];
 const initialTables = ['1-Stol', '2-Stol', '3-Stol', '4-Stol', '5-Stol', 'VIP-1', 'VIP-2', 'Olib ketish'];
@@ -260,14 +256,14 @@ export default function App() {
       const safeOrders = Array.isArray(prevOrders) ? prevOrders : [];
 
       const existingOrderIndex = safeOrders.findIndex(
-        o => o && o.table === targetTable && !CLOSED_STATUSES.includes(o.status)
+        o => o && o.table === targetTable && !CLOSED_ORDER_STATUSES.includes(o.status)
       );
 
       if (existingOrderIndex !== -1 && targetTable !== 'Olib ketish') {
         const updatedOrders = [...safeOrders];
         const existingOrder = updatedOrders[existingOrderIndex];
         // Dozakaz (B3): eski taomlar qayta pishirilmaydi, oshxona faqat yangi porsiyalarni ko'radi
-        const isPastKitchen = !KITCHEN_STATUSES.includes(existingOrder.status);
+        const isPastKitchen = !KITCHEN_ORDER_STATUSES.includes(existingOrder.status);
         const prevItems = (Array.isArray(existingOrder.items) ? existingOrder.items : []).map(it =>
           it && isPastKitchen && it.kitchenDoneQty === undefined
             ? { ...it, kitchenDoneQty: getItemQty(it) }
@@ -279,7 +275,7 @@ export default function App() {
           ...existingOrder,
           items: combinedItems,
           ...orderTotalsFields(existingOrder, combinedItems, existingOrder.serviceFee ?? serviceFee),
-          status: isPastKitchen ? 'Yangi' : existingOrder.status,
+          status: isPastKitchen ? ORDER_STATUS.NEW : existingOrder.status,
           kitchenRoundAt: isPastKitchen ? nowMs : existingOrder.kitchenRoundAt,
           updatedAt: nowTime
         };
@@ -293,7 +289,7 @@ export default function App() {
         table: targetTable,
         waiter: currentUser?.name || 'QR-Menyu (Mijoz)',
         items: normalizedItems,
-        status: 'Yangi',
+        status: ORDER_STATUS.NEW,
         time: nowTime,
         date: new Date(nowMs).toLocaleDateString()
       };

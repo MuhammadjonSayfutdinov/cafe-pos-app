@@ -1,4 +1,5 @@
 import React from 'react';
+import { PAYMENT_METHOD } from '../constants/orderStatus';
 
 export default function CashierPaymentControls({
   discountType = 'none',
@@ -115,7 +116,7 @@ export default function CashierPaymentControls({
               </div>
 
               {/* Bonusdan ishlatish qismi */}
-              {availableBonus > 0 && paymentMethod !== 'Qarz' && (
+              {availableBonus > 0 && paymentMethod !== PAYMENT_METHOD.DEBT && (
                 <div className="pt-2 border-t border-gray-100 dark:border-gray-700 space-y-1.5">
                   <div className="flex justify-between items-center text-[11px] font-bold">
                     <span className="text-gray-500">Bonusdan chegirish:</span>
@@ -166,7 +167,7 @@ export default function CashierPaymentControls({
           )}
 
           {/* Ushbu chekdan yig'iladigan yangi Cashback ko'rsatkichi */}
-          {(matchedCustomer || customerPhone.trim().length >= 4) && paymentMethod !== 'Qarz' && earnedCashback > 0 && (
+          {(matchedCustomer || customerPhone.trim().length >= 4) && paymentMethod !== PAYMENT_METHOD.DEBT && earnedCashback > 0 && (
             <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-xs font-black text-emerald-700 dark:text-emerald-300">
               <span>🎁 Shu chekdan yoziladi (+{cashbackPercent}%):</span>
               <span>+{earnedCashback.toLocaleString()} so'm</span>
@@ -265,7 +266,7 @@ export default function CashierPaymentControls({
         </div>
 
         {/* ARALASH TO'LOV INPUTLARI */}
-        {paymentMethod === 'Aralash' && (
+        {paymentMethod === PAYMENT_METHOD.MIXED && (
           <div className="p-4 rounded-2xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/50 space-y-3 animate-fade-in">
             <div>
               <label className="block text-[10px] font-black uppercase text-purple-700 dark:text-purple-300 mb-1">
@@ -297,7 +298,7 @@ export default function CashierPaymentControls({
         )}
 
         {/* QARZGA YOZISH INPUTI */}
-        {paymentMethod === 'Qarz' && (
+        {paymentMethod === PAYMENT_METHOD.DEBT && (
           <div className="p-4 rounded-2xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50 space-y-2 animate-fade-in">
             <label className="block text-[10px] font-black uppercase text-orange-700 dark:text-orange-300">
               📝 Qarzdor mijoz ismi va telefoni *

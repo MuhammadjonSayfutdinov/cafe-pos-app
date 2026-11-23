@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { notify, confirmAsync } from '../utils/notify';
 
 export default function AdminUsersTab({ 
   users = [], 
@@ -113,14 +114,14 @@ export default function AdminUsersTab({
 
     // 1. Validatsiya: Bo'sh maydonlarni tekshirish
     if (!cleanName || !cleanPin) {
-      alert("Iltimos, xodim ismini va PIN-kodni to'liq kiriting!");
+      notify("Iltimos, xodim ismini va PIN-kodni to'liq kiriting!");
       return;
     }
 
     // 2. Validatsiya: PIN uzunligini qat'iy tekshirish
     const requiredLength = getRequiredPinLength(formData.role);
     if (cleanPin.length !== requiredLength) {
-      alert(`Xato! "${getRoleMeta(formData.role).badgeName}" lavozimi uchun PIN-kod aynan ${requiredLength} xonali raqam bo'lishi shart!`);
+      notify(`Xato! "${getRoleMeta(formData.role).badgeName}" lavozimi uchun PIN-kod aynan ${requiredLength} xonali raqam bo'lishi shart!`);
       return;
     }
 
@@ -129,7 +130,7 @@ export default function AdminUsersTab({
       u => u && String(u.name || '').trim().toLowerCase() === cleanName.toLowerCase() && u.id !== editingId
     );
     if (duplicateNameUser) {
-      alert(`⛔️ "${cleanName}" ismli xodim tizimda allaqachon mavjud! Hisobotlar adashib ketmasligi uchun boshqa ism (yoki familiya bosh harfi bilan) kiriting.`);
+      notify(`⛔️ "${cleanName}" ismli xodim tizimda allaqachon mavjud! Hisobotlar adashib ketmasligi uchun boshqa ism (yoki familiya bosh harfi bilan) kiriting.`);
       return;
     }
 
@@ -138,7 +139,7 @@ export default function AdminUsersTab({
       u => u && String(u.pin || '').trim() === cleanPin && u.id !== editingId
     );
     if (duplicatePinUser) {
-      alert(`⛔️ Ushbu PIN-kod boshqa xodimga (${duplicatePinUser.name}) biriktirilgan! Tizimga kirishda to'qnashuv bo'lmasligi uchun boshqa PIN-kod kiriting.`);
+      notify(`⛔️ Ushbu PIN-kod boshqa xodimga (${duplicatePinUser.name}) biriktirilgan! Tizimga kirishda to'qnashuv bo'lmasligi uchun boshqa PIN-kod kiriting.`);
       return;
     }
 
@@ -208,10 +209,10 @@ export default function AdminUsersTab({
     }
   };
 
-  const handleDelete = (user) => {
+  const handleDelete = async (user) => {
     // 1. O'zining aktiv profilini o'chirishdan himoya
     if (currentUser && user.id === currentUser.id) {
-      alert("⛔️ Siz hozir ushbu Admin profili orqali tizimda o'tiribsiz! O'zingizning profilingizni o'chira olmaysiz.");
+      notify("⛔️ Siz hozir ushbu Admin profili orqali tizimda o'tiribsiz! O'zingizning profilingizni o'chira olmaysiz.");
       return;
     }
 
@@ -219,12 +220,12 @@ export default function AdminUsersTab({
     if (user.role === 'admin') {
       const adminCount = safeUsers.filter(u => u.role === 'admin').length;
       if (adminCount <= 1) {
-        alert("⛔️ Diqqat! Tizimda kamida 1 ta Admin qolishi shart. Bu xodimni o'chira olmaysiz.");
+        notify("⛔️ Diqqat! Tizimda kamida 1 ta Admin qolishi shart. Bu xodimni o'chira olmaysiz.");
         return;
       }
     }
 
-    if (window.confirm(`Rostdan ham "${user.name}" (${getRoleMeta(user.role).badgeName}) xodimini tizimdan o'chirmoqchimisiz?`)) {
+    if (await confirmAsync(`Rostdan ham "${user.name}" (${getRoleMeta(user.role).badgeName}) xodimini tizimdan o'chirmoqchimisiz?`)) {
       if (typeof setUsers === 'function') {
         setUsers(prev => prev.filter(u => u.id !== user.id));
       }

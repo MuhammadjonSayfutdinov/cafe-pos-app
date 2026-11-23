@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { ORDER_STATUS } from '../constants/orderStatus';
 
 // =========================================================
 // STANDART SLA SOZLAMALARI (DAQIQALARDA)
@@ -221,7 +222,7 @@ export default function KitchenMode({
   // Oshxonaga tegishli faol buyurtmalar ('Yangi' va 'Tayyorlanmoqda')
   const kitchenActiveOrders = useMemo(() => {
     return safeOrders.filter(
-      o => o && (o.status === 'Yangi' || o.status === 'Tayyorlanmoqda')
+      o => o && (o.status === ORDER_STATUS.NEW || o.status === ORDER_STATUS.COOKING)
     );
   }, [safeOrders]);
 
@@ -335,8 +336,8 @@ export default function KitchenMode({
   const visibleOrders = useMemo(() => {
     const filtered = enrichedOrders.filter(o => {
       if (statusFilter === 'delayed') return o.slaLevel === 'critical' || o.slaLevel === 'warning';
-      if (statusFilter === 'new') return o.status === 'Yangi';
-      if (statusFilter === 'cooking') return o.status === 'Tayyorlanmoqda';
+      if (statusFilter === 'new') return o.status === ORDER_STATUS.NEW;
+      if (statusFilter === 'cooking') return o.status === ORDER_STATUS.COOKING;
       return true;
     });
 
@@ -380,7 +381,7 @@ export default function KitchenMode({
     const totalActive = enrichedOrders.length;
     const criticalCount = enrichedOrders.filter(o => o.slaLevel === 'critical').length;
     const warningCount = enrichedOrders.filter(o => o.slaLevel === 'warning').length;
-    const newCount = enrichedOrders.filter(o => o.status === 'Yangi').length;
+    const newCount = enrichedOrders.filter(o => o.status === ORDER_STATUS.NEW).length;
 
     const totalCompletedToday = (slaHistory.onTimeCount || 0) + (slaHistory.delayedCount || 0);
     const avgCookSeconds = totalCompletedToday > 0
@@ -418,11 +419,11 @@ export default function KitchenMode({
   const handleAdvanceOrderStatus = (order) => {
     if (!order) return;
     const currentStatus = order.status;
-    const nextStatus = currentStatus === 'Yangi' ? 'Tayyorlanmoqda' : 'Tayyor';
+    const nextStatus = currentStatus === ORDER_STATUS.NEW ? ORDER_STATUS.COOKING : ORDER_STATUS.READY;
     const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     // Agar taom 'Tayyor' bo'layotgan bo'lsa, SLA statistikasiga yozamiz
-    if (nextStatus === 'Tayyor') {
+    if (nextStatus === ORDER_STATUS.READY) {
       const critSec = (Number(slaConfig.criticalMinutes) || 20) * 60;
       const isDelayed = (order.elapsedSeconds || 0) >= critSec;
 
@@ -440,18 +441,18 @@ export default function KitchenMode({
           ...o,
           status: nextStatus,
           // Tayyor bo'lganda barcha porsiyalar "pishgan" deb belgilanadi
-          items: nextStatus === 'Tayyor' && Array.isArray(o.items)
+          items: nextStatus === ORDER_STATUS.READY && Array.isArray(o.items)
             ? o.items.map(it => (it ? { ...it, kitchenDoneQty: Number(it.quantity ?? it.qty ?? 1) || 0 } : it))
             : o.items,
-          cookingStartedAt: nextStatus === 'Tayyorlanmoqda' ? nowTimeStr : o.cookingStartedAt,
-          readyTime: nextStatus === 'Tayyor' ? nowTimeStr : o.readyTime,
-          cookDurationSeconds: nextStatus === 'Tayyor' ? order.elapsedSeconds : o.cookDurationSeconds
+          cookingStartedAt: nextStatus === ORDER_STATUS.COOKING ? nowTimeStr : o.cookingStartedAt,
+          readyTime: nextStatus === ORDER_STATUS.READY ? nowTimeStr : o.readyTime,
+          cookDurationSeconds: nextStatus === ORDER_STATUS.READY ? order.elapsedSeconds : o.cookDurationSeconds
         };
       })
     );
 
     // Tayyor bo'lgan buyurtmaning "✓" belgilarini tozalash (dozakazda eski belgi qolmasin)
-    if (nextStatus === 'Tayyor') {
+    if (nextStatus === ORDER_STATUS.READY) {
       const prefix = `${order.id}_`;
       setCheckedSubItems(prev => {
         const next = {};
@@ -464,7 +465,7 @@ export default function KitchenMode({
 
     if (typeof addAuditLog === 'function') {
       addAuditLog(
-        nextStatus === 'Tayyorlanmoqda' ? "Oshxona: Pishirish boshlandi" : "Oshxona: Taom tayyor bo'ldi",
+        nextStatus === ORDER_STATUS.COOKING ? "Oshxona: Pishirish boshlandi" : "Oshxona: Taom tayyor bo'ldi",
         `${order.table} (${order.formattedTimer} ichida -> ${nextStatus})`
       );
     }
@@ -777,7 +778,7 @@ export default function KitchenMode({
                   ? 'border-red-500 dark:border-red-500 ring-4 ring-red-500/20'
                   : isWarning
                   ? 'border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/20'
-                  : order.status === 'Yangi'
+                  : order.status === ORDER_STATUS.NEW
                   ? 'border-indigo-400 dark:border-indigo-500'
                   : 'border-emerald-400 dark:border-emerald-600';
 
@@ -785,7 +786,7 @@ export default function KitchenMode({
                   ? 'bg-red-600 text-white'
                   : isWarning
                   ? 'bg-amber-500 text-white'
-                  : order.status === 'Yangi'
+                  : order.status === ORDER_STATUS.NEW
                   ? 'bg-indigo-600 text-white'
                   : 'bg-emerald-600 text-white';
 
@@ -928,12 +929,12 @@ export default function KitchenMode({
                         type="button"
                         onClick={() => handleAdvanceOrderStatus(order)}
                         className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider text-white shadow-lg transition active:scale-95 flex items-center justify-center gap-2 ${
-                          order.status === 'Yangi'
+                          order.status === ORDER_STATUS.NEW
                             ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30'
                             : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30'
                         }`}
                       >
-                        {order.status === 'Yangi' ? (
+                        {order.status === ORDER_STATUS.NEW ? (
                           <>
                             <span>🔥</span> Pishirishni Boshlash
                           </>
