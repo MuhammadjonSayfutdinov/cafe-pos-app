@@ -299,7 +299,10 @@ export default function App() {
       return [{ ...newOrder, ...orderTotalsFields(newOrder, normalizedItems, serviceFee) }, ...safeOrders];
     });
 
-    addAuditLog("Buyurtma yaratildi", `${targetTable} uchun ${normalizedItems.length} xil taom qo'shildi`);
+    addAuditLog(
+      "Buyurtma yaratildi",
+      `${targetTable}: ${normalizedItems.map(it => `${it.quantity}× ${it.name || 'Taom'}`).join(', ')}`
+    );
   };
 
   // ==========================================

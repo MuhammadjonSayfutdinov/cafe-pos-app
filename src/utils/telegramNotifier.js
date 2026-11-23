@@ -9,7 +9,8 @@ export const DEFAULT_TELEGRAM_CONFIG = {
   notifyOnDiscount: true,      // Chegirma berilganda
   notifyOnLowStock: true,      // Omborda xomashyo kam qolganda
   notifyOnEverySale: false,    // Har bir oddiy sotuvda
-  notifyOnSecurity: true       // Muhim o'chirish va xavfsizlik amallarida
+  notifyOnSecurity: true,      // Muhim o'chirish va xavfsizlik amallarida
+  notifyOnActivity: true       // Har bir amal: jonli jurnal (src/utils/telegramFeed.js)
 };
 
 // LocalStorage'dan Telegram sozlamalarini xavfsiz o'qish
@@ -49,6 +50,7 @@ export async function sendTelegramMessage(htmlText, eventType = 'general', custo
   if (eventType === 'low_stock' && !config.notifyOnLowStock) return { ok: false, skipped: true };
   if (eventType === 'sale' && !config.notifyOnEverySale) return { ok: false, skipped: true };
   if (eventType === 'security' && !config.notifyOnSecurity) return { ok: false, skipped: true };
+  if (eventType === 'activity' && config.notifyOnActivity === false) return { ok: false, skipped: true };
 
   const token = String(config.botToken || '').trim();
   const rawChatIds = String(config.chatId || '').trim();
@@ -82,13 +84,20 @@ export async function sendTelegramMessage(htmlText, eventType = 'general', custo
 
     const firstError = results.find(r => !r.ok);
     if (firstError) {
-      return { ok: false, error: firstError.description || 'Telegram API xatosi' };
+      const code = Number(firstError.error_code) || 0;
+      return {
+        ok: false,
+        error: firstError.description || 'Telegram API xatosi',
+        // 429 (juda tez) va server xatolarida keyinroq qayta urinish mumkin
+        retryable: code === 429 || code >= 500,
+        retryAfter: Number(firstError.parameters?.retry_after) || 0
+      };
     }
 
     return { ok: true, results };
   } catch (err) {
     console.warn('Telegram xabarini yuborishda internet xatosi:', err);
-    return { ok: false, error: "Internet aloqasi yo'q yoki Telegram serveriga ulanib bo'lmadi." };
+    return { ok: false, retryable: true, error: "Internet aloqasi yo'q yoki Telegram serveriga ulanib bo'lmadi." };
   }
 }
 

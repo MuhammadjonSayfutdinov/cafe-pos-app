@@ -690,6 +690,16 @@ export default function WaiterMode({
       };
     });
 
+    // Jurnal (va Telegram) uchun: oshxonaga shu safar ketayotgan porsiyalar, masalan "2× Osh, 1× Choy"
+    const newPortionsText = cart
+      .map(item => {
+        if (!item) return null;
+        const added = (getItemQty(item) || 1) - (Number(item.sentQty) || 0);
+        return added > 0 ? `${added}× ${item.name || 'Taom'}` : null;
+      })
+      .filter(Boolean)
+      .join(', ');
+
     const nowMs = Date.now();
     const nowDate = new Date(nowMs).toLocaleDateString();
     const nowTime = new Date(nowMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -717,7 +727,7 @@ export default function WaiterMode({
       );
       recordAuditLog(
         'Buyurtma yangilandi',
-        `${selectedTable}: Jami ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
+        `${selectedTable}: ${newPortionsText ? `dozakaz ${newPortionsText} • ` : ''}Jami ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
       );
     } else {
       const baseOrder = {
@@ -739,7 +749,7 @@ export default function WaiterMode({
       updateOrders(prev => [newOrder, ...(Array.isArray(prev) ? prev : [])]);
       recordAuditLog(
         'Yangi buyurtma ochildi',
-        `${selectedTable}: ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
+        `${selectedTable}: ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)${newPortionsText ? ` • ${newPortionsText}` : ''}`
       );
     }
 
@@ -763,6 +773,10 @@ export default function WaiterMode({
           ? { ...o, status: ORDER_STATUS.DELIVERED }
           : o
       )
+    );
+    recordAuditLog(
+      'Mijozga yetkazildi',
+      `${currentTableOrder.table || selectedTable}: ${Number(currentTableOrder.total ?? currentTableOrder.finalTotal ?? 0).toLocaleString()} so'm`
     );
     setSelectedTable(null);
     setCart([]);

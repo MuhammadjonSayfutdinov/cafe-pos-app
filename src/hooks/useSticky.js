@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { notify } from '../utils/notify';
 import { SAME_TAB_EVENT } from '../sync/config';
 import { localWrite } from '../sync/engine';
+import { reportLocalWrite } from '../utils/telegramFeed';
 
 // localStorage bilan sinxron state (B11).
 //
@@ -82,6 +83,8 @@ export function useSticky(key, defaultValue) {
     writeValue(key, next);
     // Bulutga sinxronlash (sozlanmagan bo'lsa hech narsa qilmaydi)
     localWrite(key, next);
+    // Telegram jonli jurnali (faqat shu qurilmada bajarilgan amallar)
+    reportLocalWrite(key, latest, next);
     setValue(next);
     window.dispatchEvent(new CustomEvent(SAME_TAB_EVENT, { detail: { key, newValue: next } }));
   }, [key]);

@@ -194,7 +194,7 @@ export default function AdminSettingsTab({
       `👤 <b>Tekshiruvchi:</b> ${escapeHtml(currentUser?.name || 'Admin')}`,
       `🕒 <b>Vaqt:</b> ${new Date().toLocaleString()}`,
       `━━━━━━━━━━━━━━━━━━`,
-      `✅ Endi smena hisobotlari (Z-Otchyot), qarzlar, chegirmalar va ombor ogohlantirishlari shu yerga jonli kelib tushadi!`
+      `✅ Endi xodimlarning har bir amali (jonli jurnal), smena hisobotlari (Z-Otchyot), qarzlar, chegirmalar va ombor ogohlantirishlari shu yerga kelib tushadi!`
     ].join('\n');
 
     const res = await sendTelegramMessage(testHtml, 'test', telegramConfig);
@@ -484,7 +484,7 @@ export default function AdminSettingsTab({
                 Telegram Bot Xabarnoma Tizimi
               </h3>
               <p className="text-xs font-bold text-gray-500 mt-0.5">
-                Z-Otchyot, nasiya qarzlar, chegirmalar va ombor qoldig'i haqida rahbar Telegramiga jonli hisobot
+                Har bir amal, Z-Otchyot, nasiya qarzlar, chegirmalar va ombor qoldig'i haqida rahbar Telegramiga jonli hisobot
               </p>
             </div>
           </div>
@@ -535,7 +535,7 @@ export default function AdminSettingsTab({
                 value={telegramConfig?.chatId || ''}
                 onChange={e => updateTgField('chatId', e.target.value)}
                 placeholder="Masalan: 123456789"
-                className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs sm:text-sm text-gray-900 dark:text-white outline-hidden focus:border-sky-500"
+                className="flex-1 min-w-0 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs sm:text-sm text-gray-900 dark:text-white outline-hidden focus:border-sky-500"
               />
               <button
                 type="button"
@@ -555,11 +555,12 @@ export default function AdminSettingsTab({
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
+              { key: 'notifyOnActivity', icon: '📡', title: 'Har bir amal (jonli jurnal)', desc: "Kirish-chiqish, buyurtma, dozakaz, oshxona, to'lov, ombor, xodim, menyu va sozlamalar" },
               { key: 'notifyOnZReport', icon: '📊', title: 'Z-Otchyot (Smena yopilganda)', desc: 'Kunlik tushum, tannarx va sof foyda' },
               { key: 'notifyOnDebt', icon: '📝', title: 'Nasiya (Qarz) cheklari', desc: 'Mijoz qarzga yozdirganda darhol xabar' },
               { key: 'notifyOnDiscount', icon: '🎁', title: 'Chegirma (Skidka) berilganda', desc: 'Kassir chegirma qilgan cheklar nazorati' },
               { key: 'notifyOnLowStock', icon: '⚠️', title: 'Ombor kam qolganda', desc: 'Masalliq qizil chegaradan tushganda' },
-              { key: 'notifyOnEverySale', icon: '🧾', title: 'Har bir yopilgan chekda', desc: 'Barcha sotuvlarni bittalab jonli kuzatish' },
+              { key: 'notifyOnEverySale', icon: '🧾', title: 'Har bir yopilgan chekda', desc: "Har bir chek taomlari bilan batafsil (jurnalda qisqa qatori bor)" },
               { key: 'notifyOnSecurity', icon: '🛡️', title: 'Xavfsizlik amallarida', desc: "Muhim o'chirish va Admin tasdiqlari" }
             ].map(opt => {
               const isChecked = Boolean(telegramConfig?.[opt.key]);
@@ -605,7 +606,7 @@ export default function AdminSettingsTab({
 
         <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
           <div className="text-[11px] font-bold text-gray-400 leading-relaxed">
-            💡 1) <b>@BotFather</b> dan Token oling. 2) Botingizga kirib <b>Start</b> bosing. 3) <b>"🔍 ID ni topish"</b> tugmasini bosing.
+            💡 1) <b>@BotFather</b> dan Token oling. 2) Botingizga kirib <b>Start</b> bosing (guruh uchun: botni guruhga qo'shing). 3) <b>"🔍 ID ni topish"</b> tugmasini bosing. Bir nechta ID ni vergul bilan yozish mumkin.
           </div>
 
           <button

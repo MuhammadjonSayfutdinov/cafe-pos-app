@@ -14,6 +14,8 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
   ofitsiant menyusida "N porsiyaga yetadi / yetarli emas" belgisi, yetmasa kamomad yozuvi
 - **Statistika:** tushum, tannarx, sof foyda, ofitsiantlar maoshi, Z-hisobot (Telegram'ga yuborish)
 - **Admin:** menyu, kategoriyalar, xodimlar va PIN kodlar, audit jurnali, zaxira nusxa, Telegram sozlamalari
+- **Telegram:** har bir amal (kirish-chiqish, buyurtma, dozakaz, oshxona, to'lov, ombor, xodim, menyu) rahbar
+  Telegramiga jonli jurnal bo'lib boradi; Z-hisobot, qarz, chegirma, ombor ogohlantirishlari alohida xabar
 - **Xavfsizlik:** xavfli amallar admin PIN bilan tasdiqlanadi, 5 ta xato PIN'dan keyin vaqtincha bloklash
 - **Planshetga o'rnatish (PWA):** bosh ekranga qo'shiladi, internet uzilib sahifa yangilansa ham ochiladi
 
@@ -84,6 +86,7 @@ src/
     notify.js             toast va tasdiqlash oynasi
     migrate.js            eski ma'lumotlarni yangi sxemaga keltirish
     telegramNotifier.js   Telegram xabarlari
+    telegramFeed.js       Telegram jonli jurnali: har bir amal, navbat va oflayn qayta yuborish
 ```
 
 ## Dasturchilar uchun
