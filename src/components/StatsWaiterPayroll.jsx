@@ -1,40 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { getRecordTimeMs } from '../utils/dates';
 
 // =========================================================
 // BUYURTMA VA XARAJAT SANASINI UNIVERSAL O'QISH YORDAMCHISI
 // =========================================================
-const parseRecordTimeMs = (record) => {
-  if (!record) return Date.now();
-
-  if (record.closedAtMs && !isNaN(Number(record.closedAtMs))) return Number(record.closedAtMs);
-  if (record.createdAt && !isNaN(Number(record.createdAt))) return Number(record.createdAt);
-
-  const rawDateStr = String(record.closeTime || record.archiveDate || record.date || '').trim();
-  if (rawDateStr) {
-    const dmyMatch = rawDateStr.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
-    if (dmyMatch) {
-      const day = Number(dmyMatch[1]);
-      const month = Number(dmyMatch[2]) - 1;
-      const year = Number(dmyMatch[3]);
-      const timeMatch = rawDateStr.match(/(\d{1,2}):(\d{2})/);
-      const hh = timeMatch ? Number(timeMatch[1]) : 12;
-      const mm = timeMatch ? Number(timeMatch[2]) : 0;
-      const constructed = new Date(year, month, day, hh, mm).getTime();
-      if (!isNaN(constructed)) return constructed;
-    }
-
-    const parsed = Date.parse(rawDateStr);
-    if (!isNaN(parsed)) return parsed;
-  }
-
-  const idMatch = String(record.id || '').match(/\d{13}/);
-  if (idMatch) {
-    const idMs = Number(idMatch[0]);
-    if (idMs > 1600000000000 && idMs <= Date.now() + 86400000) return idMs;
-  }
-
-  return Date.now();
-};
+// Sanasi aniqlanmagan yozuv sana filtrlariga tushmaydi (B4)
+const parseRecordTimeMs = (record) => getRecordTimeMs(record) ?? 0;
 
 const toDateInputStr = (dateObj) => {
   const y = dateObj.getFullYear();

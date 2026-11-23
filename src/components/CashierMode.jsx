@@ -213,6 +213,7 @@ export default function CashierMode({
   const [mixedCash, setMixedCash] = useState('');
   const [mixedCard, setMixedCard] = useState('');
   const [debtorName, setDebtorName] = useState('');
+  const [debtorPhone, setDebtorPhone] = useState('');
 
   // CRM (Mijoz va Bonus) statelari
   const [customerPhone, setCustomerPhone] = useState('');
@@ -408,6 +409,7 @@ export default function CashierMode({
     setMixedCash('');
     setMixedCard('');
     setDebtorName('');
+    setDebtorPhone('');
     setCustomerPhone('');
     setCustomerName('');
     setUseBonusAmount('');
@@ -783,8 +785,10 @@ export default function CashierMode({
     }
 
     const cleanDebtor = debtorName.trim();
-    if (paymentMethod === 'Qarz' && !cleanDebtor) {
-      alert("⛔️ Iltimos, qarzga yozish uchun qarzdor mijozning ismi va telefon raqamini kiriting!");
+    const cleanDebtorPhone = debtorPhone.trim();
+    // Qarz uchun ism VA telefon majburiy (B8): kamida 9 ta raqam
+    if (paymentMethod === 'Qarz' && (!cleanDebtor || cleanPhoneDigits(cleanDebtorPhone).length < 9)) {
+      alert("⛔️ Qarzga yozish uchun mijozning ismi va to'liq telefon raqamini (kamida 9 ta raqam) kiriting!");
       return;
     }
 
@@ -839,7 +843,8 @@ export default function CashierMode({
         cardAmount: paymentMethod === 'Plastik' ? totals.finalTotal : paymentMethod === 'Aralash' ? cardAmount : 0,
         paymeAmount: paymentMethod === 'Payme' ? totals.finalTotal : 0,
         clickAmount: paymentMethod === 'Click' ? totals.finalTotal : 0,
-        debtorName: paymentMethod === 'Qarz' ? cleanDebtor : ''
+        debtorName: paymentMethod === 'Qarz' ? cleanDebtor : '',
+        debtorPhone: paymentMethod === 'Qarz' ? cleanDebtorPhone : ''
       };
 
       const closedOrderObject = {
@@ -863,6 +868,7 @@ export default function CashierMode({
         finalTotal: totals.finalTotal,
         total: totals.finalTotal,
         debtorName: paymentMethod === 'Qarz' ? cleanDebtor : (selectedOrder.debtorName || ''),
+        debtorPhone: paymentMethod === 'Qarz' ? cleanDebtorPhone : (selectedOrder.debtorPhone || ''),
         paymentDetails,
         cashierName: currentUser?.name || 'Kassir',
         closeTime: closeTimeStr,
@@ -981,30 +987,41 @@ export default function CashierMode({
   // ==========================================
   // 12. QARZNI SO'NDIRISH VA CHEKNI O'CHIRISH
   // ==========================================
-  const handlePayOffDebt = (debtOrder) => {
+  // Qarz yopilganda (B7): haqiqiy to'lov turi yoziladi, sotuv sanasi (closeTime, closedAtMs) o'zgarmaydi
+  const handlePayOffDebt = (debtOrder, method = 'Naqd') => {
     if (!debtOrder) return;
-    const debtAmount = Number(debtOrder.finalTotal ?? debtOrder.total ?? 0) || 0;
+    const payMethod = ['Naqd', 'Plastik', 'Click', 'Payme'].includes(method) ? method : 'Naqd';
+    const debtAmount = Number(debtOrder.total ?? debtOrder.finalTotal ?? 0) || 0;
     const debtor = debtOrder.debtorName || debtOrder.paymentDetails?.debtorName || "Noma'lum mijoz";
-
-    if (!window.confirm(`💰 "${debtor}" ning ${debtAmount.toLocaleString()} so'm qarzini to'landi deb tasdiqlaysizmi?`)) {
-      return;
-    }
-
-    const paidTime = new Date().toLocaleString();
+    const paidAtMs = Date.now();
 
     updateOrders(prev =>
       (Array.isArray(prev) ? prev : []).map(o =>
         o && String(o.id) === String(debtOrder.id)
-          ? { ...o, status: "To'langan", paymentMethod: 'Naqd', debtPaidAt: paidTime, closeTime: paidTime }
+          ? {
+              ...o,
+              status: "To'langan",
+              paymentMethod: payMethod,
+              wasDebt: true,
+              debtPaidMethod: payMethod,
+              debtPaidAt: new Date(paidAtMs).toLocaleString(),
+              debtPaidAtMs: paidAtMs,
+              debtPaidBy: currentUser?.name || 'Kassir',
+              paymentDetails: {
+                ...(o.paymentDetails || {}),
+                cashAmount: payMethod === 'Naqd' ? debtAmount : 0,
+                cardAmount: payMethod === 'Plastik' ? debtAmount : 0,
+                clickAmount: payMethod === 'Click' ? debtAmount : 0,
+                paymeAmount: payMethod === 'Payme' ? debtAmount : 0
+              }
+            }
           : o
       )
     );
 
     if (typeof addAuditLog === 'function') {
-      addAuditLog("Qarz to'landi", `${debtor}: +${debtAmount.toLocaleString()} so'm`);
+      addAuditLog("Qarz to'landi", `${debtor}: +${debtAmount.toLocaleString()} so'm (${payMethod})`);
     }
-
-    alert(`✅ "${debtor}" ning ${debtAmount.toLocaleString()} so'm qarzi muvaffaqiyatli yopildi!`);
   };
 
   const handleDeleteOrder = (orderId, tableName = 'Stol') => {
@@ -1179,6 +1196,8 @@ export default function CashierMode({
               setMixedCard={handleMixedCardChange}
               debtorName={debtorName}
               setDebtorName={setDebtorName}
+              debtorPhone={debtorPhone}
+              setDebtorPhone={setDebtorPhone}
               customers={safeCustomers}
               customerPhone={customerPhone}
               setCustomerPhone={setCustomerPhone}

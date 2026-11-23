@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { getRecordTimeMs, isTodayMs } from '../utils/dates';
 
 export default function AdminDashboard({ 
   orders = [],
@@ -49,10 +50,11 @@ export default function AdminDashboard({
   // ==========================================
   const periodOrders = useMemo(() => {
     if (periodFilter === 'today') {
-      return safeOrders.filter(o => o && (!o.date || o.date === todayDateStr));
+      // Sana matn emas, vaqt (ms) bo'yicha; sanasiz buyurtma bugungi hisoblanmaydi (B4)
+      return safeOrders.filter(o => o && isTodayMs(getRecordTimeMs(o)));
     }
     return safeOrders;
-  }, [safeOrders, periodFilter, todayDateStr]);
+  }, [safeOrders, periodFilter]);
 
   // To'langan cheklar, Qarz cheklar va Hozirgi faol (ochiq) cheklar
   const completedOrders = useMemo(() => {

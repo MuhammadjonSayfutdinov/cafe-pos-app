@@ -13,6 +13,8 @@ export default function CashierPaymentControls({
   setMixedCard,
   debtorName = '',
   setDebtorName,
+  debtorPhone = '',
+  setDebtorPhone,
   // CRM & CASHBACK PROP'LARI
   customers = [],
   customerPhone = '',
@@ -305,7 +307,16 @@ export default function CashierPaymentControls({
               required
               value={debtorName}
               onChange={(e) => setDebtorName(e.target.value)}
-              placeholder="Masalan: Rustam aka (90 123-45-67)"
+              placeholder="Ism: Masalan, Rustam aka"
+              className="w-full p-3 rounded-xl bg-white dark:bg-gray-900 border border-orange-300 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-orange-500"
+            />
+            <input
+              type="tel"
+              inputMode="tel"
+              required
+              value={debtorPhone}
+              onChange={(e) => typeof setDebtorPhone === 'function' && setDebtorPhone(e.target.value)}
+              placeholder="Telefon: 90 123 45 67"
               className="w-full p-3 rounded-xl bg-white dark:bg-gray-900 border border-orange-300 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-orange-500"
             />
           </div>

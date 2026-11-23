@@ -4,6 +4,7 @@ import StatsOverviewCards from './StatsOverviewCards';
 import StatsPaymentBreakdown from './StatsPaymentBreakdown';
 import StatsPopularItems from './StatsPopularItems';
 import PrintReceiptModal from './PrintReceiptModal';
+import { getRecordTimeMs } from '../utils/dates';
 
 // ===============================================
 // 1. O'LCHOV BIRLIKLARI KONVERTORI (TANNARX UCHUN)
@@ -46,39 +47,9 @@ const convertToInventoryUnit = (amount, fromUnit, toInvUnit) => {
 // ===============================================
 // 2. SANANI UNIVERSAL O'QISH VA FORMATLASH
 // ===============================================
-const parseRecordTimestamp = (record) => {
-  if (!record) return Date.now();
-
-  if (record.closedAtMs && !isNaN(Number(record.closedAtMs))) return Number(record.closedAtMs);
-  if (record.createdAt && !isNaN(Number(record.createdAt))) return Number(record.createdAt);
-
-  const rawStr = String(record.closeTime || record.archiveDate || record.date || '').trim();
-  if (rawStr) {
-    // DD.MM.YYYY (17.10.2026) formatini aniqlash
-    const dmy = rawStr.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
-    if (dmy) {
-      const day = Number(dmy[1]);
-      const month = Number(dmy[2]) - 1;
-      const year = Number(dmy[3]);
-      const hm = rawStr.match(/(\d{1,2}):(\d{2})/);
-      const hh = hm ? Number(hm[1]) : 12;
-      const mm = hm ? Number(hm[2]) : 0;
-      const dt = new Date(year, month, day, hh, mm).getTime();
-      if (!isNaN(dt)) return dt;
-    }
-
-    const parsed = Date.parse(rawStr);
-    if (!isNaN(parsed)) return parsed;
-  }
-
-  const idDigits = String(record.id || '').match(/\d{13}/);
-  if (idDigits) {
-    const ms = Number(idDigits[0]);
-    if (ms > 1600000000000 && ms <= Date.now() + 86400000) return ms;
-  }
-
-  return Date.now();
-};
+// Sanasi aniqlanmagan yozuv 0 (1970) bo'ladi va sana filtrlariga tushmaydi (B4).
+// Oldin Date.now() qaytarilardi va sanasiz yozuvlar "bugungi" hisoblanardi.
+const parseRecordTimestamp = (record) => getRecordTimeMs(record) ?? 0;
 
 const toDateInputStr = (dateObj) => {
   const y = dateObj.getFullYear();
