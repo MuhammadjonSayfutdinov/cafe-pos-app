@@ -143,6 +143,8 @@ export default function WaiterMode({
   const [cart, setCart] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('Barchasi');
   const [searchQuery, setSearchQuery] = useState('');
+  // Telefon/planshetda (lg dan kichik) menyu va savatcha alohida ko'rsatiladi: 'menu' | 'cart'
+  const [mobilePanel, setMobilePanel] = useState('menu');
   const [qrModalTable, setQrModalTable] = useState(null);
   const [localPreCheckPrintOrder, setLocalPreCheckPrintOrder] = useState(null);
 
@@ -284,6 +286,7 @@ export default function WaiterMode({
     setSelectedTable(tableName);
     setSelectedCategory('Barchasi');
     setSearchQuery('');
+    setMobilePanel('menu');
 
     const existing = safeOrders.find(
       o =>
@@ -316,6 +319,26 @@ export default function WaiterMode({
     safeOrders, safeMenu, safeInventory,
     cart.map(c => ({ item: c, qty: Math.max(0, (Number(c.quantity ?? c.qty ?? 1) || 0) - (Number(c.sentQty) || 0)) }))
   ), [safeOrders, safeMenu, safeInventory, cart]);
+
+  // Telefondagi savatcha tugmasi uchun: jami porsiya, oshxonaga hali yuborilmaganlari va summa
+  const cartStats = useMemo(() => {
+    let portions = 0;
+    let newPortions = 0;
+    let subTotal = 0;
+    cart.forEach(c => {
+      if (!c) return;
+      const q = Number(c.quantity ?? c.qty ?? 1) || 0;
+      portions += q;
+      newPortions += Math.max(0, q - (Number(c.sentQty) || 0));
+      subTotal += (Number(c.price) || 0) * q;
+    });
+    return { portions, newPortions, subTotal };
+  }, [cart]);
+
+  const openMobilePanel = (panel) => {
+    setMobilePanel(panel);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const getStock = useCallback(
     (dish, variant) => stockStatus(dish, variant, safeInventory, reservedStock),
@@ -1027,56 +1050,111 @@ export default function WaiterMode({
             </div>
           </div>
 
-          <div className="h-[calc(100vh-190px)] min-h-[560px] flex flex-col lg:flex-row gap-6">
-            <WaiterMenu
-              menuItems={safeMenu}
-              menu={safeMenu}
-              menuCategories={safeCategories}
-              categories={safeCategories}
-              selectedCategory={selectedCategory}
-              setSelectedCategory={setSelectedCategory}
-              activeCategory={selectedCategory}
-              setActiveCategory={setSelectedCategory}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              searchTerm={searchQuery}
-              setSearchTerm={setSearchQuery}
-              cart={cart}
-              onAddToCart={handleAddToCart}
-              addToCart={handleAddToCart}
-              getStock={getStock}
-              onUpdateQuantity={handleUpdateQuantity}
-            />
-
-            <WaiterCart
-              selectedTable={selectedTable}
-              table={selectedTable}
-              cart={cart}
-              setCart={setCart}
-              currentTableOrder={currentTableOrder}
-              activeOrder={currentTableOrder}
-              existingOrder={currentTableOrder}
-              serviceFee={serviceFee}
-              onUpdateQuantity={handleUpdateQuantity}
-              updateQuantity={handleUpdateQuantity}
-              updateQty={handleUpdateQuantity}
-              onRemoveItem={handleRemoveFromCart}
-              removeFromCart={handleRemoveFromCart}
-              onUpdateNote={handleUpdateNote}
-              updateItemNote={handleUpdateNote}
-              onSubmitOrder={handleSubmitOrder}
-              submitOrder={handleSubmitOrder}
-              handleSendOrder={handleSubmitOrder}
-              onMarkAsDelivered={handleMarkAsDelivered}
-              markAsServed={handleMarkAsDelivered}
-              onLockPreCheck={handleLockAndPrintPreCheck}
-              onCancelEntireOrder={handleCancelEntireOrder}
-              onBack={() => {
-                setSelectedTable(null);
-                setCart([]);
-              }}
-            />
+          {/* Telefon/planshet: menyu va savatcha almashtirgichi (katta ekranda ikkalasi yonma-yon) */}
+          <div className="lg:hidden grid grid-cols-2 gap-1.5 p-1.5 bg-white dark:bg-gray-800 rounded-2xl shadow-xs border border-gray-100 dark:border-gray-700">
+            {[
+              { id: 'menu', label: '🍽 Menyu' },
+              { id: 'cart', label: '🛒 Savatcha' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => openMobilePanel(tab.id)}
+                className={`py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-1.5 transition active:scale-95 ${
+                  mobilePanel === tab.id
+                    ? 'bg-amber-500 text-white shadow-md shadow-amber-500/25'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                {tab.label}
+                {tab.id === 'cart' && cartStats.portions > 0 && (
+                  <span className={`min-w-6 px-1.5 py-0.5 rounded-full text-xs ${
+                    mobilePanel === 'cart' ? 'bg-white text-amber-600' : 'bg-amber-500 text-white'
+                  }`}>
+                    {cartStats.portions}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
+
+          {/* Katta ekranda balandlik qat'iy (ichida scroll), telefonda sahifa o'zi aylanadi:
+              aks holda savatcha butun joyni egallab, taomlar ro'yxati ko'rinmay qolardi */}
+          <div className="flex flex-col gap-4 lg:flex-row lg:gap-6 lg:h-[calc(100vh-190px)] lg:min-h-[560px]">
+            <div className={mobilePanel === 'menu' ? 'contents' : 'hidden lg:contents'}>
+              <WaiterMenu
+                menuItems={safeMenu}
+                menu={safeMenu}
+                menuCategories={safeCategories}
+                categories={safeCategories}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                activeCategory={selectedCategory}
+                setActiveCategory={setSelectedCategory}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                searchTerm={searchQuery}
+                setSearchTerm={setSearchQuery}
+                cart={cart}
+                onAddToCart={handleAddToCart}
+                addToCart={handleAddToCart}
+                getStock={getStock}
+                onUpdateQuantity={handleUpdateQuantity}
+              />
+            </div>
+
+            <div className={mobilePanel === 'cart' ? 'contents' : 'hidden lg:contents'}>
+              <WaiterCart
+                selectedTable={selectedTable}
+                table={selectedTable}
+                cart={cart}
+                setCart={setCart}
+                currentTableOrder={currentTableOrder}
+                activeOrder={currentTableOrder}
+                existingOrder={currentTableOrder}
+                serviceFee={serviceFee}
+                onUpdateQuantity={handleUpdateQuantity}
+                updateQuantity={handleUpdateQuantity}
+                updateQty={handleUpdateQuantity}
+                onRemoveItem={handleRemoveFromCart}
+                removeFromCart={handleRemoveFromCart}
+                onUpdateNote={handleUpdateNote}
+                updateItemNote={handleUpdateNote}
+                onSubmitOrder={handleSubmitOrder}
+                submitOrder={handleSubmitOrder}
+                handleSendOrder={handleSubmitOrder}
+                onMarkAsDelivered={handleMarkAsDelivered}
+                markAsServed={handleMarkAsDelivered}
+                onLockPreCheck={handleLockAndPrintPreCheck}
+                onCancelEntireOrder={handleCancelEntireOrder}
+                onBack={() => {
+                  setSelectedTable(null);
+                  setCart([]);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Telefonda menyu ko'rinib turganda pastda yopishib turadigan savatcha tugmasi */}
+          {mobilePanel === 'menu' && cartStats.portions > 0 && (
+            <button
+              type="button"
+              onClick={() => openMobilePanel('cart')}
+              className="lg:hidden sticky bottom-3 z-30 w-full px-4 py-3.5 rounded-2xl bg-gray-900 dark:bg-amber-500 text-white font-black text-sm shadow-2xl flex items-center justify-between gap-3 transition active:scale-[0.98]"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <span className="px-2 py-0.5 rounded-full bg-amber-500 dark:bg-white dark:text-amber-600 text-xs shrink-0">
+                  {cartStats.portions}
+                </span>
+                <span className="truncate">
+                  {cartStats.newPortions > 0 ? `${cartStats.newPortions} ta yangi porsiya` : 'Savatcha'}
+                </span>
+              </span>
+              <span className="shrink-0">
+                {cartStats.subTotal.toLocaleString()} so'm ➜
+              </span>
+            </button>
+          )}
         </div>
       )}
 

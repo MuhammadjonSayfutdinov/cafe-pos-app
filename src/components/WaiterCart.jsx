@@ -228,7 +228,7 @@ export default function WaiterCart({
             <span className="text-5xl mb-2 opacity-60">🍽️</span>
             <p className="font-black text-sm">Savatcha hozircha bo'sh</p>
             <p className="text-xs font-bold mt-1 max-w-[220px]">
-              Chap tomondagi menyudan taomlarni bosib savatchaga qo'shing
+              Menyudan taomlarni bosib savatchaga qo'shing
             </p>
           </div>
         ) : (
