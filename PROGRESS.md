@@ -1,7 +1,7 @@
 # PROGRESS — cafe-pos-app
 
 Oxirgi yangilanish: 2026-11-23
-Joriy bosqich: **2-bosqich**. 0 va 1-bosqich xatolari tuzatildi (`claude/xatolarni-tuzatish` branch).
+Joriy bosqich: **3-bosqich (backend)**. 0, 1 va 2-bosqichlar bajarildi (1-bosqich: PR #1; 2-bosqich: `ikkinchi-bosqich` branch).
 
 > Bu fayl Claude uchun yozilgan. Barcha kodni faqat Claude yozadi (Gemini ishlatilmaydi).
 > Yangi chatda birinchi navbatda shu faylni va `ai-context.txt` ni o'qi.
@@ -38,8 +38,8 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 
 ## Joriy vazifa
 
-**2-bosqich, 1-qadam:** statuslar uchun `src/constants` fayli; B11 (`useSticky`), B12 (Telegram kodi 3 joyda), B13 (`alert/confirm`).
-0-bosqichdan qolgan: README.
+**3-bosqich, 1-qadam:** backend variantini tanlash (pastdagi "Qarorlar" jadvali). Qaror qabul qilinmaguncha kod yozilmaydi.
+Kichik ishlar (istalgan vaqtda): `barcha-kodlar.txt` (eskirgan kod nusxasi) va `preview.html` kerakmi, ko'rib chiqish.
 
 ## Vazifa → kerakli fayllar
 
@@ -68,9 +68,9 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | B8 | Qarzga yozishda telefon tekshirilmaydi (faqat ism) | `CashierMode.jsx` | 1 | [x] |
 | B9 | Chekni bo'lishda chegirma yo'qoladi, qisman miqdor ko'chirilmaydi | `App.jsx` (`handleSplitOrder`) | 1 | [x] |
 | B10 | Jami summa formulasi 4+ joyda nusxalangan; takroriy maydonlar | `App.jsx`, `CashierMode.jsx` | 1 | [x] |
-| B11 | `useSticky`: oxirgi yozuv g'olib; to'lib qolsa xato faqat konsolga | `useSticky.js` | 2 | [ ] |
-| B12 | Telegram yuborish kodi 3 joyda nusxalangan, `telegramNotifier.js` ishlatilmaydi | `CashierMode`, `WaiterMode`, `StatsMode` | 2 | [ ] |
-| B13 | Taxminan 70 ta `alert/confirm` | ko'p fayllar | 2 | [ ] |
+| B11 | `useSticky`: oxirgi yozuv g'olib; to'lib qolsa xato faqat konsolga | `useSticky.js` | 2 | [x] |
+| B12 | Telegram yuborish kodi 3 joyda nusxalangan, `telegramNotifier.js` ishlatilmaydi | `CashierMode`, `WaiterMode`, `StatsMode` | 2 | [x] |
+| B13 | Taxminan 70 ta `alert/confirm` | ko'p fayllar | 2 | [x] |
 
 ## Bosqichlar
 
@@ -79,7 +79,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 - [x] `autosync.cjs`, `tasks.json` dagi task va `gitdoc` sozlamalarini o'chirish
 - [x] Tailwind 4 ga to'liq o'tish, CDN ni olib tashlash (B2)
 - [x] `index.html` da `lang="uz"`
-- [ ] README
+- [x] README
 - [x] `ai-context.txt` va `PROGRESS.md` ni repoga qo'shish
 
 ### 1-bosqich. Mantiq xatolari (2–3 kun)
@@ -90,10 +90,10 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 - [x] B5 + B6 zaxira va PIN xavfsizligi (`src/utils/pinGuard.js`)
 
 ### 2-bosqich. Ma'lumot qatlami va interfeys (2–3 kun)
-- [ ] Statuslar uchun `constants` fayli (kodlar o'zbekcha yozuvlardan alohida)
-- [ ] Yagona sxema, eski ma'lumotlarni ko'chiruvchi migratsiya
-- [ ] `ErrorBoundary`, sxema tekshiruvi (`zod`)
-- [ ] B11, B12, B13
+- [x] Statuslar uchun `src/constants/orderStatus.js` (kalitlar kod uchun; saqlanadigan qiymatlar eski ma'lumot bilan mos bo'lishi uchun o'zgartirilmadi)
+- [x] Migratsiya `src/utils/migrate.js` (sxema v2): eski maydonlardan yangilarini to'ldiradi, eskilarini o'chirmaydi
+- [x] `ErrorBoundary`; sxema tekshiruvi `migrate.js` da (buzilgan kalit zaxiraga olinadi). `zod` qo'shilmadi: yangi kutubxona uchun ruxsat so'ralmagan
+- [x] B11 (`useSticky`), B12 (`telegramNotifier.js`), B13 (`src/utils/notify.js`: toast va tasdiqlash oynasi)
 
 ### 3-bosqich. Backend (1–2 hafta)
 - [ ] Variant tanlash (qarorlar bo'limiga qarang)
@@ -119,7 +119,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | Ombor qachon ayiriladi | To'lovda (`CashierMode.deductOrderIngredientsFromStock`). Sabab: ofitsiant buyurtmasi `App.jsx` dan o'tmaydi, kassadagi kod birlik va porsiyani hisoblaydi, bekor qilingan chekni qaytarish shart emas | qabul qilindi |
 | Taom statusi | Taomda `kitchenDoneQty`; dozakazda oshxona faqat qolgan porsiyani ko'radi | qabul qilindi |
 | Backend | Supabase (tez) yoki Node + SQLite/PostgreSQL + WebSocket | tanlanmagan |
-| Autosync |qabul qilindi | taklif |
+| Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
 ## Commit jurnali
 
@@ -131,6 +131,9 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 3 | Sana va qarz | da57106 | [x] |
 | 4 | PIN va zaxira xavfsizligi | 68b7dcf | [x] |
 | 5 | Taom darajasidagi status | 65b1dd6 | [x] |
+| 6 | useSticky, konstantalar, migratsiya, ErrorBoundary | 4f520b7 | [x] |
+| 7 | Telegram kodi bitta joyda | dbcf7fc | [x] |
+| 8 | alert/confirm o'rniga toast va oyna | ef25712 | [x] |
 
 ## Yangi chatning birinchi xabari
 
