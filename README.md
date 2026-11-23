@@ -15,7 +15,8 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
 
 ## Texnologiyalar
 
-React 19, Vite 7, Tailwind CSS 4. Backend yo'q: ma'lumotlar brauzerning `localStorage`ida saqlanadi.
+React 19, Vite 7, Tailwind CSS 4. Ma'lumotlar qurilmada (`localStorage`) saqlanadi; ixtiyoriy ravishda
+**Supabase** orqali bir nechta qurilma o'rtasida sinxronlanadi (sozlash: [SUPABASE.md](SUPABASE.md)).
 
 ## Ishga tushirish
 
@@ -52,8 +53,8 @@ Admin standart PIN bilan ishlasa, ekranning tepasida ogohlantirish chiqib turadi
 
 ## Ma'lumotlar haqida muhim
 
-- Ma'lumotlar faqat shu brauzer va shu qurilmada saqlanadi. Boshqa qurilmalar bilan sinxronlash
-  hozircha yo'q (backend 3-bosqichda rejalashtirilgan).
+- Supabase sozlanmagan bo'lsa, ma'lumotlar faqat shu brauzer va shu qurilmada saqlanadi.
+  Bir nechta qurilmani (ofitsiant, oshxona, kassa) ulash uchun: [SUPABASE.md](SUPABASE.md).
 - Brauzer tarixi yoki sayt ma'lumotlari tozalansa, hamma narsa o'chadi. **Muntazam zaxira nusxa oling:**
   Boshqaruv → Tizim Sozlamalari → zaxira nusxani yuklab olish.
 - Zaxira fayliga PIN kodlar va Telegram bot tokeni yozilmaydi. Tokenni alohida, xavfsiz joyda saqlang.
@@ -62,13 +63,17 @@ Admin standart PIN bilan ishlasa, ekranning tepasida ogohlantirish chiqib turadi
 ## Loyiha tuzilishi
 
 ```
+supabase/schema.sql       Supabase jadvallari va xavfsizlik qoidalari
+scripts/                  sinov uchun soxta sinxron server
 src/
   App.jsx                 global state, rollar bo'yicha ekranlar, QR-buyurtma
   main.jsx                ishga tushirish: migratsiya, ErrorBoundary, bildirishnomalar
   components/             ekranlar (Waiter*, Cashier*, Kitchen*, Warehouse*, Stats*, Admin*)
   constants/orderStatus.js  buyurtma statuslari va to'lov turlari
   hooks/useSticky.js      localStorage bilan sinxron state
+  sync/                   bulutda sinxronlash (dvigatel, Supabase transporti)
   utils/
+    ids.js                noyob id (bir nechta qurilmada to'qnashmaydi)
     orderTotals.js        buyurtma summasini hisoblashning yagona joyi
     dates.js              sana bilan ishlash (millisekund bo'yicha)
     pinGuard.js           xato PIN urinishlarini cheklash
