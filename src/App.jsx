@@ -62,6 +62,9 @@ const initialUsers = [
   { id: 5, name: 'Omborchi', role: 'warehouse', pin: '444444' }
 ];
 
+// Namuna PIN kodlar README'da ochiq yozilgan: ular bilan qolgan xodim haqida admin ogohlantiriladi
+const SAMPLE_PINS = new Set(initialUsers.map(u => u.pin));
+
 export default function App() {
   // ==========================================
   // 1. ASOSIY STATE'LAR (Baza - LocalStorage Sync)
@@ -109,15 +112,8 @@ export default function App() {
         isUpdated = true;
       }
 
-      // 2. Agar xotirada Omborchi yo'qolib qolgan bo'lsa, uni qayta qo'shamiz
-      const hasWarehouse = safeUsers.some(u => u.role === 'warehouse');
-      if (!hasWarehouse) {
-        const warehouseUser = initialUsers.find(u => u.role === 'warehouse');
-        if (warehouseUser) {
-          safeUsers.push(warehouseUser);
-          isUpdated = true;
-        }
-      }
+      // Omborchi o'chirilsa qayta qo'shilmaydi: avval u standart 444444 PIN bilan qaytib,
+      // bulut orqali barcha qurilmalarga tarqalardi. Omborni admin ham ocha oladi.
 
       return isUpdated ? safeUsers : prevUsers;
     });
@@ -413,6 +409,9 @@ export default function App() {
 
   // C) ASOSIY ISHCHI DASTUR REJIMI
   const currentActiveView = currentUser.role === 'admin' ? adminActiveView : currentUser.role;
+  const staffWithSamplePin = currentUser.role === 'admin'
+    ? (Array.isArray(users) ? users : []).filter(u => u && SAMPLE_PINS.has(String(u.pin ?? '')))
+    : [];
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
@@ -502,12 +501,11 @@ export default function App() {
           />
         )}
 
-        {/* Standart admin PIN hali almashtirilmagan bo'lsa ogohlantirish (B6) */}
-        {currentUser.role === 'admin' && String(
-          (Array.isArray(users) ? users : []).find(u => u && String(u.id) === String(currentUser.id))?.pin ?? currentUser.pin
-        ) === DEFAULT_ADMIN_PIN && (
-          <div className="mb-4 p-3 rounded-2xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs sm:text-sm font-black">
-            ⚠️ Admin hali standart PIN ({DEFAULT_ADMIN_PIN}) bilan ishlayapti. Boshqaruv → "Xodimlar va Parollar" bo'limida PIN kodni almashtiring.
+        {/* Namuna PIN (777777, 1111, ...) hali almashtirilmagan bo'lsa ogohlantirish (B6) */}
+        {staffWithSamplePin.length > 0 && (
+          <div className="mb-4 p-3 rounded-2xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs sm:text-sm font-black break-words">
+            ⚠️ Namuna PIN kod bilan qolgan xodimlar: {staffWithSamplePin.map(u => String(u.name || '—')).join(', ')}.
+            {' '}Boshqaruv → "Xodimlar va Parollar" bo'limida PIN kodlarni almashtiring yoki keraksiz xodimni o'chiring.
           </div>
         )}
         
