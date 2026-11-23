@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ORDER_STATUS } from '../constants/orderStatus';
+import { ORDER_STATUS, isDeliveryTable, isNoServiceFeeTable } from '../constants/orderStatus';
 import { confirmAsync } from '../utils/notify';
 
 const QUICK_CHEF_NOTES = [
@@ -64,8 +64,8 @@ export default function WaiterCart({
       return sum + (Number(item.quantity ?? item.qty ?? 1) || 0);
     }, 0);
 
-    const isTakeaway = resolvedTable === 'Olib ketish';
-    const feePct = isTakeaway ? 0 : Number(serviceFee) || 0;
+    // Olib ketish va yetkazib berishda xizmat haqi olinmaydi
+    const feePct = isNoServiceFeeTable(resolvedTable) ? 0 : Number(serviceFee) || 0;
     const feeAmount = Math.round((subTotal * feePct) / 100);
     const finalTotal = subTotal + feeAmount;
 
@@ -138,7 +138,7 @@ export default function WaiterCart({
               )}
             </div>
             <p className="text-xs font-bold text-gray-400 mt-0.5">
-              🪑 {resolvedTable} • {cartSummary.totalPortions} porsiya taom
+              {isDeliveryTable(resolvedTable) ? '🛵' : '🪑'} {resolvedTable} • {cartSummary.totalPortions} porsiya taom
             </p>
           </div>
 

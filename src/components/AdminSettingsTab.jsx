@@ -4,6 +4,7 @@ import { detectTelegramChatId, sendTelegramMessage, escapeHtml, getTelegramConfi
 import { notify, confirmAsync } from '../utils/notify';
 import { localWrite } from '../sync/engine';
 import AdminSyncSection from './AdminSyncSection';
+import { VALID_ROLES } from '../constants/roles';
 
 // Telegram sozlamalari: yagona joy - src/utils/telegramNotifier.js (B12)
 const readTelegramConfig = getTelegramConfig;
@@ -11,7 +12,6 @@ const readTelegramConfig = getTelegramConfig;
 // ==========================================
 // ZAXIRA FAYLINI TEKSHIRISH (B5)
 // ==========================================
-const VALID_ROLES = ['admin', 'warehouse', 'cashier', 'waiter', 'kitchen'];
 const isPlainObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 
 const validateBackup = (data) => {

@@ -4,7 +4,7 @@ import CashierOrderList from './CashierOrderList';
 import CashierReceipt from './CashierReceipt';
 import CashierPaymentControls from './CashierPaymentControls';
 import { calcOrderTotals } from '../utils/orderTotals';
-import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
+import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD, isDeliveryOrder } from '../constants/orderStatus';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
@@ -370,8 +370,16 @@ export default function CashierMode({
     }
     setSelectedOrderId(order.id);
     resetPaymentControls();
-    if (order.customerPhone) {
-      setCustomerPhone(order.customerPhone);
+    const phone = order.customerPhone || order.delivery?.phone;
+    if (phone) {
+      setCustomerPhone(phone);
+    }
+    if (order.delivery?.customerName) {
+      setCustomerName(order.delivery.customerName);
+    }
+    // Yetkazish: kuryer mijozdan qanday pul olganini belgilagan bo'lsa, shu usul tanlanadi
+    if (isDeliveryOrder(order) && order.delivery?.collectedMethod) {
+      setPaymentMethod(order.delivery.collectedMethod);
     }
   };
 

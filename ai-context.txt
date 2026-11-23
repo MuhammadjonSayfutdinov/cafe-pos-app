@@ -74,6 +74,9 @@ Avtorizatsiya va umumiy:
 Mijoz (QR):
   CustomerQRView (915), CustomerMode (926)
 
+Kuryer (yetkazib berish):
+  CourierMode, DeliveryOrderModal (ofitsiant ekranidan ochiladi), utils/delivery.js
+
 Ofitsiant:
   WaiterMode (1164)           Asosiy karkas (xarita, menyu, savat)
   WaiterTableGrid (889)       Stollar xaritasi, chaqiruv, "TAYYOR"
@@ -127,14 +130,21 @@ pos_orders (buyurtma):
     subTotal, serviceFee (foiz), serviceFeeAmount, discount, total,
     status, paymentMethod, paymentDetails, time ("14:30"), date (matn) }
   "date" va "time" faqat ko'rsatish uchun; hisob-kitob uchun createdAt.
+  Yetkazish buyurtmasi: table "Yetkazish #N", orderType 'delivery',
+    delivery: { customerName, phone, address, landmark, note, fee, status
+    ('kutilmoqda' | "yo'lda" | 'yetkazildi'), courier, courierId, assignedAt,
+    pickedAt, deliveredAt, collectedMethod }. Xizmat haqi 0, yetkazish narxi
+    items ichida isDeliveryFee: true qator. Chekni kassir yopadi.
 
 Statuslar (haqiqatda ishlatiladiganlar):
   'Yangi' -> 'Tayyorlanmoqda' -> 'Tayyor' -> 'Yetkazildi' -> "To'langan"
   Qo'shimcha: 'Qarz', 'Arxiv'. 'Bekor qilindi' hozircha kodda ishlatilmaydi.
   Yangi holat qo'shsangiz, constants fayliga kiriting (qo'lda yozmang).
 
-pos_users (xodim): { id, name, role, pin, canSeeSales? }
-  role: 'admin' | 'warehouse' | 'cashier' | 'waiter' | 'kitchen'
+pos_users (xodim): { id, name, title?, role, pin, canSeeSales? }
+  role: 'admin' | 'warehouse' | 'cashier' | 'waiter' | 'kitchen' | 'courier'
+  (yagona ro'yxat: src/constants/roles.js). title - admin yozgan lavozim nomi,
+  faqat ko'rsatish uchun; kirish huquqi role bo'yicha.
   PIN: admin va warehouse uchun 6 xonali, qolganlari uchun 4 xonali.
   Ikki xodimda bir xil PIN bo'lishi mumkin emas (LockScreen PIN bo'yicha
   xodimni topadi).

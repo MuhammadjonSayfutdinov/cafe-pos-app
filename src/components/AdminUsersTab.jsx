@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
+import { ROLE_OPTIONS, TITLE_SUGGESTIONS, getRequiredPinLength } from '../constants/roles';
+
+const EMPTY_FORM = { name: '', title: '', role: 'waiter', pin: '', canSeeSales: true };
 
 export default function AdminUsersTab({ 
   users = [], 
@@ -18,27 +21,20 @@ export default function AdminUsersTab({
   const [filterGroup, setFilterGroup] = useState('all'); // 'all' | 'management' | 'staff'
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Yangi yoki tahrirlanayotgan xodim ma'lumotlari
-  const [formData, setFormData] = useState({
-    name: '',
-    role: 'waiter',
-    pin: '',
-    canSeeSales: true
-  });
+  // Yangi yoki tahrirlanayotgan xodim ma'lumotlari.
+  // title - lavozim nomi (admin o'zi yozadi), role - qaysi bo'limga kira oladi
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
-  // Tizimdagi mavjud rollar va ularning PIN talablari
-  const roleOptions = [
-    { value: 'admin', label: '👑 Admin (6 xonali PIN)', group: 'management', icon: '👑', badgeName: 'Admin' },
-    { value: 'warehouse', label: '📦 Omborchi (6 xonali PIN)', group: 'management', icon: '📦', badgeName: 'Omborchi' },
-    { value: 'cashier', label: '💳 Kassir (4 xonali PIN)', group: 'staff', icon: '💳', badgeName: 'Kassir' },
-    { value: 'waiter', label: '📝 Ofitsiant (4 xonali PIN)', group: 'staff', icon: '📝', badgeName: 'Ofitsiant' },
-    { value: 'kitchen', label: '👨‍🍳 Oshpaz (4 xonali PIN)', group: 'staff', icon: '👨‍🍳', badgeName: 'Oshpaz' }
-  ];
-
-  // Rol bo'yicha talab qilinadigan PIN uzunligini aniqlash (HIMOYA)
-  const getRequiredPinLength = (role) => {
-    return (role === 'admin' || role === 'warehouse') ? 6 : 4;
-  };
+  // Tizimdagi mavjud rollar va ularning PIN talablari (yagona joy: src/constants/roles.js)
+  const roleOptions = ROLE_OPTIONS.map(r => ({
+    value: r.value,
+    label: r.label === r.section
+      ? `${r.icon} ${r.label} (${r.pinLength} xonali PIN)`
+      : `${r.icon} ${r.label} — ${r.section} (${r.pinLength} xonali PIN)`,
+    group: r.group,
+    icon: r.icon,
+    badgeName: r.label
+  }));
 
   const getRoleMeta = (role) => {
     return roleOptions.find(r => r.value === role) || {
@@ -111,6 +107,7 @@ export default function AdminUsersTab({
     e.preventDefault();
     
     const cleanName = (formData.name || '').trim();
+    const cleanTitle = (formData.title || '').trim();
     const cleanPin = String(formData.pin || '').trim();
 
     // 1. Validatsiya: Bo'sh maydonlarni tekshirish
@@ -151,6 +148,7 @@ export default function AdminUsersTab({
           user.id === editingId ? { 
             ...user, 
             name: cleanName,
+            title: cleanTitle,
             role: formData.role,
             pin: cleanPin,
             canSeeSales: formData.role === 'waiter' ? Boolean(formData.canSeeSales) : (formData.role === 'admin')
@@ -158,7 +156,7 @@ export default function AdminUsersTab({
         ));
       }
       if (typeof addAuditLog === 'function') {
-        addAuditLog("Xodim tahrirlandi", `${cleanName} (${formData.role}) ma'lumotlari yangilandi`);
+        addAuditLog("Xodim tahrirlandi", `${cleanName} (${cleanTitle || getRoleMeta(formData.role).badgeName}) ma'lumotlari yangilandi`);
       }
       setEditingId(null);
     } else {
@@ -166,6 +164,7 @@ export default function AdminUsersTab({
       const newUser = {
         id: newId('user_'),
         name: cleanName,
+        title: cleanTitle,
         role: formData.role,
         pin: cleanPin,
         canSeeSales: formData.role === 'waiter' ? Boolean(formData.canSeeSales) : (formData.role === 'admin')
@@ -174,18 +173,19 @@ export default function AdminUsersTab({
         setUsers(prev => [...prev, newUser]);
       }
       if (typeof addAuditLog === 'function') {
-        addAuditLog("Yangi xodim qo'shildi", `${cleanName} (${formData.role}) tizimga qo'shildi`);
+        addAuditLog("Yangi xodim qo'shildi", `${cleanName} (${cleanTitle || getRoleMeta(formData.role).badgeName}) tizimga qo'shildi`);
       }
     }
 
     // Formani tozalash
-    setFormData({ name: '', role: 'waiter', pin: '', canSeeSales: true });
+    setFormData(EMPTY_FORM);
   };
 
   const handleEdit = (user) => {
     setEditingId(user.id);
     setFormData({
       name: user.name || '',
+      title: user.title || '',
       role: user.role || 'waiter',
       pin: String(user.pin || ''),
       canSeeSales: user.canSeeSales !== undefined ? Boolean(user.canSeeSales) : true
@@ -245,7 +245,7 @@ export default function AdminUsersTab({
 
   const handleCancel = () => {
     setEditingId(null);
-    setFormData({ name: '', role: 'waiter', pin: '', canSeeSales: true });
+    setFormData(EMPTY_FORM);
   };
 
   // ==========================================
@@ -259,9 +259,12 @@ export default function AdminUsersTab({
         filterGroup === 'all' ? true :
         filterGroup === 'management' ? isManagement : !isManagement;
 
-      const matchesSearch = !searchQuery.trim() || 
-        String(user.name || '').toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
-        String(user.role || '').toLowerCase().includes(searchQuery.trim().toLowerCase());
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch = !q ||
+        String(user.name || '').toLowerCase().includes(q) ||
+        String(user.title || '').toLowerCase().includes(q) ||
+        String(user.role || '').toLowerCase().includes(q) ||
+        String(getRoleMeta(user.role).badgeName || '').toLowerCase().includes(q);
 
       return matchesGroup && matchesSearch;
     });
@@ -302,7 +305,7 @@ export default function AdminUsersTab({
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             {/* Xodim Ismi */}
             <div>
@@ -315,15 +318,40 @@ export default function AdminUsersTab({
                 value={formData.name} 
                 onChange={handleInputChange} 
                 placeholder="Masalan: Alisher" 
+                autoComplete="off"
                 required
                 className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white font-bold transition"
               />
             </div>
-            
-            {/* Vazifasi (Roli) */}
+
+            {/* Lavozim nomi: admin o'zi yozadi (ro'yxat faqat taklif) */}
             <div>
               <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">
-                Vazifasi (Roli) *
+                Lavozim nomi (o'zingiz yozing)
+              </label>
+              <input
+                type="text"
+                name="title"
+                list="staff-title-suggestions"
+                value={formData.title}
+                onChange={handleInputChange}
+                placeholder="Masalan: Barmen, Bosh oshpaz"
+                autoComplete="off"
+                maxLength={40}
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white font-bold transition"
+              />
+              <datalist id="staff-title-suggestions">
+                {TITLE_SUGGESTIONS.map(t => <option key={t} value={t} />)}
+              </datalist>
+              <p className="text-[11px] font-bold text-gray-400 mt-1.5">
+                Ixtiyoriy. Bo'sh qolsa "{getRoleMeta(formData.role).badgeName}" deb ko'rinadi. Kirish huquqi pastdagi bo'limga qarab beriladi.
+              </p>
+            </div>
+            
+            {/* Qaysi bo'limga kiradi (Roli) */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">
+                Qaysi bo'limda ishlaydi *
               </label>
               <select 
                 name="role"
@@ -487,7 +515,7 @@ export default function AdminUsersTab({
                           user.role === 'warehouse' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
                           'bg-indigo-50 text-indigo-600 dark:bg-gray-700 dark:text-gray-300'
                         }`}>
-                          {roleMeta.icon} {roleMeta.badgeName}
+                          {roleMeta.icon} {String(user.title || '').trim() || roleMeta.badgeName}
                         </span>
 
                         {isCurrentUser && (
@@ -501,6 +529,11 @@ export default function AdminUsersTab({
                     <h4 className="font-black text-lg text-gray-900 dark:text-white mb-1">
                       {safeName}
                     </h4>
+                    {String(user.title || '').trim() && (
+                      <p className="text-[11px] font-bold text-gray-400">
+                        Bo'lim: {roleMeta.icon} {roleMeta.badgeName}
+                      </p>
+                    )}
                     
                     {/* PIN Kodni yashirish va ko'rsatish mantig'i */}
                     <div className="flex items-center gap-2 mt-2 bg-white dark:bg-gray-800 p-2.5 rounded-xl border border-gray-100 dark:border-gray-700 w-max">

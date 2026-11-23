@@ -23,7 +23,8 @@ const DEFAULT_ROLE_TIMEOUTS = {
   cashier: 180,   // Kassir: 3 daqiqa
   warehouse: 300, // Omborchi: 5 daqiqa
   admin: 300,     // Admin: 5 daqiqa
-  kitchen: 0      // Oshxona: Standart o'chiq (oshpaz qo'li band bo'lgani uchun)
+  kitchen: 0,     // Oshxona: Standart o'chiq (oshpaz qo'li band bo'lgani uchun)
+  courier: 300    // Kuryer: 5 daqiqa (o'z telefonida ishlaydi)
 };
 
 const STORAGE_KEY = 'pos_auto_lock_settings';

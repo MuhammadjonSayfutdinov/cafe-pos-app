@@ -876,7 +876,8 @@ export default function StatsMode({
     ordersToCount.forEach(order => {
       if (Array.isArray(order?.items)) {
         order.items.forEach(item => {
-          if (!item) return;
+          // Yetkazish narxi taom emas: TOP ro'yxatga kirmaydi (tushumda bor)
+          if (!item || item.isDeliveryFee) return;
           const itemName = String(item.name || "Noma'lum taom").trim();
           const itemQuantity = Number(item.quantity ?? item.qty ?? 1) || 0;
           const itemPrice = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;

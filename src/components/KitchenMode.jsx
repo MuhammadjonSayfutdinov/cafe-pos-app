@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { ORDER_STATUS } from '../constants/orderStatus';
+import { ORDER_STATUS, isDeliveryOrder } from '../constants/orderStatus';
 import { localWrite } from '../sync/engine';
 
 // =========================================================
@@ -804,7 +804,7 @@ export default function KitchenMode({
                           <div>
                             <div className="flex items-center gap-2">
                               <h3 className="text-xl font-black tracking-tight">
-                                🪑 {order.table}
+                                {isDeliveryOrder(order) ? '🛵' : '🪑'} {order.table}
                               </h3>
                               {isCritical && (
                                 <span className="px-2 py-0.5 rounded-md bg-white text-red-600 text-[10px] font-black uppercase animate-bounce">

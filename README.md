@@ -10,10 +10,14 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
 - **Kassa:** naqd, plastik, Click/Payme, aralash va qarzga to'lov; chegirma, bonus/keshbek, pre-chek, qarzlar ro'yxati;
   smena ochish/yopish, sanalgan naqd va farq, Z-hisobot (chop etish, Telegram), smenalar tarixi
 - **Mijoz QR-menyusi:** stoldagi QR kod orqali o'z telefonidan buyurtma (ofitsiant tasdiqlaydi), ofitsiantni chaqirish
+- **Kuryer (yetkazib berish):** ofitsiant ekranida "🛵 Yangi yetkazish" (telefon, manzil, mo'ljal, yetkazish narxi;
+  doimiy mijozning manzili o'zi to'ladi), kuryer o'z telefonida buyurtmani oladi, tayyor bo'lgach yo'lga chiqadi,
+  yetkazgach mijoz qanday to'laganini belgilaydi; pulni kassaga topshiradi, kassir chekni yopadi.
+  Admin uchun kuryerlar bo'yicha kunlik hisobot (yetkazishlar soni, yetkazish haqi, qo'lidagi naqd)
 - **Ombor:** qoldiqlar, kirim/chiqim tarixi, texnologik karta bo'yicha avtomatik ayirish (to'lov paytida);
   ofitsiant menyusida "N porsiyaga yetadi / yetarli emas" belgisi, yetmasa kamomad yozuvi
 - **Statistika:** tushum, tannarx, sof foyda, ofitsiantlar maoshi, Z-hisobot (Telegram'ga yuborish)
-- **Admin:** menyu, kategoriyalar, xodimlar va PIN kodlar, audit jurnali, zaxira nusxa, Telegram sozlamalari
+- **Admin:** menyu, kategoriyalar, xodimlar va PIN kodlar (lavozim nomini o'zingiz yozasiz, masalan "Barmen"), audit jurnali, zaxira nusxa, Telegram sozlamalari
 - **Telegram:** har bir amal (kirish-chiqish, buyurtma, dozakaz, oshxona, to'lov, ombor, xodim, menyu) rahbar
   Telegramiga jonli jurnal bo'lib boradi; Z-hisobot, qarz, chegirma, ombor ogohlantirishlari alohida xabar
 - **Xavfsizlik:** xavfli amallar admin PIN bilan tasdiqlanadi, 5 ta xato PIN'dan keyin vaqtincha bloklash
@@ -54,6 +58,7 @@ npm run preview
 | Omborchi | Omborchi | `444444` |
 
 Admin va omborchi "BOSHQARUV" orqali (6 xonali PIN), qolganlar "XODIMLAR" orqali (4 xonali PIN) kiradi.
+Kuryer namunada yo'q: Boshqaruv → "Xodimlar va Parollar" → "Qaysi bo'limda ishlaydi" = "🛵 Kuryer".
 **Birinchi kirishdan keyin barcha PIN kodlarni almashtiring:** Boshqaruv → "Xodimlar va Parollar".
 Admin standart PIN bilan ishlasa, ekranning tepasida ogohlantirish chiqib turadi.
 
@@ -75,12 +80,14 @@ src/
   App.jsx                 global state, rollar bo'yicha ekranlar, QR-buyurtma
   main.jsx                ishga tushirish: migratsiya, ErrorBoundary, bildirishnomalar
   components/             ekranlar (Waiter*, Cashier*, Kitchen*, Warehouse*, Stats*, Admin*)
-  constants/orderStatus.js  buyurtma statuslari va to'lov turlari
+  constants/orderStatus.js  buyurtma statuslari, to'lov turlari, yetkazib berish sxemasi
+  constants/roles.js      xodim rollari (bo'limlar) va PIN uzunligi
   hooks/useSticky.js      localStorage bilan sinxron state
   sync/                   bulutda sinxronlash (dvigatel, Supabase transporti)
   utils/
     ids.js                noyob id (bir nechta qurilmada to'qnashmaydi)
     orderTotals.js        buyurtma summasini hisoblashning yagona joyi
+    delivery.js           yetkazib berish: "Yetkazish #N" nomi, yetkazish narxi qatori, doimiy mijoz manzili
     dates.js              sana bilan ishlash (millisekund bo'yicha)
     pinGuard.js           xato PIN urinishlarini cheklash
     notify.js             toast va tasdiqlash oynasi

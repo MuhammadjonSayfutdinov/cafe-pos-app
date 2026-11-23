@@ -32,7 +32,8 @@ export const KV_KEYS = Object.freeze([
   'pos_reservations',
   'pos_table_timers',
   'pos_waiter_payroll_rules',
-  'pos_revenue_target_limit'
+  'pos_revenue_target_limit',
+  'pos_delivery_fee' // yetkazish narxi (standart)
 ]);
 
 export const isRecordCollection = (key) => Object.prototype.hasOwnProperty.call(RECORD_COLLECTIONS, key);

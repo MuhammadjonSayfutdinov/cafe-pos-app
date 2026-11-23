@@ -84,7 +84,8 @@ export default function StatsPopularItems({
     validOrders.forEach(order => {
       if (!Array.isArray(order.items)) return;
       order.items.forEach(item => {
-        if (!item) return;
+        // Yetkazish narxi taom emas: TOP ro'yxatga kirmaydi (tushumda bor)
+        if (!item || item.isDeliveryFee) return;
         const rawName = String(item.name || "Noma'lum taom").trim();
         const qty = Number(item.quantity ?? item.qty ?? 1) || 0;
         const price = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;

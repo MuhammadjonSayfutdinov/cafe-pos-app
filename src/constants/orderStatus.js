@@ -49,3 +49,29 @@ export const PAYMENT_METHOD = Object.freeze({
 });
 
 export const TAKEAWAY_TABLE = 'Olib ketish';
+
+// ==========================================
+// YETKAZIB BERISH (KURYER)
+// ==========================================
+// Yetkazish buyurtmasi oddiy buyurtma: oshxona va kassadan o'tadi. Qo'shimcha maydonlar:
+//   orderType: 'delivery', delivery: { customerName, phone, address, landmark, note, fee,
+//   status, courier, courierId, assignedAt, pickedAt, deliveredAt, collectedMethod }
+// Stol nomi "Yetkazish #3" ko'rinishida: kassa, oshxona va chek shu nom bilan ko'rsatadi.
+export const ORDER_TYPE = Object.freeze({ DINE_IN: 'dine_in', DELIVERY: 'delivery' });
+
+export const DELIVERY_TABLE_PREFIX = 'Yetkazish #';
+
+export const DELIVERY_STATUS = Object.freeze({
+  WAITING: 'kutilmoqda',   // kuryer biriktirilmagan yoki hali yo'lga chiqmagan
+  ON_WAY: "yo'lda",        // kuryer olib ketdi
+  DELIVERED: 'yetkazildi'  // mijozga topshirildi (pulni kassa yopadi)
+});
+
+export const isDeliveryTable = (table) =>
+  typeof table === 'string' && table.startsWith(DELIVERY_TABLE_PREFIX);
+
+export const isDeliveryOrder = (order) =>
+  Boolean(order) && (order.orderType === ORDER_TYPE.DELIVERY || isDeliveryTable(order.table));
+
+/** Xizmat haqi (ofitsiant foizi) olinmaydigan joylar: olib ketish va yetkazib berish */
+export const isNoServiceFeeTable = (table) => table === TAKEAWAY_TABLE || isDeliveryTable(table);

@@ -39,6 +39,8 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 ## Joriy vazifa
 
 **Pilot:** foydalanuvchi `supabase/qr.sql` ni ishga tushiradi, saytni Vercel'ga joylaydi, kafeda sinaydi.
+**Keyingi qadam (4-qadam):** stollar uchun QR stikerlar (chop etiladigan varaq).
+Kuryer bo'limi va xodim lavozim nomi qo'shildi (pastda, 4-bosqich).
 Keyin pilot natijasiga qarab: PIN tekshiruvini serverga ko'chirish, Click/Payme, fiskal chek, Vitest.
 Kichik ishlar (istalgan vaqtda): `barcha-kodlar.txt` (eskirgan kod nusxasi) va `preview.html` kerakmi, ko'rib chiqish.
 
@@ -72,6 +74,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | B11 | `useSticky`: oxirgi yozuv g'olib; to'lib qolsa xato faqat konsolga | `useSticky.js` | 2 | [x] |
 | B12 | Telegram yuborish kodi 3 joyda nusxalangan, `telegramNotifier.js` ishlatilmaydi | `CashierMode`, `WaiterMode`, `StatsMode` | 2 | [x] |
 | B13 | Taxminan 70 ta `alert/confirm` | ko'p fayllar | 2 | [x] |
+| B14 | Chekni bo'lishda `movTotals` aniqlanmagan: bo'lingandan keyin xato chiqib, oyna yopilmasdi (qayta bosilsa ikki marta bo'linardi) | `WaiterMode.jsx` (`handleConfirmSplit`) | 4 | [x] |
 
 ## Bosqichlar
 
@@ -108,6 +111,10 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 - [ ] Click/Payme integratsiyasi
 - [ ] Onlayn-kassa va fiskal chek talablarini tekshirish (O'zbekiston)
 - [x] Texnologik karta bo'yicha ayirish, qoldiq ogohlantirishi, kamomad yozuvi (`src/utils/inventoryCalc.js`)
+- [x] Kuryer bo'limi: yetkazib berish buyurtmasi (ofitsiant ekranida "🛵 Yangi yetkazish"), kuryer roli va ekrani
+  (`CourierMode.jsx`, `DeliveryOrderModal.jsx`, `src/utils/delivery.js`), kassada kuryer ma'lumoti, kunlik hisobot
+- [x] Xodim qo'shishda lavozim nomi qo'lda yoziladi (`user.title`), rollar bitta joyda (`src/constants/roles.js`)
+- [ ] Stollar uchun QR stikerlar
 
 ### 5-bosqich. Sifat
 - [ ] `Vitest`: summa, chegirma, bonus, ombor hisobi
@@ -123,6 +130,8 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | Id lar | `src/utils/ids.js` (`newId`): bir nechta qurilmada `Date.now()` to'qnashardi | qabul qilindi |
 | Telegram jonli jurnali | Har bir audit yozuvi Telegramga boradi (`src/utils/telegramFeed.js`, `useSticky` orqali). Faqat amal bajarilgan qurilma yuboradi (bulutdan kelgan yozuv yuborilmaydi), amallar 2,5 soniyada bitta xabarga yig'iladi, oflayn navbat qurilmada saqlanadi | qabul qilindi |
 | Yangi qurilmani ulash | Qurilma shu kafe hisobi bilan birinchi sinxronni tugatmaguncha ilova ochilmaydi (`SyncGate`, `isFirstSyncPending`). Komponentlarning standart qiymati (`useSticky` seed) birinchi sinxrondan oldin navbatga qo'yilmaydi. Sabab: sekin internetda yangi qurilma namuna xodimlar (777777, 2222) va menyuni bulutga yozib, admin PIN'ini qaytarardi va o'chirilgan xodimlarni tiklardi | qabul qilindi |
+| Yetkazib berish | Yetkazish buyurtmasi oddiy buyurtma: stol nomi `Yetkazish #N`, `orderType: 'delivery'`, `delivery: {...}` (sxema: `orderStatus.js`). Oshxona va kassadan o'tadi. Kuryer faqat holatni belgilaydi (oldi, yo'lda, yetkazildi + mijoz qanday to'lagani), chekni kassir yopadi: ombor ayirish va smena hisobi yagona joyda qoladi. Xizmat haqi (%) olinmaydi, yetkazish narxi chekda alohida qator (`isDeliveryFee`, oshxonaga chiqmaydi). Kuryer buyurtmaga ismi bilan biriktiriladi (ismlar takrorlanmaydi) | qabul qilindi |
+| Lavozim nomi | `user.title` faqat ko'rsatish uchun (admin o'zi yozadi: "Barmen", "Bosh oshpaz"). Kirish huquqi har doim `role` bo'yicha | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
 ## Commit jurnali
@@ -143,6 +152,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 11 | Mijoz telefonidan QR-buyurtma | a3ea5a4 | [x] |
 | 12 | Kassa smenasi va Z-hisobot | 7338932 | [x] |
 | 13 | Ombor nazorati va kamomad | 285e607 | [x] |
+| 14 | Kuryer bo'limi va xodim lavozim nomi | "4: kuryer bo'limi..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

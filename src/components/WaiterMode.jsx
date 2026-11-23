@@ -4,9 +4,19 @@ import WaiterTableGrid from './WaiterTableGrid';
 import WaiterMenu from './WaiterMenu';
 import WaiterCart from './WaiterCart';
 import WaiterActionModals from './WaiterActionModals';
+import DeliveryOrderModal from './DeliveryOrderModal';
 import { orderTotalsFields, getItemQty, getItemPrice } from '../utils/orderTotals';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
-import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
+import {
+  CLOSED_ORDER_STATUSES,
+  DELIVERY_STATUS,
+  KITCHEN_ORDER_STATUSES,
+  ORDER_STATUS,
+  ORDER_TYPE,
+  isDeliveryOrder,
+  isDeliveryTable
+} from '../constants/orderStatus';
+import { buildDeliveryFeeItem, getDeliveryStatus, nextDeliveryTable } from '../utils/delivery';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
@@ -147,6 +157,10 @@ export default function WaiterMode({
   const [mobilePanel, setMobilePanel] = useState('menu');
   const [qrModalTable, setQrModalTable] = useState(null);
   const [localPreCheckPrintOrder, setLocalPreCheckPrintOrder] = useState(null);
+
+  // Yetkazib berish: mijoz ma'lumoti oshxonaga yuborilguncha shu yerda turadi
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+  const [pendingDelivery, setPendingDelivery] = useState(null);
 
   // Stol ko'chirish va Chek bo'lish modallari
   const [transferOrder, setTransferOrder] = useState(null);
@@ -313,6 +327,32 @@ export default function WaiterMode({
       setCart([]);
     }
   };
+
+  // Stol ekranidan chiqish (yetkazish uchun kiritilgan, lekin yuborilmagan ma'lumot ham tozalanadi)
+  const closeSelectedTable = () => {
+    setSelectedTable(null);
+    setCart([]);
+    setPendingDelivery(null);
+  };
+
+  // =========================================================
+  // 5.1 🛵 YETKAZIB BERISH (KURYER) BUYURTMALARI
+  // =========================================================
+  const openDeliveryOrders = useMemo(
+    () => safeOrders.filter(o => o && isDeliveryOrder(o) && !CLOSED_ORDER_STATUSES.includes(o.status)),
+    [safeOrders]
+  );
+
+  // Mijoz ma'lumoti kiritildi -> "Yetkazish #N" joyi ochiladi, taomlar oddiy menyudan tanlanadi
+  const handleStartDelivery = (info) => {
+    const table = nextDeliveryTable(safeOrders);
+    setIsDeliveryModalOpen(false);
+    handleSelectTable(table);
+    setPendingDelivery({ ...info, table });
+  };
+
+  const selectedDeliveryInfo = currentTableOrder?.delivery
+    || (pendingDelivery && pendingDelivery.table === selectedTable ? pendingDelivery : null);
 
   // Ochiq buyurtmalar va savatdagi yuborilmagan porsiyalar band qilgan masalliq (ombor nazorati)
   const reservedStock = useMemo(() => reservedByOpenOrders(
@@ -730,6 +770,17 @@ export default function WaiterMode({
         `${selectedTable}: ${newPortionsText ? `dozakaz ${newPortionsText} • ` : ''}Jami ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
       );
     } else {
+      const delivery = isDeliveryTable(selectedTable) && pendingDelivery?.table === selectedTable
+        ? pendingDelivery
+        : null;
+      if (isDeliveryTable(selectedTable) && !delivery) {
+        notify("⚠️ Yetkazish ma'lumoti topilmadi. Qaytadan \"🛵 Yangi yetkazish\" tugmasini bosing.");
+        return;
+      }
+      // Yetkazish narxi chekda alohida qator (oshxonaga chiqmaydi)
+      const orderItems = delivery && delivery.fee > 0
+        ? [...normalizedCart, buildDeliveryFeeItem(delivery.fee)]
+        : normalizedCart;
       const baseOrder = {
         id: newId(),
         createdAt: nowMs,
@@ -738,18 +789,34 @@ export default function WaiterMode({
         date: nowDate,
         time: nowTime,
         status: ORDER_STATUS.NEW,
-        items: normalizedCart,
-        customerName: activeBooking?.customerName || '',
-        customerPhone: activeBooking?.customerPhone || '',
-        depositPaid: Number(activeBooking?.depositAmount || 0)
+        items: orderItems,
+        customerName: delivery ? delivery.customerName : (activeBooking?.customerName || ''),
+        customerPhone: delivery ? delivery.phone : (activeBooking?.customerPhone || ''),
+        depositPaid: Number(activeBooking?.depositAmount || 0),
+        ...(delivery ? {
+          orderType: ORDER_TYPE.DELIVERY,
+          delivery: {
+            customerName: delivery.customerName,
+            phone: delivery.phone,
+            address: delivery.address,
+            landmark: delivery.landmark,
+            note: delivery.note,
+            fee: delivery.fee,
+            status: DELIVERY_STATUS.WAITING,
+            courier: '',
+            courierId: null
+          }
+        } : {})
       };
-      const newOrder = { ...baseOrder, ...orderTotalsFields(baseOrder, normalizedCart, serviceFee) };
+      const newOrder = { ...baseOrder, ...orderTotalsFields(baseOrder, orderItems, serviceFee) };
       const totalAmount = newOrder.total;
 
       updateOrders(prev => [newOrder, ...(Array.isArray(prev) ? prev : [])]);
       recordAuditLog(
-        'Yangi buyurtma ochildi',
-        `${selectedTable}: ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)${newPortionsText ? ` • ${newPortionsText}` : ''}`
+        delivery ? 'Yangi yetkazish buyurtmasi' : 'Yangi buyurtma ochildi',
+        `${selectedTable}: ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)${newPortionsText ? ` • ${newPortionsText}` : ''}${
+          delivery ? ` • ${delivery.customerName || 'Mijoz'}, ${delivery.phone}, ${delivery.address}` : ''
+        }`
       );
     }
 
@@ -761,12 +828,16 @@ export default function WaiterMode({
       });
     }
 
-    setSelectedTable(null);
-    setCart([]);
+    closeSelectedTable();
   };
 
   const handleMarkAsDelivered = () => {
     if (!currentTableOrder) return;
+    // Yetkazish buyurtmasini kuryer o'z bo'limida "Yetkazildi" deb belgilaydi (pul usuli bilan)
+    if (isDeliveryOrder(currentTableOrder)) {
+      notify("🛵 Bu yetkazish buyurtmasi: uni kuryer o'z bo'limida \"Mijozga yetkazildi\" deb belgilaydi");
+      return;
+    }
     updateOrders(prev =>
       (Array.isArray(prev) ? prev : []).map(o =>
         o && String(o.id) === String(currentTableOrder.id)
@@ -1004,7 +1075,7 @@ export default function WaiterMode({
       )
     ]);
 
-    recordAuditLog("Chek bo'lindi", `${splitOrder.table} -> ${splitTargetTable} (${movTotals.total.toLocaleString()} s)`);
+    recordAuditLog("Chek bo'lindi", `${splitOrder.table} -> ${splitTargetTable} (${newSplitOrder.total.toLocaleString()} s)`);
     setSplitOrder(null);
     setSplitTargetTable('');
     setSplitQuantities({});
@@ -1015,6 +1086,51 @@ export default function WaiterMode({
   // =========================================================
   return (
     <div className="max-w-7xl mx-auto pb-8">
+      {!selectedTable && (
+        <div className="mb-4 bg-white dark:bg-gray-800 p-3 rounded-3xl shadow-xs border border-orange-100 dark:border-orange-900/50 flex flex-col sm:flex-row sm:items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsDeliveryModalOpen(true)}
+            className="shrink-0 px-4 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-black text-sm shadow-md shadow-orange-500/25 flex items-center justify-center gap-2 transition active:scale-95"
+          >
+            <span>🛵</span> Yangi yetkazish
+          </button>
+          {openDeliveryOrders.length === 0 ? (
+            <p className="text-xs font-bold text-gray-400">
+              Telefon orqali buyurtma: mijoz manzilini yozing, taomlarni tanlang. Kuryer o'z bo'limida ko'radi.
+            </p>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-0.5">
+              {openDeliveryOrders.map(o => {
+                const st = getDeliveryStatus(o);
+                const label = st === DELIVERY_STATUS.ON_WAY
+                  ? "🛵 yo'lda"
+                  : st === DELIVERY_STATUS.DELIVERED
+                  ? '✅ yetkazildi'
+                  : o.delivery?.courier
+                  ? `👤 ${o.delivery.courier}`
+                  : '⏳ kuryer kutmoqda';
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => handleSelectTable(o.table)}
+                    className="shrink-0 text-left px-3 py-2 rounded-2xl bg-orange-50 dark:bg-gray-900 border border-orange-200 dark:border-gray-700 hover:border-orange-400 transition active:scale-95"
+                  >
+                    <span className="block font-black text-xs text-gray-900 dark:text-white whitespace-nowrap">
+                      {o.table} • {o.status}
+                    </span>
+                    <span className="block text-[11px] font-bold text-gray-500 whitespace-nowrap max-w-[220px] truncate">
+                      {label} • {o.delivery?.customerName || o.delivery?.phone || ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {!selectedTable ? (
         <WaiterTableGrid
           tables={safeTables}
@@ -1047,22 +1163,31 @@ export default function WaiterMode({
           <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex justify-between items-center">
             <button
               type="button"
-              onClick={() => {
-                setSelectedTable(null);
-                setCart([]);
-              }}
+              onClick={closeSelectedTable}
               className="px-5 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-800 dark:text-white font-black text-xs sm:text-sm flex items-center gap-2 transition active:scale-95"
             >
               <span>⬅️</span> Zaldagi stollarga qaytish
             </button>
 
-            <div className="text-right">
+            <div className="text-right min-w-0">
               <span className="text-xs font-bold text-gray-400 block">Tanlangan joy:</span>
-              <span className="font-black text-lg text-amber-600 dark:text-amber-400">
-                🪑 {selectedTable}
+              <span className={`font-black text-lg ${isDeliveryTable(selectedTable) ? 'text-orange-600 dark:text-orange-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {isDeliveryTable(selectedTable) ? '🛵' : '🪑'} {selectedTable}
               </span>
             </div>
           </div>
+
+          {selectedDeliveryInfo && (
+            <div className="bg-orange-50 dark:bg-gray-800 p-3.5 rounded-2xl border border-orange-200 dark:border-orange-900/50 text-xs font-bold text-gray-700 dark:text-gray-200 flex flex-wrap gap-x-4 gap-y-1">
+              <span>👤 {selectedDeliveryInfo.customerName || 'Mijoz'}</span>
+              <span>📞 {selectedDeliveryInfo.phone}</span>
+              <span className="break-words">📍 {selectedDeliveryInfo.address}{selectedDeliveryInfo.landmark ? ` (${selectedDeliveryInfo.landmark})` : ''}</span>
+              {Number(selectedDeliveryInfo.fee) > 0 && (
+                <span>🛵 Yetkazish: {Number(selectedDeliveryInfo.fee).toLocaleString()} so'm{currentTableOrder ? '' : ' (yuborilganda chekka qo\'shiladi)'}</span>
+              )}
+              {selectedDeliveryInfo.note && <span className="text-amber-700 dark:text-amber-300">📝 {selectedDeliveryInfo.note}</span>}
+            </div>
+          )}
 
           {/* Telefon/planshet: menyu va savatcha almashtirgichi (katta ekranda ikkalasi yonma-yon) */}
           <div className="lg:hidden grid grid-cols-2 gap-1.5 p-1.5 bg-white dark:bg-gray-800 rounded-2xl shadow-xs border border-gray-100 dark:border-gray-700">
@@ -1141,10 +1266,7 @@ export default function WaiterMode({
                 markAsServed={handleMarkAsDelivered}
                 onLockPreCheck={handleLockAndPrintPreCheck}
                 onCancelEntireOrder={handleCancelEntireOrder}
-                onBack={() => {
-                  setSelectedTable(null);
-                  setCart([]);
-                }}
+                onBack={closeSelectedTable}
               />
             </div>
           </div>
@@ -1170,6 +1292,14 @@ export default function WaiterMode({
             </button>
           )}
         </div>
+      )}
+
+      {isDeliveryModalOpen && (
+        <DeliveryOrderModal
+          orders={safeOrders}
+          onClose={() => setIsDeliveryModalOpen(false)}
+          onSubmit={handleStartDelivery}
+        />
       )}
 
       {/* BARCHA MODALLAR ALOHIDA FAYLDA */}

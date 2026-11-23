@@ -10,6 +10,7 @@ import WaiterMode from './components/WaiterMode';
 import CashierMode from './components/CashierMode';
 import CustomerQRView from './components/CustomerQRView';
 import KitchenMode from './components/KitchenMode';
+import CourierMode from './components/CourierMode';
 import AdminPanel from './components/AdminPanel';
 import WarehouseMode from './components/WarehouseMode';
 import ManagerOverrideModal from './components/ManagerOverrideModal';
@@ -21,7 +22,8 @@ import SyncStatusBadge from './components/SyncStatusBadge';
 import QrRequestsPanel from './components/QrRequestsPanel';
 import { callRpc } from './sync/engine';
 import { notify } from './utils/notify';
-import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from './constants/orderStatus';
+import { CLOSED_ORDER_STATUSES, DELIVERY_STATUS, KITCHEN_ORDER_STATUSES, ORDER_STATUS, isDeliveryOrder } from './constants/orderStatus';
+import { getRoleMeta, getUserTitle } from './constants/roles';
 import { newId } from './utils/ids';
 
 const initialMenuItems = [
@@ -92,7 +94,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [view, setView] = useState('login'); // 'login' | 'app' | 'guest_qr'
   const [guestTable, setGuestTable] = useState('1-Stol'); 
-  const [adminActiveView, setAdminActiveView] = useState('admin'); // 'admin' | 'stats' | 'warehouse' | 'waiter' | 'cashier' | 'kitchen'
+  const [adminActiveView, setAdminActiveView] = useState('admin'); // 'admin' | 'stats' | 'warehouse' | 'waiter' | 'cashier' | 'kitchen' | 'courier'
   
   const [overrideRequest, setOverrideRequest] = useState(null); 
   const [receiptToPrint, setReceiptToPrint] = useState(null);
@@ -415,6 +417,11 @@ export default function App() {
   const staffWithSamplePin = currentUser.role === 'admin'
     ? (Array.isArray(users) ? users : []).filter(u => u && SAMPLE_PINS.has(String(u.pin ?? '')))
     : [];
+  // Kuryer biriktirilmagan yetkazish buyurtmalari (admin menyusidagi belgi)
+  const unassignedDeliveries = (Array.isArray(orders) ? orders : []).filter(
+    o => o && isDeliveryOrder(o) && !CLOSED_ORDER_STATUSES.includes(o.status) &&
+      !o.delivery?.courier && (o.delivery?.status || DELIVERY_STATUS.WAITING) === DELIVERY_STATUS.WAITING
+  ).length;
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
@@ -432,7 +439,7 @@ export default function App() {
               {cafeName}
             </h1>
             <p className="text-xs font-bold text-gray-400">
-              {currentUser.name} • <span className="uppercase text-indigo-500">{currentUser.role}</span>
+              {currentUser.name} • <span className="uppercase text-indigo-500">{getRoleMeta(currentUser.role).icon} {getUserTitle(currentUser)}</span>
             </p>
           </div>
         </div>
@@ -446,7 +453,8 @@ export default function App() {
               { id: 'warehouse', label: '📦 Ombor' },
               { id: 'waiter', label: `📝 Ofitsiant ${waiterCalls.length > 0 ? `(${waiterCalls.length})` : ''}` },
               { id: 'cashier', label: '💰 Kassa' },
-              { id: 'kitchen', label: '👨‍🍳 Oshxona' }
+              { id: 'kitchen', label: '👨‍🍳 Oshxona' },
+              { id: 'courier', label: `🛵 Kuryer ${unassignedDeliveries > 0 ? `(${unassignedDeliveries})` : ''}` }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -567,6 +575,17 @@ export default function App() {
             menuItems={menuItems}
             setMenuItems={setMenuItems}
             menuCategories={menuCategories}
+            currentUser={currentUser}
+            addAuditLog={addAuditLog}
+          />
+        )}
+
+        {/* 3.1 YETKAZIB BERISH (KURYER) */}
+        {currentActiveView === 'courier' && (
+          <CourierMode
+            orders={orders}
+            setOrders={setOrders}
+            users={users}
             currentUser={currentUser}
             addAuditLog={addAuditLog}
           />

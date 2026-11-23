@@ -31,6 +31,7 @@ const ROLE_LABEL = {
   waiter: 'Ofitsiant',
   kitchen: 'Oshpaz',
   warehouse: 'Omborchi',
+  courier: 'Kuryer',
   guest: 'Mijoz'
 };
 
@@ -39,6 +40,7 @@ const ICONS = [
   [/kirish/, '🔑'],
   [/chiqish/, '🚪'],
   [/(^|\s)o'chiril|bekor|tozala|kamaytiril|rad etil/, '🗑'],
+  [/kuryer|yetkazish/, '🛵'],
   [/oshxona|stop-list/, '👨‍🍳'],
   [/yetkazil/, '🍽'],
   [/pre-chek/, '🧾'],

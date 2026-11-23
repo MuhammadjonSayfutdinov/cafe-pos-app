@@ -1,4 +1,5 @@
 import React from 'react';
+import { isDeliveryOrder } from '../constants/orderStatus';
 
 export default function CashierReceipt({ 
   selectedOrder, 
@@ -42,7 +43,7 @@ export default function CashierReceipt({
             </div>
 
             <h3 className="text-2xl font-black text-gray-900 dark:text-white mt-1.5">
-              🪑 {selectedOrder.table}
+              {isDeliveryOrder(selectedOrder) ? '🛵' : '🪑'} {selectedOrder.table}
             </h3>
             <p className="text-xs font-bold text-gray-400 mt-0.5">
               👤 Xodim: {selectedOrder.waiterName || selectedOrder.waiter || 'Ofitsiant'} • 🕒 {selectedOrder.time}

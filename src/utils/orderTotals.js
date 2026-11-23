@@ -1,7 +1,7 @@
 // Buyurtma summasini hisoblashning YAGONA joyi (B10).
 // Pul butun so'mda hisoblanadi.
 
-const TAKEAWAY_TABLE = 'Olib ketish';
+import { isNoServiceFeeTable } from '../constants/orderStatus';
 
 export const getItemQty = (item) => {
   const q = Number(item?.quantity ?? item?.qty ?? 1);
@@ -15,7 +15,7 @@ export const getItemPrice = (item) =>
  * @param {object} p
  * @param {Array}  p.items              buyurtmadagi taomlar
  * @param {number} p.serviceFeePercent  xizmat haqi foizi
- * @param {string} [p.table]            'Olib ketish' bo'lsa xizmat haqi 0
+ * @param {string} [p.table]            'Olib ketish' yoki 'Yetkazish #N' bo'lsa xizmat haqi 0
  * @param {number} [p.discountAmount]   chegirma (so'm)
  * @param {number} [p.usedBonus]        ishlatilgan bonus (so'm)
  */
@@ -30,7 +30,7 @@ export function calcOrderTotals({
   const subTotal = Math.round(
     list.reduce((sum, it) => (it ? sum + getItemPrice(it) * getItemQty(it) : sum), 0)
   );
-  const feePct = table === TAKEAWAY_TABLE ? 0 : Math.max(0, Number(serviceFeePercent) || 0);
+  const feePct = isNoServiceFeeTable(table) ? 0 : Math.max(0, Number(serviceFeePercent) || 0);
   const serviceFeeAmount = Math.round((subTotal * feePct) / 100);
   const gross = subTotal + serviceFeeAmount;
   const discount = Math.min(gross, Math.max(0, Math.round(Number(discountAmount) || 0)));

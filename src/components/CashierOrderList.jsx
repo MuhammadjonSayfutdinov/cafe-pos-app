@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ORDER_STATUS } from '../constants/orderStatus';
+import { DELIVERY_STATUS, ORDER_STATUS, isDeliveryOrder } from '../constants/orderStatus';
 
 const DEBT_PAY_METHODS = ['Naqd', 'Plastik', 'Click', 'Payme'];
 
@@ -191,6 +191,17 @@ export default function CashierOrderList({
                   {displayTotal > 0 && (
                     <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 mt-1.5">
                       {displayTotal.toLocaleString()} so'm
+                    </p>
+                  )}
+
+                  {isDeliveryOrder(order) && (
+                    <p className="text-[11px] font-black text-orange-600 dark:text-orange-400 mt-1">
+                      🛵 {order.delivery?.courier || 'Kuryer biriktirilmagan'}
+                      {order.delivery?.status === DELIVERY_STATUS.DELIVERED
+                        ? ` • yetkazdi, ${order.delivery?.collectedMethod || 'Naqd'} olib keladi`
+                        : order.delivery?.status === DELIVERY_STATUS.ON_WAY
+                        ? " • yo'lda"
+                        : ''}
                     </p>
                   )}
                 </div>
