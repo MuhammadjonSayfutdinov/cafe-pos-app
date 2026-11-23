@@ -37,8 +37,21 @@ export function createSupabaseTransport({ url, anonKey }) {
       return `${url}|${data.session?.user?.id || 'anon'}`;
     },
     async getSession() {
-      const { data } = await client.auth.getSession();
-      return data.session;
+      try {
+        const { data } = await client.auth.getSession();
+        if (data.session) return data.session;
+      } catch {
+        // tarmoq xatosi: pastdagi zaxira tekshiruvga o'tamiz
+      }
+      // Internet yo'q va token muddati tugagan bo'lsa ham, qurilma avval ulangan bo'lsa
+      // kassa ishlashda davom etsin (internet qaytganda token avtomatik yangilanadi).
+      try {
+        const stored = JSON.parse(window.localStorage.getItem('cafe_supabase_auth') || 'null');
+        if (stored?.user && !navigator.onLine) return { user: stored.user, offline: true };
+      } catch {
+        // ignore
+      }
+      return null;
     },
     async signIn(email, password) {
       const { data, error } = await client.auth.signInWithPassword({ email, password });
