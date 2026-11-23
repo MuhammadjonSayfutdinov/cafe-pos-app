@@ -122,6 +122,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | Backend | Supabase (pilot). Haqiqiy ishga o'tishda shaxsiy ma'lumotlar qonuni sababli mahalliy serverga ko'chish (`supabaseTransport.js` almashtiriladi) | qabul qilindi |
 | Id lar | `src/utils/ids.js` (`newId`): bir nechta qurilmada `Date.now()` to'qnashardi | qabul qilindi |
 | Telegram jonli jurnali | Har bir audit yozuvi Telegramga boradi (`src/utils/telegramFeed.js`, `useSticky` orqali). Faqat amal bajarilgan qurilma yuboradi (bulutdan kelgan yozuv yuborilmaydi), amallar 2,5 soniyada bitta xabarga yig'iladi, oflayn navbat qurilmada saqlanadi | qabul qilindi |
+| Yangi qurilmani ulash | Qurilma shu kafe hisobi bilan birinchi sinxronni tugatmaguncha ilova ochilmaydi (`SyncGate`, `isFirstSyncPending`). Komponentlarning standart qiymati (`useSticky` seed) birinchi sinxrondan oldin navbatga qo'yilmaydi. Sabab: sekin internetda yangi qurilma namuna xodimlar (777777, 2222) va menyuni bulutga yozib, admin PIN'ini qaytarardi va o'chirilgan xodimlarni tiklardi | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
 ## Commit jurnali

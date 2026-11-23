@@ -78,6 +78,10 @@ Planshet va telefonlar dasturni oddiy havola orqali ochishi uchun:
 3. **Deploy** bosing. Bir necha daqiqada `https://cafe-pos-app-xxxx.vercel.app` kabi havola beriladi.
 4. Har bir qurilmada shu havolani oching. Brauzer menyusidan **"Bosh ekranga qo'shish"** ni tanlang:
    dastur ilovaga o'xshab ochiladi.
+   - **iPhone/iPad:** bosh ekrandagi belgi Safari'dan alohida xotiraga ega. Avval bosh ekranga qo'shing,
+     keyin **belgidan** ochib qurilmani ulang. Safari'da ulangan bo'lsa ham, belgidan ochilganda yana bir marta ulash kerak.
+   - Yangi qurilma bulutdan menyu va xodimlarni olmaguncha ochilmaydi (namuna xodimlar bulutdagi
+     ma'lumotni buzmasligi uchun). Internet sekin bo'lsa, "yuklanmoqda" ekrani biroz turadi.
 
 GitHub'ga yangi commit push qilinganda Vercel saytni avtomatik yangilaydi.
 
@@ -121,6 +125,7 @@ stollarning buyurtmalari ko'rinmaydi.
 | Belgi | Sabab va yechim |
 |-------|-----------------|
 | "Email yoki parol noto'g'ri" | 3-qadamdagi hisobni tekshiring, foydalanuvchi "Confirmed" bo'lishi kerak |
+| Yangi qurilmada "Bulutdan ma'lumot olib bo'lmadi" | Internetni tekshiring va "Qayta urinish" ni bosing. Supabase loyihasi uxlab qolgan bo'lishi mumkin (Dashboard → Restore) |
 | Doim `📴 Oflayn` | Internetni tekshiring. Supabase loyihasi uxlab qolgan bo'lishi mumkin (Dashboard → Restore) |
 | Boshqa qurilmaga o'zgarish kelmayapti | SQL'dagi 5-qism (Realtime) bajarilganini tekshiring. Belgini bosing: "Hozir sinxronlash" |
 | Qurilmani boshqa kafe hisobiga ulash kerak | Tizim Sozlamalari → "Qurilmani bulutdan uzish" |

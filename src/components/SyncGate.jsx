@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getSyncStatus, subscribeSyncStatus, signIn } from '../sync/engine';
+import { getSyncStatus, subscribeSyncStatus, signIn, isFirstSyncPending, syncNow } from '../sync/engine';
 
 // Bulut sinxronlash yoqilgan bo'lsa: qurilma kafe hisobiga ulanmaguncha ilovani ko'rsatmaydi.
 // Sinxronlash o'chiq bo'lsa (.env.local bo'sh) - darhol ilovani ko'rsatadi.
@@ -18,6 +18,12 @@ export default function SyncGate({ children }) {
 
   if (status.state === 'auth') return <DeviceLogin />;
 
+  // Yangi qurilma: bulut ma'lumoti kelmaguncha ilova ochilmaydi. Aks holda namuna xodimlar
+  // (777777, 2222...) bilan kirish mumkin bo'lardi va ular bulutdagi ma'lumotni buzardi.
+  if ((status.state === 'booting' || status.state === 'offline') && isFirstSyncPending()) {
+    return <FirstSyncScreen status={status} />;
+  }
+
   if (status.state === 'booting' && !skipWait) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4 bg-gray-100 dark:bg-gray-900 text-center">
@@ -35,6 +41,52 @@ export default function SyncGate({ children }) {
   }
 
   return children;
+}
+
+function FirstSyncScreen({ status }) {
+  const failed = status.state === 'offline';
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!busy) return undefined;
+    const t = setTimeout(() => setBusy(false), 3000);
+    return () => clearTimeout(t);
+  }, [busy]);
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4 bg-gray-100 dark:bg-gray-900 text-center">
+      {failed ? (
+        <div className="text-5xl">📴</div>
+      ) : (
+        <div className="w-14 h-14 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
+      )}
+      <p className="font-black text-gray-800 dark:text-gray-100">
+        {failed ? "Bulutdan ma'lumot olib bo'lmadi" : "Ma'lumotlar bulutdan yuklanmoqda..."}
+      </p>
+      <p className="max-w-sm text-xs font-bold text-gray-500 dark:text-gray-400">
+        {failed
+          ? "Internetni tekshiring. Dastur o'zi qayta urinib turadi. Bu qurilma birinchi marta ulanmoqda, shuning uchun menyu va xodimlar kelmaguncha ochilmaydi."
+          : "Bu qurilma birinchi marta ulanmoqda. Internet sekin bo'lsa, biroz kuting."}
+      </p>
+      {failed && (
+        <>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              syncNow();
+            }}
+            className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 active:scale-95 text-white font-black"
+          >
+            {busy ? 'Urinilmoqda...' : '🔄 Qayta urinish'}
+          </button>
+          {status.error && (
+            <p className="max-w-sm text-[10px] font-bold text-gray-400 break-words">{String(status.error)}</p>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 function DeviceLogin() {

@@ -137,9 +137,15 @@ function writeLocalFromRemote(key, value) {
   window.dispatchEvent(new CustomEvent(SAME_TAB_EVENT, { detail: { key, newValue: value, source: 'remote' } }));
 }
 
-/** useSticky (va boshqa yozuvchilar) har bir yozuvdan keyin chaqiradi. */
-export function localWrite(key, nextValue) {
+/**
+ * useSticky (va boshqa yozuvchilar) har bir yozuvdan keyin chaqiradi.
+ * seed: komponentning standart (namuna) qiymati. Birinchi sinxrondan oldin u navbatga
+ * qo'yilmaydi: aks holda yangi qurilmaning namuna xodimlari (777777, 2222...) va menyusi
+ * bulutdagi haqiqiy ma'lumot ustiga yozilardi. Bulut bo'sh bo'lsa, mergeInitial o'zi yuklaydi.
+ */
+export function localWrite(key, nextValue, { seed = false } = {}) {
   if (!transport || !isSyncedKey(key)) return;
+  if (seed && !started) return;
   const prev = shadow.get(key);
   shadow.set(key, nextValue);
 
@@ -420,6 +426,13 @@ async function startWithRetry() {
 
 // ---------- tashqi API ----------
 
+/**
+ * Qurilma shu kafe hisobi bilan hali birorta ham to'liq sinxron qilmaganmi.
+ * Bunday qurilmada ilova bulut ma'lumoti kelguncha ochilmaydi (SyncGate): uning
+ * xotirasida faqat namuna ma'lumot bor.
+ */
+export const isFirstSyncPending = () => !started && !storage()?.getItem(INIT_IDENTITY_KEY);
+
 /** Transport yuklanayotganda: ilova o'rniga yuklanish ekrani ko'rinsin */
 export function markBooting() {
   setStatus({ state: 'booting' });
@@ -472,6 +485,14 @@ export async function bootSync() {
 export async function signIn(email, password) {
   if (!transport) throw new Error("Sinxronlash sozlanmagan");
   const session = await transport.signIn(email, password);
+  // Boshqa kafe hisobiga ulandi: oldingi hisobning "birinchi sinxron bo'lgan" belgisi o'chadi
+  try {
+    if (storage()?.getItem(INIT_IDENTITY_KEY) !== await transport.identity()) {
+      storage()?.removeItem(INIT_IDENTITY_KEY);
+    }
+  } catch {
+    // ignore
+  }
   setStatus({ state: 'booting', email: session?.user?.email || email, error: null });
   await startWithRetry();
 }

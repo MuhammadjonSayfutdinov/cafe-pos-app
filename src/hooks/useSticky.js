@@ -67,7 +67,8 @@ export function useSticky(key, defaultValue) {
       if (window.localStorage.getItem(key) === null && !unsavedValues.has(key)) {
         writeValue(key, defaultRef.current);
         // Birinchi qurilmaning boshlang'ich ma'lumotlari bulutga ham chiqsin
-        localWrite(key, defaultRef.current);
+        // (seed: bulutdagi haqiqiy ma'lumot ustiga yozilmaydi, engine.localWrite)
+        localWrite(key, defaultRef.current, { seed: true });
       }
     } catch {
       // localStorage mavjud emas
