@@ -1,27 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
+import { detectTelegramChatId, sendTelegramMessage, escapeHtml, getTelegramConfig, DEFAULT_TELEGRAM_CONFIG } from '../utils/telegramNotifier';
 
-const DEFAULT_TELEGRAM_CONFIG = {
-  enabled: false,
-  botToken: '',
-  chatId: '',
-  notifyOnZReport: true,
-  notifyOnDebt: true,
-  notifyOnDiscount: true,
-  notifyOnLowStock: true,
-  notifyOnEverySale: false,
-  notifyOnSecurity: true
-};
-
-const readTelegramConfig = () => {
-  try {
-    const raw = window.localStorage.getItem('pos_telegram_config');
-    if (!raw) return DEFAULT_TELEGRAM_CONFIG;
-    return { ...DEFAULT_TELEGRAM_CONFIG, ...(JSON.parse(raw) || {}) };
-  } catch {
-    return DEFAULT_TELEGRAM_CONFIG;
-  }
-};
+// Telegram sozlamalari: yagona joy - src/utils/telegramNotifier.js (B12)
+const readTelegramConfig = getTelegramConfig;
 
 // ==========================================
 // ZAXIRA FAYLINI TEKSHIRISH (B5)
@@ -175,45 +157,18 @@ export default function AdminSettingsTab({
 
     setTgStatus({ loading: true, message: 'Telegram bot tekshirilmoqda...', isError: false });
 
-    try {
-      const res = await fetch(`https://api.telegram.org/bot${cleanToken}/getUpdates`);
-      const data = await res.json();
-
-      if (!data.ok) {
-        setTgStatus({ loading: false, message: `❌ ${data.description || "Bot Token noto'g'ri!"}`, isError: true });
-        return;
-      }
-
-      const updates = Array.isArray(data.result) ? data.result : [];
-      let foundId = '';
-      let foundName = '';
-
-      for (let i = updates.length - 1; i >= 0; i--) {
-        const msg = updates[i].message || updates[i].my_chat_member || updates[i].channel_post;
-        if (msg && msg.chat && msg.chat.id) {
-          foundId = String(msg.chat.id);
-          foundName = msg.chat.title || `${msg.chat.first_name || ''} ${msg.chat.last_name || ''}`.trim() || msg.chat.username || 'Foydalanuvchi';
-          break;
-        }
-      }
-
-      if (foundId) {
-        updateTgField('chatId', foundId);
-        updateTgField('enabled', true);
-        setTgStatus({
-          loading: false,
-          message: `✅ Topildi! "${foundName}" (ID: ${foundId}) avtomatik ulandi.`,
-          isError: false
-        });
-      } else {
-        setTgStatus({
-          loading: false,
-          message: "❌ Xabarlar topilmadi! Telegramda botingizga kirib '/start' bosing va qayta urinib ko'ring.",
-          isError: true
-        });
-      }
-    } catch {
-      setTgStatus({ loading: false, message: '❌ Internet aloqasini tekshiring!', isError: true });
+    // Yagona joy: src/utils/telegramNotifier.js (B12)
+    const res = await detectTelegramChatId(cleanToken);
+    if (res.ok) {
+      updateTgField('chatId', res.chatId);
+      updateTgField('enabled', true);
+      setTgStatus({
+        loading: false,
+        message: `✅ Topildi! "${res.chatName}" (ID: ${res.chatId}) avtomatik ulandi.`,
+        isError: false
+      });
+    } else {
+      setTgStatus({ loading: false, message: `❌ ${res.error}`, isError: true });
     }
   };
 
@@ -231,37 +186,18 @@ export default function AdminSettingsTab({
     const testHtml = [
       `🚀 <b>TELEGRAM BOT MUVAFFAQIYATLI ULANDI!</b>`,
       `━━━━━━━━━━━━━━━━━━`,
-      `🏪 <b>Kafe:</b> ${cafeName}`,
-      `👤 <b>Tekshiruvchi:</b> ${currentUser?.name || 'Admin'}`,
+      `🏪 <b>Kafe:</b> ${escapeHtml(cafeName)}`,
+      `👤 <b>Tekshiruvchi:</b> ${escapeHtml(currentUser?.name || 'Admin')}`,
       `🕒 <b>Vaqt:</b> ${new Date().toLocaleString()}`,
       `━━━━━━━━━━━━━━━━━━`,
       `✅ Endi smena hisobotlari (Z-Otchyot), qarzlar, chegirmalar va ombor ogohlantirishlari shu yerga jonli kelib tushadi!`
     ].join('\n');
 
-    try {
-      const chatIds = rawChatIds.split(',').map(s => s.trim()).filter(Boolean);
-      const responses = await Promise.all(
-        chatIds.map(id =>
-          fetch(`https://api.telegram.org/bot${cleanToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: id,
-              text: testHtml,
-              parse_mode: 'HTML'
-            })
-          }).then(r => r.json())
-        )
-      );
-
-      const errObj = responses.find(r => !r.ok);
-      if (errObj) {
-        setTgStatus({ loading: false, message: `❌ Xatolik: ${errObj.description}`, isError: true });
-      } else {
-        setTgStatus({ loading: false, message: '✅ Sinov xabari Telegramingizga muvaffaqiyatli yuborildi!', isError: false });
-      }
-    } catch {
-      setTgStatus({ loading: false, message: '❌ Internet aloqasi yo\'q!', isError: true });
+    const res = await sendTelegramMessage(testHtml, 'test', telegramConfig);
+    if (res.ok) {
+      setTgStatus({ loading: false, message: '✅ Sinov xabari Telegramingizga muvaffaqiyatli yuborildi!', isError: false });
+    } else {
+      setTgStatus({ loading: false, message: `❌ Xatolik: ${res.error}`, isError: true });
     }
   };
 

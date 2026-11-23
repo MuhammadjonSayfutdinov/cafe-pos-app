@@ -6,6 +6,7 @@ import StatsPopularItems from './StatsPopularItems';
 import PrintReceiptModal from './PrintReceiptModal';
 import { getRecordTimeMs } from '../utils/dates';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
+import { getTelegramConfig, sendTelegramMessage, escapeHtml } from '../utils/telegramNotifier';
 
 // ===============================================
 // 1. O'LCHOV BIRLIKLARI KONVERTORI (TANNARX UCHUN)
@@ -58,12 +59,6 @@ const toDateInputStr = (dateObj) => {
   const d = String(dateObj.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
-
-const escapeHtml = (str) =>
-  String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 
 // ===============================================
 // 3. OFITSIANT MAOSH STAVKASI STANDART QOIDASI
@@ -946,13 +941,8 @@ export default function StatsMode({
   // ===============================================
   const sendReportToTelegram = async (customLabel = null) => {
     try {
-      const raw = window.localStorage.getItem('pos_telegram_config');
-      if (!raw) return { ok: false, error: 'Telegram Bot sozlanmagan!' };
-      const cfg = JSON.parse(raw);
-      const token = String(cfg?.botToken || '').trim();
-      const rawIds = String(cfg?.chatId || '').trim();
-
-      if (!token || !rawIds) {
+      const cfg = getTelegramConfig();
+      if (!String(cfg.botToken || '').trim() || !String(cfg.chatId || '').trim()) {
         return { ok: false, error: 'Admin Sozlamalarida Bot Token va Chat ID kiritilmagan!' };
       }
 
@@ -974,21 +964,9 @@ export default function StatsMode({
         ...Object.entries(paymentStats).map(([k, v]) => `  • ${escapeHtml(k)}: ${Number(v || 0).toLocaleString()} so'm`)
       ].join('\n');
 
-      const chatIds = rawIds.split(',').map(s => s.trim()).filter(Boolean);
-      await Promise.all(
-        chatIds.map(id =>
-          fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: id,
-              text: htmlMsg,
-              parse_mode: 'HTML'
-            })
-          })
-        )
-      );
-      return { ok: true };
+      // Qo'lda yuborilgan hisobot: Telegram xabarnomalari o'chiq bo'lsa ham ketadi (B12)
+      const res = await sendTelegramMessage(htmlMsg, 'manual', cfg);
+      return res.ok ? { ok: true } : { ok: false, error: res.error || 'Telegram xatosi' };
     } catch {
       return { ok: false, error: 'Internet xatosi!' };
     }

@@ -7,6 +7,7 @@ import WaiterActionModals from './WaiterActionModals';
 import { orderTotalsFields, getItemQty, getItemPrice } from '../utils/orderTotals';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
+import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -31,44 +32,8 @@ const playWaiterBeep = () => {
   }
 };
 
-const escapeHtml = (str) =>
-  String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-
-async function sendWaiterSecurityTelegram(linesArray) {
-  try {
-    const raw = window.localStorage.getItem('pos_telegram_config');
-    if (!raw) return;
-    const cfg = JSON.parse(raw);
-    if (!cfg || !cfg.enabled || cfg.notifyOnSecurity === false) return;
-
-    const token = String(cfg.botToken || '').trim();
-    const rawIds = String(cfg.chatId || '').trim();
-    if (!token || !rawIds) return;
-
-    const text = linesArray.filter(Boolean).join('\n');
-    const chatIds = rawIds.split(',').map(s => s.trim()).filter(Boolean);
-
-    await Promise.all(
-      chatIds.map(id =>
-        fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: id,
-            text,
-            parse_mode: 'HTML',
-            disable_web_page_preview: true
-          })
-        })
-      )
-    );
-  } catch {
-    // ignore offline error
-  }
-}
+// Telegram: yagona joy - src/utils/telegramNotifier.js (B12)
+const sendWaiterSecurityTelegram = (linesArray) => sendTelegramLines(linesArray, 'security');
 
 export default function WaiterMode({
   tables: tablesProp,

@@ -25,7 +25,7 @@ export const getTelegramConfig = () => {
 };
 
 // HTML belgilarni xavfsiz kodlash (Taom nomida <, >, & bo'lsa xato bermasligi uchun)
-const escapeHtml = (str) => {
+export const escapeHtml = (str) => {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -36,7 +36,9 @@ const escapeHtml = (str) => {
 export async function sendTelegramMessage(htmlText, eventType = 'general', customConfig = null) {
   const config = customConfig || getTelegramConfig();
 
-  if (!config.enabled && eventType !== 'test') {
+  // 'test' va 'manual' (qo'lda yuborilgan hisobot) o'chirilgan holatda ham yuboriladi
+  const isManual = eventType === 'test' || eventType === 'manual';
+  if (!config.enabled && !isManual) {
     return { ok: false, skipped: true, reason: "Telegram xabarnoma o'chirilgan" };
   }
 
@@ -88,6 +90,14 @@ export async function sendTelegramMessage(htmlText, eventType = 'general', custo
     console.warn('Telegram xabarini yuborishda internet xatosi:', err);
     return { ok: false, error: "Internet aloqasi yo'q yoki Telegram serveriga ulanib bo'lmadi." };
   }
+}
+
+// Qatorlar ro'yxatini yuborish (bo'sh qatorlar tashlab ketiladi). Xato bo'lsa ham ilova to'xtamaydi.
+// eventType: 'security' | 'debt' | 'discount' | 'sale' | 'low_stock' | 'z_report' | 'manual' | 'test'
+export async function sendTelegramLines(lines, eventType = 'general') {
+  const text = (Array.isArray(lines) ? lines : [lines]).filter(Boolean).join('\n');
+  if (!text) return { ok: false, skipped: true };
+  return sendTelegramMessage(text, eventType);
 }
 
 // Botga /start bosgan rahbarning Chat ID sini avtomatik topib berish

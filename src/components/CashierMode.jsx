@@ -5,6 +5,7 @@ import CashierReceipt from './CashierReceipt';
 import CashierPaymentControls from './CashierPaymentControls';
 import { calcOrderTotals } from '../utils/orderTotals';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
+import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 
 // ==========================================
 // 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
@@ -97,45 +98,16 @@ const convertRecipeToInventoryUnit = (amount, fromUnit, toInvUnit) => {
 // ==========================================
 // 4. ICHKI XAVFSIZ TELEGRAM XABAR YUBORGICH
 // ==========================================
-const escapeHtml = (str) =>
-  String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-
-async function sendCashierTelegramAlert(linesArray, checkKey = null) {
-  try {
-    const raw = window.localStorage.getItem('pos_telegram_config');
-    if (!raw) return;
-    const cfg = JSON.parse(raw);
-    if (!cfg || !cfg.enabled) return;
-    if (checkKey && cfg[checkKey] === false) return;
-
-    const token = String(cfg.botToken || '').trim();
-    const rawIds = String(cfg.chatId || '').trim();
-    if (!token || !rawIds) return;
-
-    const text = linesArray.filter(Boolean).join('\n');
-    const chatIds = rawIds.split(',').map(s => s.trim()).filter(Boolean);
-
-    await Promise.all(
-      chatIds.map(id =>
-        fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: id,
-            text,
-            parse_mode: 'HTML',
-            disable_web_page_preview: true
-          })
-        })
-      )
-    );
-  } catch {
-    // Internet bo'lmasa kassa odatdagidek ishlayveradi
-  }
-}
+// Telegram: yagona joy - src/utils/telegramNotifier.js (B12)
+const TG_EVENT_BY_FLAG = {
+  notifyOnSecurity: 'security',
+  notifyOnDebt: 'debt',
+  notifyOnDiscount: 'discount',
+  notifyOnEverySale: 'sale',
+  notifyOnLowStock: 'low_stock'
+};
+const sendCashierTelegramAlert = (linesArray, flagKey = null) =>
+  sendTelegramLines(linesArray, TG_EVENT_BY_FLAG[flagKey] || 'general');
 
 export default function CashierMode({
   orders,
