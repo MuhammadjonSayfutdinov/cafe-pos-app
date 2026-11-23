@@ -44,7 +44,7 @@ export function TableQrModal({
   return (
     <div 
       onClick={() => typeof onClose === 'function' && onClose()}
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[120] p-4 animate-fade-in"
+      className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[120] p-4 animate-fade-in"
     >
       {/* QR STIKER UCHUN MAXSUS PRINT CSS */}
       <style>{`
@@ -110,7 +110,7 @@ export function TableQrModal({
           </div>
           
           {/* QR Kod Tasviri */}
-          <div className="bg-amber-50/70 dark:bg-white p-5 rounded-3xl border-4 border-dashed border-amber-400 inline-block mb-5 shadow-sm">
+          <div className="bg-amber-50/70 dark:bg-white p-5 rounded-3xl border-4 border-dashed border-amber-400 inline-block mb-5 shadow-xs">
             {!imgError ? (
               <img 
                 src={qrUrl} 
@@ -307,7 +307,7 @@ export function ReceiptModal({
   return (
     <div 
       onClick={() => typeof onClose === 'function' && onClose()}
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[120] p-4 print:bg-white print:static print:p-0 animate-fade-in"
+      className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[120] p-4 print:bg-white print:static print:p-0 animate-fade-in"
     >
       <style>{`
         @media print { 

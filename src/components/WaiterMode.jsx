@@ -4,6 +4,8 @@ import WaiterTableGrid from './WaiterTableGrid';
 import WaiterMenu from './WaiterMenu';
 import WaiterCart from './WaiterCart';
 import WaiterActionModals from './WaiterActionModals';
+import { orderTotalsFields, getItemQty, getItemPrice } from '../utils/orderTotals';
+import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -245,35 +247,18 @@ export default function WaiterMode({
     }
 
     // Agar chekda taomlar qolgan bo'lsa -> Oshxona va Kassadagi buyurtmani darhol yangilaymiz!
-    const subTotal = nextCartItems.reduce((sum, item) => {
-      const p = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;
-      const q = Number(item.quantity ?? item.qty ?? 1) || 0;
-      return sum + p * q;
-    }, 0);
-
-    const isTakeaway = selectedTable === 'Olib ketish';
-    const feePct = isTakeaway ? 0 : Number(currentTableOrder.serviceFee ?? serviceFee) || 0;
-    const serviceFeeAmount = Math.round((subTotal * feePct) / 100);
-    const totalAmount = subTotal + serviceFeeAmount;
-
     updateOrders(prev =>
       (Array.isArray(prev) ? prev : []).map(o =>
         o && String(o.id) === String(currentTableOrder.id)
           ? {
               ...o,
               items: nextCartItems,
-              subTotal,
-              subtotal: subTotal,
-              serviceFee: feePct,
-              serviceFeePercent: feePct,
-              serviceFeeAmount,
-              total: totalAmount,
-              finalTotal: totalAmount
+              ...orderTotalsFields(o, nextCartItems, o.serviceFee ?? serviceFee)
             }
           : o
       )
     );
-  }, [currentTableOrder, selectedTable, serviceFee, updateOrders]);
+  }, [currentTableOrder, serviceFee, updateOrders]);
 
   // =========================================================
   // 4. 🔒 ADMIN PIN TEKSHIRUV MOTORI
@@ -298,17 +283,30 @@ export default function WaiterMode({
     if (!securityPrompt) return;
 
     const cleanPin = pinInput.trim();
+    const lockLeftMs = getPinLockRemainingMs('waiter_override');
+    if (lockLeftMs > 0) {
+      setPinError(`⛔️ Bloklangan: ${Math.ceil(lockLeftMs / 1000)} soniya kuting.`);
+      return;
+    }
     const adminUsers = (Array.isArray(stickyUsers) ? stickyUsers : []).filter(
       u => u && String(u.role || '').toLowerCase() === 'admin'
     );
 
-    const matchedAdmin = adminUsers.find(u => String(u.pin || u.password || '') === cleanPin);
-    const isDefaultPin = ['111111', '000000', '123456', '1111', '0000'].includes(cleanPin);
+    const matchedAdmin = cleanPin
+      ? adminUsers.find(u => String(u.pin || u.password || '') === cleanPin)
+      : null;
 
-    if (!matchedAdmin && !isDefaultPin) {
-      setPinError("❌ Admin PIN-kodi noto'g'ri!");
+    // Faqat haqiqiy admin PIN qabul qilinadi (oldin '0000', '123456' kabi kodlar ham o'tardi)
+    if (!matchedAdmin) {
+      const { attemptsLeft, lockedMs } = registerPinFailure('waiter_override');
+      setPinError(
+        lockedMs > 0
+          ? `⛔️ Juda ko'p xato! ${Math.ceil(lockedMs / 1000)} soniya kuting.`
+          : `❌ Admin PIN-kodi noto'g'ri! (${attemptsLeft} ta urinish qoldi)`
+      );
       return;
     }
+    resetPinGuard('waiter_override');
 
     const adminLabel = matchedAdmin?.name || 'Admin';
     const callback = securityPrompt.onConfirm;
@@ -666,74 +664,77 @@ export default function WaiterMode({
   const handleSubmitOrder = () => {
     if (!selectedTable || !Array.isArray(cart) || cart.length === 0) return;
 
+    // Oshxonaga yangi porsiya ketyaptimi? (sentQty - avval yuborilgan miqdor)
+    const hasNewPortions = cart.some(
+      item => item && (getItemQty(item) || 1) > (Number(item.sentQty) || 0)
+    );
+
+    // Buyurtma oshxonadan o'tib bo'lgan bo'lsa, avval yuborilgan porsiyalar tayyor hisoblanadi
+    // (kitchenDoneQty maydoni yo'q eski buyurtmalar uchun)
+    const orderPastKitchen = Boolean(
+      currentTableOrder && !['Yangi', 'Tayyorlanmoqda'].includes(currentTableOrder.status)
+    );
+
     const normalizedCart = cart.map((item, idx) => {
-      const price = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;
-      const qty = Number(item.quantity ?? item.qty ?? 1) || 1;
+      const qty = getItemQty(item) || 1;
+      const prevDone = item.kitchenDoneQty !== undefined
+        ? Number(item.kitchenDoneQty) || 0
+        : (orderPastKitchen ? Number(item.sentQty) || 0 : 0);
       return {
         ...item,
         cartItemId: item.cartItemId || `ci_${item.id || idx}_${Date.now()}`,
-        price,
+        price: getItemPrice(item),
         quantity: qty,
-        qty,
-        sentQty: qty
+        sentQty: qty,
+        kitchenDoneQty: Math.min(qty, prevDone)
       };
     });
 
-    const subTotal = normalizedCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const isTakeaway = selectedTable === 'Olib ketish';
-    const feePct = isTakeaway ? 0 : Number(serviceFee) || 0;
-    const serviceFeeAmount = Math.round((subTotal * feePct) / 100);
-    const totalAmount = subTotal + serviceFeeAmount;
-
-    const nowDate = new Date().toLocaleDateString();
-    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nowMs = Date.now();
+    const nowDate = new Date(nowMs).toLocaleDateString();
+    const nowTime = new Date(nowMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const activeBooking = reservations?.[selectedTable];
 
     if (currentTableOrder) {
+      const feePct = currentTableOrder.serviceFee ?? serviceFee;
+      const totalAmount = orderTotalsFields(currentTableOrder, normalizedCart, feePct).total;
+
       updateOrders(prev =>
-        (Array.isArray(prev) ? prev : []).map(o =>
-          o && String(o.id) === String(currentTableOrder.id)
-            ? {
-                ...o,
-                items: normalizedCart,
-                subTotal,
-                subtotal: subTotal,
-                serviceFee: feePct,
-                serviceFeePercent: feePct,
-                serviceFeeAmount,
-                total: totalAmount,
-                finalTotal: totalAmount,
-                status: 'Yangi'
-              }
-            : o
-        )
+        (Array.isArray(prev) ? prev : []).map(o => {
+          if (!o || String(o.id) !== String(currentTableOrder.id)) return o;
+          // Dozakaz (B3): butun buyurtma emas, faqat yangi porsiyalar oshxonaga qaytadi.
+          // Faqat izoh/miqdor kamaygan bo'lsa status o'zgarmaydi.
+          const isPastKitchen = !['Yangi', 'Tayyorlanmoqda'].includes(o.status);
+          const backToKitchen = hasNewPortions && isPastKitchen;
+          return {
+            ...o,
+            items: normalizedCart,
+            ...orderTotalsFields(o, normalizedCart, feePct),
+            status: backToKitchen ? 'Yangi' : o.status,
+            kitchenRoundAt: backToKitchen ? nowMs : o.kitchenRoundAt
+          };
+        })
       );
       recordAuditLog(
         'Buyurtma yangilandi',
         `${selectedTable}: Jami ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
       );
     } else {
-      const newOrder = {
-        id: Date.now().toString(),
-        createdAt: Date.now(),
+      const baseOrder = {
+        id: String(nowMs),
+        createdAt: nowMs,
         table: selectedTable,
         waiter: currentUser?.name || 'Ofitsiant',
-        waiterName: currentUser?.name || 'Ofitsiant',
         date: nowDate,
         time: nowTime,
         status: 'Yangi',
         items: normalizedCart,
-        subTotal,
-        subtotal: subTotal,
-        serviceFee: feePct,
-        serviceFeePercent: feePct,
-        serviceFeeAmount,
-        total: totalAmount,
-        finalTotal: totalAmount,
         customerName: activeBooking?.customerName || '',
         customerPhone: activeBooking?.customerPhone || '',
         depositPaid: Number(activeBooking?.depositAmount || 0)
       };
+      const newOrder = { ...baseOrder, ...orderTotalsFields(baseOrder, normalizedCart, serviceFee) };
+      const totalAmount = newOrder.total;
 
       updateOrders(prev => [newOrder, ...(Array.isArray(prev) ? prev : [])]);
       recordAuditLog(
@@ -868,6 +869,7 @@ export default function WaiterMode({
       quantity: 1,
       qty: 1,
       sentQty: 1,
+      kitchenDoneQty: 1,
       note: `Tarif: ${timerStats.hourlyRate.toLocaleString()} s/soat`
     };
 
@@ -876,49 +878,25 @@ export default function WaiterMode({
     );
 
     if (existingOrder) {
-      const nextItems = [...(Array.isArray(existingOrder.items) ? existingOrder.items : []), timerLineItem];
-      const nextSubTotal = nextItems.reduce(
-        (s, it) => s + (Number(it.price) || 0) * (Number(it.quantity ?? it.qty ?? 1) || 1),
-        0
-      );
-      const feePct = tableName === 'Olib ketish' ? 0 : Number(existingOrder.serviceFee ?? serviceFee) || 0;
-      const nextFeeAmt = Math.round((nextSubTotal * feePct) / 100);
-
       updateOrders(prev =>
-        (Array.isArray(prev) ? prev : []).map(o =>
-          o && String(o.id) === String(existingOrder.id)
-            ? {
-                ...o,
-                items: nextItems,
-                subTotal: nextSubTotal,
-                subtotal: nextSubTotal,
-                serviceFeeAmount: nextFeeAmt,
-                total: nextSubTotal + nextFeeAmt,
-                finalTotal: nextSubTotal + nextFeeAmt
-              }
-            : o
-        )
+        (Array.isArray(prev) ? prev : []).map(o => {
+          if (!o || String(o.id) !== String(existingOrder.id)) return o;
+          const nextItems = [...(Array.isArray(o.items) ? o.items : []), timerLineItem];
+          return { ...o, items: nextItems, ...orderTotalsFields(o, nextItems, o.serviceFee ?? serviceFee) };
+        })
       );
     } else {
-      const feePct = tableName === 'Olib ketish' ? 0 : Number(serviceFee) || 0;
-      const feeAmt = Math.round((lineItemPrice * feePct) / 100);
-      const newOrder = {
+      const baseOrder = {
         id: Date.now().toString(),
         createdAt: Date.now(),
         table: tableName,
         waiter: currentUser?.name || 'Ofitsiant',
-        waiterName: currentUser?.name || 'Ofitsiant',
         date: new Date().toLocaleDateString(),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         status: 'Yetkazildi',
-        items: [timerLineItem],
-        subTotal: lineItemPrice,
-        subtotal: lineItemPrice,
-        serviceFee: feePct,
-        serviceFeeAmount: feeAmt,
-        total: lineItemPrice + feeAmt,
-        finalTotal: lineItemPrice + feeAmt
+        items: [timerLineItem]
       };
+      const newOrder = { ...baseOrder, ...orderTotalsFields(baseOrder, baseOrder.items, serviceFee) };
       updateOrders(prev => [newOrder, ...(Array.isArray(prev) ? prev : [])]);
     }
 
@@ -963,13 +941,25 @@ export default function WaiterMode({
     const movedItems = [];
 
     originalItems.forEach((item, idx) => {
-      const totalQty = Number(item.quantity ?? item.qty ?? 1) || 1;
-      const moveQty = Math.min(totalQty, Math.max(0, Number(splitQuantities[idx]) || 0));
+      const totalQty = getItemQty(item) || 1;
+      const moveQty = Math.min(totalQty, Math.max(0, Math.floor(Number(splitQuantities[idx]) || 0)));
+      const doneQty = Math.min(totalQty, Number(item.kitchenDoneQty) || 0);
+      // Tayyor porsiyalar avval ko'chiriladigan qismga beriladi
+      const movedDone = Math.min(moveQty, doneQty);
 
-      if (moveQty > 0) movedItems.push({ ...item, quantity: moveQty, qty: moveQty, sentQty: moveQty });
+      if (moveQty > 0) {
+        movedItems.push({
+          ...item,
+          cartItemId: `${item.cartItemId || item.id || idx}_split_${Date.now()}`,
+          quantity: moveQty,
+          qty: moveQty,
+          sentQty: moveQty,
+          kitchenDoneQty: movedDone
+        });
+      }
       if (totalQty - moveQty > 0) {
         const remQ = totalQty - moveQty;
-        remainingItems.push({ ...item, quantity: remQ, qty: remQ, sentQty: remQ });
+        remainingItems.push({ ...item, quantity: remQ, qty: remQ, sentQty: remQ, kitchenDoneQty: doneQty - movedDone });
       }
     });
 
@@ -978,41 +968,24 @@ export default function WaiterMode({
       return;
     }
 
-    const calcTotals = (itemsList, feePct) => {
-      const sub = itemsList.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
-      const fee = Math.round((sub * feePct) / 100);
-      return { sub, fee, total: sub + fee };
-    };
-
-    const feePct = Number(splitOrder.serviceFee ?? serviceFee) || 0;
-    const remTotals = calcTotals(remainingItems, feePct);
-    const movTotals = calcTotals(movedItems, feePct);
-
-    const newSplitOrder = {
+    const feePct = splitOrder.serviceFee ?? serviceFee;
+    const splitBase = {
       ...splitOrder,
       id: `${Date.now()}`,
       table: splitTargetTable,
       items: movedItems,
-      subTotal: movTotals.sub,
-      subtotal: movTotals.sub,
-      serviceFeeAmount: movTotals.fee,
-      total: movTotals.total,
-      finalTotal: movTotals.total
+      // Pre-chek eski chekka tegishli, yangi chekka o'tmaydi
+      isPreCheckPrinted: false,
+      preCheckCount: 0,
+      preCheckTotalSnapshot: undefined
     };
+    const newSplitOrder = { ...splitBase, ...orderTotalsFields(splitBase, movedItems, feePct) };
 
     updateOrders(prev => [
       newSplitOrder,
       ...(Array.isArray(prev) ? prev : []).map(o =>
         o && String(o.id) === String(splitOrder.id)
-          ? {
-              ...o,
-              items: remainingItems,
-              subTotal: remTotals.sub,
-              subtotal: remTotals.sub,
-              serviceFeeAmount: remTotals.fee,
-              total: remTotals.total,
-              finalTotal: remTotals.total
-            }
+          ? { ...o, items: remainingItems, ...orderTotalsFields(o, remainingItems, feePct) }
           : o
       )
     ]);
@@ -1057,7 +1030,7 @@ export default function WaiterMode({
         />
       ) : (
         <div className="space-y-4 animate-fade-in">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex justify-between items-center">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex justify-between items-center">
             <button
               type="button"
               onClick={() => {

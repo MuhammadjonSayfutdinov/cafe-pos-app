@@ -1,43 +1,11 @@
 import React, { useState, useMemo } from 'react';
+import { getRecordTimeMs } from '../utils/dates';
 
 // =========================================================
 // BUYURTMA SANASINI HAR QANDAY FORMATDAN XAVFSIZ O'QISH
 // =========================================================
-const parseOrderTimeMs = (order) => {
-  if (!order) return Date.now();
-
-  if (order.closedAtMs && !isNaN(Number(order.closedAtMs))) return Number(order.closedAtMs);
-  if (order.createdAt && !isNaN(Number(order.createdAt))) return Number(order.createdAt);
-
-  const rawDateStr = String(order.closeTime || order.archiveDate || order.date || '').trim();
-  if (rawDateStr) {
-    // 1) DD.MM.YYYY formatini tekshirish (Masalan: 17.10.2026 yoki 17.10.2026, 14:20)
-    const dmyMatch = rawDateStr.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
-    if (dmyMatch) {
-      const day = Number(dmyMatch[1]);
-      const month = Number(dmyMatch[2]) - 1;
-      const year = Number(dmyMatch[3]);
-      const timeMatch = rawDateStr.match(/(\d{1,2}):(\d{2})/);
-      const hh = timeMatch ? Number(timeMatch[1]) : 12;
-      const mm = timeMatch ? Number(timeMatch[2]) : 0;
-      const constructed = new Date(year, month, day, hh, mm).getTime();
-      if (!isNaN(constructed)) return constructed;
-    }
-
-    // 2) Standart ISO yoki inglizcha sanani tekshirish
-    const parsed = Date.parse(rawDateStr);
-    if (!isNaN(parsed)) return parsed;
-  }
-
-  // 3) Order ID ichida 13 xonali timestamp bo'lsa
-  const idMatch = String(order.id || '').match(/\d{13}/);
-  if (idMatch) {
-    const idMs = Number(idMatch[0]);
-    if (idMs > 1600000000000 && idMs <= Date.now() + 86400000) return idMs;
-  }
-
-  return Date.now();
-};
+// Sanasi aniqlanmagan yozuv sana filtrlariga tushmaydi (B4)
+const parseOrderTimeMs = (record) => getRecordTimeMs(record) ?? 0;
 
 const toDateInputValue = (dateObj) => {
   const y = dateObj.getFullYear();
@@ -272,7 +240,7 @@ export default function StatsPopularItems({
       {/* =======================================================
           CHAP TOMON: TOP TAOMLAR REYTINGI + SANA ORALIG'I FILTRI
           ======================================================= */}
-      <div className="xl:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between">
+      <div className="xl:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col justify-between">
         
         <div>
           {/* Sarlavha va 3 ta Boshqaruv Punkti: Soni | Tushumi | Sana oralig'i */}
@@ -293,7 +261,7 @@ export default function StatsPopularItems({
                 onClick={() => setSortBy('count')}
                 className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl text-xs font-black transition whitespace-nowrap ${
                   sortBy === 'count'
-                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-800'
                 }`}
               >
@@ -305,7 +273,7 @@ export default function StatsPopularItems({
                 onClick={() => setSortBy('revenue')}
                 className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl text-xs font-black transition whitespace-nowrap ${
                   sortBy === 'revenue'
-                    ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-800'
                 }`}
               >
@@ -317,7 +285,7 @@ export default function StatsPopularItems({
                 onClick={() => setIsDatePanelOpen(prev => !prev)}
                 className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl text-xs font-black transition whitespace-nowrap flex items-center justify-center gap-1 ${
                   itemDateMode !== 'sync' || isDatePanelOpen
-                    ? 'bg-amber-500 text-white shadow-sm'
+                    ? 'bg-amber-500 text-white shadow-xs'
                     : 'bg-white/70 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-white'
                 }`}
               >
@@ -362,7 +330,7 @@ export default function StatsPopularItems({
                     onClick={() => setItemDateMode(p.id)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${
                       itemDateMode === p.id
-                        ? 'bg-indigo-600 text-white shadow-sm'
+                        ? 'bg-indigo-600 text-white shadow-xs'
                         : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
                     }`}
                   >
@@ -382,7 +350,7 @@ export default function StatsPopularItems({
                       type="date"
                       value={customStartDate}
                       onChange={e => setCustomStartDate(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-300 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+                      className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-300 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
                     />
                   </div>
                   <div>
@@ -393,7 +361,7 @@ export default function StatsPopularItems({
                       type="date"
                       value={customEndDate}
                       onChange={e => setCustomEndDate(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-300 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+                      className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-300 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -449,7 +417,7 @@ export default function StatsPopularItems({
                         </div>
                       </div>
                       
-                      <div className="text-right bg-white dark:bg-gray-800 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm shrink-0">
+                      <div className="text-right bg-white dark:bg-gray-800 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xs shrink-0">
                         <p className="font-black text-indigo-600 dark:text-indigo-400 text-base md:text-xl leading-none">
                           {item.count.toLocaleString()}{' '}
                           <span className="text-xs font-bold text-gray-500">pors</span>
@@ -497,11 +465,11 @@ export default function StatsPopularItems({
       {/* =======================================================
           O'NG TOMON: SMENANI YOPISH (Z-OTCHYOT BOSHQARUVI)
           ======================================================= */}
-      <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between">
+      <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col justify-between">
         
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <div className="w-14 h-14 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center text-3xl shadow-sm">
+            <div className="w-14 h-14 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center text-3xl shadow-xs">
               📊
             </div>
             <span className="text-[11px] font-black uppercase px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50">

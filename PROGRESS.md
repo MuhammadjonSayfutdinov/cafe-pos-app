@@ -1,7 +1,7 @@
 # PROGRESS — cafe-pos-app
 
-Oxirgi yangilanish: 2026-10-26
-Joriy bosqich: **0-bosqich (tozalash)**. Kod hali o'zgartirilmagan, audit tugagan.
+Oxirgi yangilanish: 2026-11-23
+Joriy bosqich: **2-bosqich**. 0 va 1-bosqich xatolari tuzatildi (`claude/xatolarni-tuzatish` branch).
 
 > Bu fayl Claude uchun yozilgan. Barcha kodni faqat Claude yozadi (Gemini ishlatilmaydi).
 > Yangi chatda birinchi navbatda shu faylni va `ai-context.txt` ni o'qi.
@@ -38,9 +38,8 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 
 ## Joriy vazifa
 
-**0-bosqich, 1-qadam:** `.gitignore` qo'shish, `node_modules` ni indeksdan chiqarish, `autosync.cjs` va `gitdoc` ni o'chirish.
-Fayllar: `package.json`, `index.html`, `src/index.css`, `.vscode/settings.json`, `.vscode/tasks.json`.
-Tugagach shu bo'limni keyingi vazifaga almashtiring.
+**2-bosqich, 1-qadam:** statuslar uchun `src/constants` fayli; B11 (`useSticky`), B12 (Telegram kodi 3 joyda), B13 (`alert/confirm`).
+0-bosqichdan qolgan: README.
 
 ## Vazifa → kerakli fayllar
 
@@ -59,16 +58,16 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 
 | ID | Xato | Fayl | Bosqich | Holat |
 |----|------|------|---------|-------|
-| B1 | Ombor ikki marta ayiriladi (buyurtma yuborilganda va to'lovda); bekor qilinsa qaytmaydi | `App.jsx`, `CashierMode.jsx` (~647) | 1 | [ ] |
-| B2 | Tailwind CDN ga bog'liq, versiyalar aralash (3 va 4), `index.css` da import yo'q | `index.html`, `package.json`, `index.css` | 0 | [ ] |
-| B3 | Dozakaz butun buyurtmani `'Yangi'` ga qaytaradi | `App.jsx` (`handleOrderSubmit`) | 1 | [ ] |
-| B4 | Sana `toLocaleDateString()` bilan solishtiriladi; `date` yo'q buyurtma "bugungi" | `AdminDashboard.jsx:52`, `WaiterMode.jsx:688` | 1 | [ ] |
-| B5 | Zaxira faylida PIN va Telegram tokeni ochiq; import tekshiruvsiz | `AdminSettingsTab.jsx` | 1 | [ ] |
-| B6 | `LockScreen` da urinishlar cheklanmagan; standart `777777` zaxirasi | `LockScreen.jsx`, `ManagerOverrideModal.jsx` | 1 | [ ] |
-| B7 | Qarz yopilganda to'lov turi `'Naqd'` ga almashadi, sana siljiydi | `CashierMode.jsx` (`handlePayOffDebt`) | 1 | [ ] |
-| B8 | Qarzga yozishda telefon tekshirilmaydi (faqat ism) | `CashierMode.jsx` | 1 | [ ] |
-| B9 | Chekni bo'lishda chegirma yo'qoladi, qisman miqdor ko'chirilmaydi | `App.jsx` (`handleSplitOrder`) | 1 | [ ] |
-| B10 | Jami summa formulasi 4+ joyda nusxalangan; takroriy maydonlar | `App.jsx`, `CashierMode.jsx` | 1 | [ ] |
+| B1 | Ombor ikki marta ayiriladi (buyurtma yuborilganda va to'lovda); bekor qilinsa qaytmaydi | `App.jsx`, `CashierMode.jsx` (~647) | 1 | [x] |
+| B2 | Tailwind CDN ga bog'liq, versiyalar aralash (3 va 4), `index.css` da import yo'q | `index.html`, `package.json`, `index.css` | 0 | [x] |
+| B3 | Dozakaz butun buyurtmani `'Yangi'` ga qaytaradi | `App.jsx` (`handleOrderSubmit`) | 1 | [x] |
+| B4 | Sana `toLocaleDateString()` bilan solishtiriladi; `date` yo'q buyurtma "bugungi" | `AdminDashboard.jsx:52`, `WaiterMode.jsx:688` | 1 | [x] |
+| B5 | Zaxira faylida PIN va Telegram tokeni ochiq; import tekshiruvsiz | `AdminSettingsTab.jsx` | 1 | [x] |
+| B6 | `LockScreen` da urinishlar cheklanmagan; standart `777777` zaxirasi | `LockScreen.jsx`, `ManagerOverrideModal.jsx` | 1 | [x] |
+| B7 | Qarz yopilganda to'lov turi `'Naqd'` ga almashadi, sana siljiydi | `CashierMode.jsx` (`handlePayOffDebt`) | 1 | [x] |
+| B8 | Qarzga yozishda telefon tekshirilmaydi (faqat ism) | `CashierMode.jsx` | 1 | [x] |
+| B9 | Chekni bo'lishda chegirma yo'qoladi, qisman miqdor ko'chirilmaydi | `App.jsx` (`handleSplitOrder`) | 1 | [x] |
+| B10 | Jami summa formulasi 4+ joyda nusxalangan; takroriy maydonlar | `App.jsx`, `CashierMode.jsx` | 1 | [x] |
 | B11 | `useSticky`: oxirgi yozuv g'olib; to'lib qolsa xato faqat konsolga | `useSticky.js` | 2 | [ ] |
 | B12 | Telegram yuborish kodi 3 joyda nusxalangan, `telegramNotifier.js` ishlatilmaydi | `CashierMode`, `WaiterMode`, `StatsMode` | 2 | [ ] |
 | B13 | Taxminan 70 ta `alert/confirm` | ko'p fayllar | 2 | [ ] |
@@ -78,17 +77,17 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 ### 0-bosqich. Tozalash (~1 kun)
 - [x] `.gitignore` (node_modules, dist, .env) va `git rm -r --cached node_modules`
 - [x] `autosync.cjs`, `tasks.json` dagi task va `gitdoc` sozlamalarini o'chirish
-- [ ] Tailwind 4 ga to'liq o'tish, CDN ni olib tashlash (B2)
-- [ ] `index.html` da `lang="uz"`
+- [x] Tailwind 4 ga to'liq o'tish, CDN ni olib tashlash (B2)
+- [x] `index.html` da `lang="uz"`
 - [ ] README
-- [ ] `ai-context.txt` va `PROGRESS.md` ni repoga qo'shish
+- [x] `ai-context.txt` va `PROGRESS.md` ni repoga qo'shish
 
 ### 1-bosqich. Mantiq xatolari (2–3 kun)
-- [ ] B1 ombor bitta joyda + bekor qilinganda qaytarish
-- [ ] B10 `calcOrderTotals()` (yangi `src/utils/orderTotals.js`)
-- [ ] B4 + B7 + B8 sana, qarz
-- [ ] B3 + B9 taom darajasidagi status, chekni bo'lish
-- [ ] B5 + B6 zaxira va PIN xavfsizligi
+- [x] B1 ombor bitta joyda (to'lovda); bekor qilingan to'lanmagan chekda ayirish yo'q
+- [x] B10 `calcOrderTotals()` (yangi `src/utils/orderTotals.js`)
+- [x] B4 + B7 + B8 sana (`src/utils/dates.js`), qarz
+- [x] B3 + B9 taom darajasida `kitchenDoneQty`, chekni bo'lish
+- [x] B5 + B6 zaxira va PIN xavfsizligi (`src/utils/pinGuard.js`)
 
 ### 2-bosqich. Ma'lumot qatlami va interfeys (2–3 kun)
 - [ ] Statuslar uchun `constants` fayli (kodlar o'zbekcha yozuvlardan alohida)
@@ -117,8 +116,8 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 
 | Masala | Qaror | Holat |
 |--------|-------|-------|
-| Ombor qachon ayiriladi | Buyurtma yuborilganda (`App.jsx`); to'lovda ayirilmaydi | taklif, tasdiqlang |
-| Taom statusi | Taom darajasida; buyurtma statusi undan hisoblanadi | taklif |
+| Ombor qachon ayiriladi | To'lovda (`CashierMode.deductOrderIngredientsFromStock`). Sabab: ofitsiant buyurtmasi `App.jsx` dan o'tmaydi, kassadagi kod birlik va porsiyani hisoblaydi, bekor qilingan chekni qaytarish shart emas | qabul qilindi |
+| Taom statusi | Taomda `kitchenDoneQty`; dozakazda oshxona faqat qolgan porsiyani ko'radi | qabul qilindi |
 | Backend | Supabase (tez) yoki Node + SQLite/PostgreSQL + WebSocket | tanlanmagan |
 | Autosync |qabul qilindi | taklif |
 
@@ -126,12 +125,12 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 
 | # | Vazifa | Commit hash | Holat |
 |---|--------|-------------|-------|
-| 0 | Repo tozalash va Tailwind 4 | | [ ] |
-| 1 | Ombor bitta joyda | | [ ] |
-| 2 | calcOrderTotals | | [ ] |
-| 3 | Sana va qarz | | [ ] |
-| 4 | PIN va zaxira xavfsizligi | | [ ] |
-| 5 | Taom darajasidagi status | | [ ] |
+| 0 | Repo tozalash va Tailwind 4 | c638460 | [x] |
+| 1 | Ombor bitta joyda | 65b1dd6 | [x] |
+| 2 | calcOrderTotals | 65b1dd6 | [x] |
+| 3 | Sana va qarz | da57106 | [x] |
+| 4 | PIN va zaxira xavfsizligi | 68b7dcf | [x] |
+| 5 | Taom darajasidagi status | 65b1dd6 | [x] |
 
 ## Yangi chatning birinchi xabari
 

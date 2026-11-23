@@ -196,7 +196,7 @@ export default function WarehouseMode({
   // 3. RENDER (UI DIZAYN)
   // ==========================================
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 min-h-[calc(100vh-140px)] flex flex-col overflow-hidden animate-fade-in">
+    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 min-h-[calc(100vh-140px)] flex flex-col overflow-hidden animate-fade-in">
       
       {/* ========================================== */}
       {/* TEPADAGI TABLAR VA O'LCHOV BIRLIGI PANELI  */}
@@ -270,7 +270,7 @@ export default function WarehouseMode({
                   onClick={() => setDisplayUnitMode(mode.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition ${
                     displayUnitMode === mode.id
-                      ? 'bg-indigo-600 text-white shadow-sm'
+                      ? 'bg-indigo-600 text-white shadow-xs'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}
                 >
@@ -399,7 +399,7 @@ export default function WarehouseMode({
           MODAL: TEZKOR BIRLIK KONVERTORI (GR <-> KG <-> TONNA)
           ======================================================= */}
       {isConverterOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-5 border border-gray-100 dark:border-gray-700">
             <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-3">
               <h3 className="font-black text-lg text-gray-900 dark:text-white flex items-center gap-2">
@@ -424,7 +424,7 @@ export default function WarehouseMode({
                   step="any"
                   value={convValue}
                   onChange={e => setConvValue(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-black text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
                 />
               </div>
 
@@ -435,7 +435,7 @@ export default function WarehouseMode({
                 <select
                   value={convFromUnit}
                   onChange={e => setConvFromUnit(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-bold text-gray-900 dark:text-white outline-none cursor-pointer"
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-bold text-gray-900 dark:text-white outline-hidden cursor-pointer"
                 >
                   <option value="gr">Gramm (gr)</option>
                   <option value="kg">Kilogramm (kg)</option>

@@ -275,7 +275,7 @@ export default function WaiterTableGrid({
     <div className="space-y-4 animate-fade-in">
       
       {/* YUQORI FILTR VA QIDIRUV PANELI */}
-      <div className="bg-white dark:bg-gray-800 p-3.5 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3">
+      <div className="bg-white dark:bg-gray-800 p-3.5 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3">
         
         {/* Filtr Tablari */}
         <div className="flex gap-1.5 overflow-x-auto hide-scrollbar pb-1 lg:pb-0">
@@ -293,7 +293,7 @@ export default function WaiterTableGrid({
               onClick={() => setTableFilter(tab.id)}
               className={`px-3.5 py-2 rounded-xl font-black text-xs whitespace-nowrap transition active:scale-95 ${
                 tableFilter === tab.id
-                  ? 'bg-amber-500 text-white shadow-sm'
+                  ? 'bg-amber-500 text-white shadow-xs'
                   : 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
               }`}
             >
@@ -309,7 +309,7 @@ export default function WaiterTableGrid({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="🔍 Stol yoki bron mehmioni..."
-            className="w-full pl-3.5 pr-8 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-amber-500"
+            className="w-full pl-3.5 pr-8 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
           />
           {searchQuery && (
             <button
@@ -352,11 +352,11 @@ export default function WaiterTableGrid({
                   : isSelected
                   ? 'bg-amber-50/90 dark:bg-amber-900/30 border-amber-500 ring-4 ring-amber-500/20 shadow-lg'
                   : isBusy
-                  ? 'bg-white dark:bg-gray-800 border-amber-300 dark:border-amber-700/80 shadow-sm hover:shadow-md'
+                  ? 'bg-white dark:bg-gray-800 border-amber-300 dark:border-amber-700/80 shadow-xs hover:shadow-md'
                   : isReserved
-                  ? 'bg-purple-50/60 dark:bg-purple-950/25 border-purple-300 dark:border-purple-700/80 shadow-sm hover:shadow-md'
+                  ? 'bg-purple-50/60 dark:bg-purple-950/25 border-purple-300 dark:border-purple-700/80 shadow-xs hover:shadow-md'
                   : isTimed
-                  ? 'bg-cyan-50/60 dark:bg-cyan-950/25 border-cyan-400 dark:border-cyan-700 shadow-sm hover:shadow-md'
+                  ? 'bg-cyan-50/60 dark:bg-cyan-950/25 border-cyan-400 dark:border-cyan-700 shadow-xs hover:shadow-md'
                   : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-emerald-400 dark:hover:border-emerald-600'
               }`}
             >
@@ -365,7 +365,7 @@ export default function WaiterTableGrid({
                 <div className="flex justify-between items-start gap-2 mb-3">
                   <div className="flex items-center gap-2.5">
                     <div
-                      className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-black shadow-sm ${
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-black shadow-xs ${
                         isTakeaway
                           ? 'bg-indigo-600 text-white'
                           : isBusy
@@ -442,7 +442,7 @@ export default function WaiterTableGrid({
                 {isReserved && reservation && (
                   <div className="mb-3 p-3 rounded-2xl bg-purple-100/80 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700 space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-600 text-white">
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-sm bg-purple-600 text-white">
                         📌 BRON: {reservation.time}
                       </span>
                       <span className="text-[11px] font-black text-purple-800 dark:text-purple-300">
@@ -654,7 +654,7 @@ export default function WaiterTableGrid({
       {bookingModalTable && (
         <div
           onClick={() => setBookingModalTable(null)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -685,7 +685,7 @@ export default function WaiterTableGrid({
                   value={bookingForm.customerName}
                   onChange={e => setBookingForm(prev => ({ ...prev, customerName: e.target.value }))}
                   placeholder="Masalan: Sardor aka"
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-purple-500"
                 />
               </div>
 
@@ -699,7 +699,7 @@ export default function WaiterTableGrid({
                     required
                     value={bookingForm.time}
                     onChange={e => setBookingForm(prev => ({ ...prev, time: e.target.value }))}
-                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-purple-500"
                   />
                 </div>
 
@@ -713,7 +713,7 @@ export default function WaiterTableGrid({
                     max="100"
                     value={bookingForm.guestsCount}
                     onChange={e => setBookingForm(prev => ({ ...prev, guestsCount: e.target.value }))}
-                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-purple-500"
                   />
                 </div>
               </div>
@@ -728,7 +728,7 @@ export default function WaiterTableGrid({
                     value={bookingForm.customerPhone}
                     onChange={e => setBookingForm(prev => ({ ...prev, customerPhone: e.target.value }))}
                     placeholder="90 123 45 67"
-                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-hidden focus:border-purple-500"
                   />
                 </div>
 
@@ -743,7 +743,7 @@ export default function WaiterTableGrid({
                     value={bookingForm.depositAmount}
                     onChange={e => setBookingForm(prev => ({ ...prev, depositAmount: e.target.value }))}
                     placeholder="Masalan: 100000"
-                    className="w-full p-3.5 rounded-xl bg-emerald-50/60 dark:bg-gray-900 border border-emerald-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-emerald-500"
+                    className="w-full p-3.5 rounded-xl bg-emerald-50/60 dark:bg-gray-900 border border-emerald-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-emerald-500"
                   />
                 </div>
               </div>
@@ -757,7 +757,7 @@ export default function WaiterTableGrid({
                   value={bookingForm.note}
                   onChange={e => setBookingForm(prev => ({ ...prev, note: e.target.value }))}
                   placeholder="Masalan: Tug'ilgan kun, bolalar stuli kerak"
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-hidden focus:border-purple-500"
                 />
               </div>
 
@@ -787,7 +787,7 @@ export default function WaiterTableGrid({
       {timerModalTable && (
         <div
           onClick={() => setTimerModalTable(null)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -824,7 +824,7 @@ export default function WaiterTableGrid({
                       }
                       className={`p-3 rounded-xl border text-left transition ${
                         timerForm.serviceTitle === p.title
-                          ? 'bg-cyan-600 text-white border-cyan-600 shadow-sm'
+                          ? 'bg-cyan-600 text-white border-cyan-600 shadow-xs'
                           : 'bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700'
                       }`}
                     >
@@ -846,7 +846,7 @@ export default function WaiterTableGrid({
                   required
                   value={timerForm.serviceTitle}
                   onChange={e => setTimerForm(prev => ({ ...prev, serviceTitle: e.target.value }))}
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-cyan-500"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-cyan-500"
                 />
               </div>
 
@@ -861,7 +861,7 @@ export default function WaiterTableGrid({
                   step="any"
                   value={timerForm.hourlyRate}
                   onChange={e => setTimerForm(prev => ({ ...prev, hourlyRate: e.target.value }))}
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-cyan-400 font-black text-lg text-gray-900 dark:text-white outline-none focus:border-cyan-500"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-cyan-400 font-black text-lg text-gray-900 dark:text-white outline-hidden focus:border-cyan-500"
                 />
               </div>
 

@@ -138,7 +138,7 @@ export default function AdminPanel({
   ];
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 min-h-[calc(100vh-140px)] flex flex-col md:flex-row overflow-hidden animate-fade-in">
+    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 min-h-[calc(100vh-140px)] flex flex-col md:flex-row overflow-hidden animate-fade-in">
       
       {/* ========================================== */}
       {/* CHAP TOMON: ADMIN MENYU TABLARI            */}
@@ -149,7 +149,7 @@ export default function AdminPanel({
         <div>
           <div className="mb-6 hidden md:block pl-2">
             <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg shadow-sm">
+              <span className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg shadow-xs">
                 👑
               </span>
               <div>

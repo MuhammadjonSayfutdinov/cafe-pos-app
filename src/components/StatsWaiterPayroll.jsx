@@ -1,40 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { getRecordTimeMs } from '../utils/dates';
 
 // =========================================================
 // BUYURTMA VA XARAJAT SANASINI UNIVERSAL O'QISH YORDAMCHISI
 // =========================================================
-const parseRecordTimeMs = (record) => {
-  if (!record) return Date.now();
-
-  if (record.closedAtMs && !isNaN(Number(record.closedAtMs))) return Number(record.closedAtMs);
-  if (record.createdAt && !isNaN(Number(record.createdAt))) return Number(record.createdAt);
-
-  const rawDateStr = String(record.closeTime || record.archiveDate || record.date || '').trim();
-  if (rawDateStr) {
-    const dmyMatch = rawDateStr.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
-    if (dmyMatch) {
-      const day = Number(dmyMatch[1]);
-      const month = Number(dmyMatch[2]) - 1;
-      const year = Number(dmyMatch[3]);
-      const timeMatch = rawDateStr.match(/(\d{1,2}):(\d{2})/);
-      const hh = timeMatch ? Number(timeMatch[1]) : 12;
-      const mm = timeMatch ? Number(timeMatch[2]) : 0;
-      const constructed = new Date(year, month, day, hh, mm).getTime();
-      if (!isNaN(constructed)) return constructed;
-    }
-
-    const parsed = Date.parse(rawDateStr);
-    if (!isNaN(parsed)) return parsed;
-  }
-
-  const idMatch = String(record.id || '').match(/\d{13}/);
-  if (idMatch) {
-    const idMs = Number(idMatch[0]);
-    if (idMs > 1600000000000 && idMs <= Date.now() + 86400000) return idMs;
-  }
-
-  return Date.now();
-};
+// Sanasi aniqlanmagan yozuv sana filtrlariga tushmaydi (B4)
+const parseRecordTimeMs = (record) => getRecordTimeMs(record) ?? 0;
 
 const toDateInputStr = (dateObj) => {
   const y = dateObj.getFullYear();
@@ -445,7 +416,7 @@ export default function StatsWaiterPayroll({
   // 6. RENDER (UI JADVAL VA MODALLAR)
   // =========================================================
   return (
-    <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-sm border-2 border-amber-100 dark:border-amber-900/40 space-y-5">
+    <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-xs border-2 border-amber-100 dark:border-amber-900/40 space-y-5">
       
       {/* 1. TEPA SARLAVHA VA BOSHQARUV TUGMALARI */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
@@ -470,7 +441,7 @@ export default function StatsWaiterPayroll({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="🔍 Ofitsiant ismi..."
-            className="px-3.5 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-amber-500 w-full sm:w-44"
+            className="px-3.5 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-amber-500 w-full sm:w-44"
           />
 
           {/* Sana oralig'i tugmasi */}
@@ -479,7 +450,7 @@ export default function StatsWaiterPayroll({
             onClick={() => setIsDateBarOpen(prev => !prev)}
             className={`px-3.5 py-2 rounded-xl font-black text-xs transition flex items-center gap-1.5 ${
               dateMode !== 'sync' || isDateBarOpen
-                ? 'bg-amber-500 text-white shadow-sm'
+                ? 'bg-amber-500 text-white shadow-xs'
                 : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
             }`}
           >
@@ -532,7 +503,7 @@ export default function StatsWaiterPayroll({
                 onClick={() => setDateMode(tab.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${
                   dateMode === tab.id
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
                 }`}
               >
@@ -778,7 +749,7 @@ export default function StatsWaiterPayroll({
       {editingWaiter && (
         <div
           onClick={() => setEditingWaiter(null)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[160] flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-[160] flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -961,7 +932,7 @@ export default function StatsWaiterPayroll({
       {inspectingWaiter && (
         <div
           onClick={() => setInspectingWaiter(null)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[160] flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-[160] flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -1001,7 +972,7 @@ export default function StatsWaiterPayroll({
                         <span className="font-black text-sm text-gray-900 dark:text-white">
                           🪑 {ord.table}
                         </span>
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                           #{String(ord.id).slice(-4)}
                         </span>
                         <span className="text-xs font-bold text-gray-400">

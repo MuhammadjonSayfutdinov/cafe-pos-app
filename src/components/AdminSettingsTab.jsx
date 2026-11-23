@@ -22,6 +22,57 @@ const readTelegramConfig = () => {
   }
 };
 
+// ==========================================
+// ZAXIRA FAYLINI TEKSHIRISH (B5)
+// ==========================================
+const VALID_ROLES = ['admin', 'warehouse', 'cashier', 'waiter', 'kitchen'];
+const isPlainObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+
+const validateBackup = (data) => {
+  const errors = [];
+  if (!isPlainObject(data)) return ["Fayl JSON obyekt emas"];
+
+  const arrayKeys = ['tables', 'menuCategories', 'menuItems', 'users', 'inventory', 'inventoryLogs', 'orders'];
+  arrayKeys.forEach(k => {
+    if (data[k] !== undefined && !Array.isArray(data[k])) errors.push(`"${k}" ro'yxat bo'lishi kerak`);
+  });
+  if (errors.length) return errors;
+
+  if (data.serviceFee !== undefined) {
+    const fee = Number(data.serviceFee);
+    if (!Number.isFinite(fee) || fee < 0 || fee > 100) errors.push("Xizmat haqi 0-100 oralig'ida bo'lishi kerak");
+  }
+  if ((data.menuItems || []).some(m => !isPlainObject(m) || !String(m.name || '').trim())) {
+    errors.push("Menyuda nomsiz yoki buzilgan taom bor");
+  }
+  if ((data.orders || []).some(o => !isPlainObject(o) || o.id === undefined || !Array.isArray(o.items))) {
+    errors.push("Buyurtmalar ro'yxatida buzilgan yozuv bor");
+  }
+  if ((data.inventory || []).some(i => !isPlainObject(i) || i.id === undefined || !String(i.name || '').trim())) {
+    errors.push("Omborda buzilgan yozuv bor");
+  }
+
+  if (Array.isArray(data.users)) {
+    const users = data.users;
+    if (users.some(u => !isPlainObject(u) || !String(u.name || '').trim() || !VALID_ROLES.includes(u.role))) {
+      errors.push("Xodimlar ro'yxatida noto'g'ri yozuv yoki rol bor");
+    }
+    const withPins = users.filter(u => isPlainObject(u) && u.pin !== undefined);
+    if (withPins.length > 0) {
+      const badPin = withPins.some(u => {
+        const len = ['admin', 'warehouse'].includes(u.role) ? 6 : 4;
+        return !new RegExp(`^\\d{${len}}$`).test(String(u.pin));
+      });
+      if (badPin) errors.push("Xodim PIN kodi formati noto'g'ri (admin/ombor 6, qolganlar 4 xonali)");
+      const pins = withPins.map(u => String(u.pin));
+      if (new Set(pins).size !== pins.length) errors.push("Ikki xodimda bir xil PIN kod bor");
+    }
+    if (!users.some(u => isPlainObject(u) && u.role === 'admin')) errors.push("Faylda birorta admin yo'q");
+  }
+
+  return errors;
+};
+
 export default function AdminSettingsTab({ 
   cafeName = 'Premium Cafe', 
   setCafeName, 
@@ -252,20 +303,28 @@ export default function AdminSettingsTab({
   };
 
   const handleExportBackup = () => {
+    // PIN kodlar va Telegram tokeni faylga yozilmaydi (B5)
+    const safeUsersForExport = (Array.isArray(users) ? users : []).map(u => {
+      if (!u || typeof u !== 'object') return u;
+      const { pin: _pin, password: _password, ...rest } = u;
+      return rest;
+    });
+    const { botToken: _botToken, ...safeTelegramConfig } = telegramConfig || {};
+
     const backupPayload = {
-      version: '2.0',
+      version: '3.0',
       exportedAt: new Date().toISOString(),
       cafeName,
       serviceFee,
       tables: safeTables,
       menuCategories,
       menuItems,
-      users,
+      users: safeUsersForExport,
       inventory,
       inventoryLogs,
       orders: safeOrders,
       auditLogs,
-      telegramConfig
+      telegramConfig: safeTelegramConfig
     };
 
     const blob = new Blob([JSON.stringify(backupPayload, null, 2)], {
@@ -289,24 +348,62 @@ export default function AdminSettingsTab({
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result);
-        if (!parsed || typeof parsed !== 'object') throw new Error("Noto'g'ri fayl");
+        const problems = validateBackup(parsed);
+        if (problems.length > 0) {
+          alert(`❌ Zaxira fayli rad etildi:\n\n• ${problems.slice(0, 6).join('\n• ')}`);
+          return;
+        }
 
         if (!window.confirm("⚠️ Diqqat! Tanlangan zaxira faylidagi ma'lumotlar hozirgi baza ustiga yoziladi. Tasdiqlaysizmi?")) {
           return;
         }
 
-        if (parsed.cafeName && typeof setCafeName === 'function') setCafeName(parsed.cafeName);
-        if (parsed.serviceFee !== undefined && typeof setServiceFee === 'function') setServiceFee(Number(parsed.serviceFee));
-        if (Array.isArray(parsed.tables) && typeof setTables === 'function') setTables(parsed.tables);
-        if (Array.isArray(parsed.menuCategories) && typeof setMenuCategories === 'function') setMenuCategories(parsed.menuCategories);
-        if (Array.isArray(parsed.menuItems) && typeof setMenuItems === 'function') setMenuItems(parsed.menuItems);
-        if (Array.isArray(parsed.users) && typeof setUsers === 'function') setUsers(parsed.users);
-        if (Array.isArray(parsed.inventory) && typeof setInventory === 'function') setInventory(parsed.inventory);
-        if (Array.isArray(parsed.inventoryLogs) && typeof setInventoryLogs === 'function') setInventoryLogs(parsed.inventoryLogs);
-        if (Array.isArray(parsed.orders) && typeof setOrders === 'function') setOrders(parsed.orders);
-        if (parsed.telegramConfig) setTelegramConfig(parsed.telegramConfig);
+        const applyRestore = () => {
+          if (parsed.cafeName && typeof setCafeName === 'function') setCafeName(String(parsed.cafeName));
+          if (parsed.serviceFee !== undefined && typeof setServiceFee === 'function') setServiceFee(Number(parsed.serviceFee));
+          if (Array.isArray(parsed.tables) && typeof setTables === 'function') setTables(parsed.tables);
+          if (Array.isArray(parsed.menuCategories) && typeof setMenuCategories === 'function') setMenuCategories(parsed.menuCategories);
+          if (Array.isArray(parsed.menuItems) && typeof setMenuItems === 'function') setMenuItems(parsed.menuItems);
+          if (Array.isArray(parsed.users) && typeof setUsers === 'function') {
+            const fileHasPins = parsed.users.some(u => u && u.pin !== undefined);
+            if (fileHasPins) {
+              setUsers(parsed.users);
+            } else {
+              // Yangi formatda PIN yo'q: hozirgi PIN kodlar saqlanadi, PIN-siz yangi xodim qo'shilmaydi
+              setUsers(prev => {
+                const current = Array.isArray(prev) ? prev : [];
+                return parsed.users
+                  .map(u => {
+                    const existing = current.find(c => c && String(c.id) === String(u.id));
+                    return existing ? { ...u, pin: existing.pin } : null;
+                  })
+                  .filter(Boolean)
+                  .concat(current.filter(c => c && !parsed.users.some(u => String(u.id) === String(c.id))));
+              });
+            }
+          }
+          if (Array.isArray(parsed.inventory) && typeof setInventory === 'function') setInventory(parsed.inventory);
+          if (Array.isArray(parsed.inventoryLogs) && typeof setInventoryLogs === 'function') setInventoryLogs(parsed.inventoryLogs);
+          if (Array.isArray(parsed.orders) && typeof setOrders === 'function') setOrders(parsed.orders);
+          if (isPlainObject(parsed.telegramConfig)) {
+            // Fayldagi token bo'lmasa, hozirgi token saqlanadi
+            setTelegramConfig(prev => ({
+              ...prev,
+              ...parsed.telegramConfig,
+              botToken: parsed.telegramConfig.botToken || prev?.botToken || ''
+            }));
+          }
+          if (typeof addAuditLog === 'function') {
+            addAuditLog('Zaxira tiklandi', `Fayl: ${file.name} (${parsed.exportedAt || "sana noma'lum"})`);
+          }
+          alert("✅ Zaxira nusxa muvaffaqiyatli tiklandi!");
+        };
 
-        alert("✅ Zaxira nusxa muvaffaqiyatli tiklandi!");
+        if (typeof requireAdminOverride === 'function') {
+          requireAdminOverride('Zaxira nusxadan bazani tiklash', applyRestore);
+        } else {
+          applyRestore();
+        }
       } catch {
         alert("❌ Xatolik! Tanlangan fayl yaroqsiz yoki buzilgan.");
       }
@@ -317,8 +414,16 @@ export default function AdminSettingsTab({
 
   const handleClearOrdersOnly = () => {
     const performClear = () => {
-      if (window.confirm("⚠️ Barcha yopilgan va ochiq cheklar tarixi o'chiriladi. Tasdiqlaysizmi?")) {
-        if (typeof setOrders === 'function') setOrders([]);
+      // Ochiq cheklar va qarzlar saqlanadi: faqat yopilgan (to'langan/arxiv) cheklar o'chiriladi
+      if (window.confirm("⚠️ To'langan va arxivdagi cheklar tarixi o'chiriladi. Ochiq cheklar va qarzlar saqlanadi. Tasdiqlaysizmi?")) {
+        if (typeof setOrders === 'function') {
+          setOrders(prev => (Array.isArray(prev) ? prev : []).filter(
+            o => o && !["To'langan", 'Arxiv'].includes(o.status)
+          ));
+        }
+        if (typeof addAuditLog === 'function') {
+          addAuditLog('Cheklar tarixi tozalandi', "To'langan va arxivdagi cheklar o'chirildi");
+        }
         alert("✅ Cheklar tarixi tozalandi!");
       }
     };
@@ -349,7 +454,7 @@ export default function AdminSettingsTab({
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
       
       {/* 1-BLOK: ASOSIY SOZLAMALAR */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-xs border border-gray-100 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
           <div>
             <h2 className="text-xl font-black text-gray-900 dark:text-white">
@@ -377,7 +482,7 @@ export default function AdminSettingsTab({
                 required
                 value={tempCafeName}
                 onChange={(e) => setTempCafeName(e.target.value)}
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-none focus:border-indigo-500 transition"
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500 transition"
                 placeholder="Masalan: Rayhon Milliy Taomlar"
               />
             </div>
@@ -395,7 +500,7 @@ export default function AdminSettingsTab({
                   required
                   value={tempServiceFee}
                   onChange={(e) => setTempServiceFee(e.target.value)}
-                  className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-none focus:border-indigo-500 transition text-lg"
+                  className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500 transition text-lg"
                 />
                 <div className="flex gap-2">
                   {[0, 5, 10, 12, 15, 20].map(pct => (
@@ -427,7 +532,7 @@ export default function AdminSettingsTab({
       </div>
 
       {/* 2-BLOK: TELEGRAM BOT XABARNOMA MARKAZI */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border-2 border-sky-100 dark:border-sky-900/40 space-y-6">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-xs border-2 border-sky-100 dark:border-sky-900/40 space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 dark:border-gray-700 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-sky-500 text-white flex items-center justify-center text-2xl shadow-md shadow-sky-500/30">
@@ -467,7 +572,7 @@ export default function AdminSettingsTab({
                 value={telegramConfig?.botToken || ''}
                 onChange={e => updateTgField('botToken', e.target.value)}
                 placeholder="Masalan: 7123456789:AAH..."
-                className="w-full pl-4 pr-11 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs sm:text-sm text-gray-900 dark:text-white outline-none focus:border-sky-500"
+                className="w-full pl-4 pr-11 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs sm:text-sm text-gray-900 dark:text-white outline-hidden focus:border-sky-500"
               />
               <button
                 type="button"
@@ -489,7 +594,7 @@ export default function AdminSettingsTab({
                 value={telegramConfig?.chatId || ''}
                 onChange={e => updateTgField('chatId', e.target.value)}
                 placeholder="Masalan: 123456789"
-                className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs sm:text-sm text-gray-900 dark:text-white outline-none focus:border-sky-500"
+                className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs sm:text-sm text-gray-900 dark:text-white outline-hidden focus:border-sky-500"
               />
               <button
                 type="button"
@@ -575,7 +680,7 @@ export default function AdminSettingsTab({
 
       {/* 3-BLOK: ZAL STOLLARINI BOSHQARISH */}
       {safeTables.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-xs border border-gray-100 dark:border-gray-700 space-y-5">
           <div>
             <h3 className="text-lg font-black text-gray-900 dark:text-white">
               🪑 Zal Stollari va Kabinalar Boshqaruvi ({safeTables.length} ta)
@@ -588,7 +693,7 @@ export default function AdminSettingsTab({
               value={newTableName}
               onChange={e => setNewTableName(e.target.value)}
               placeholder="Yangi stol yoki xona nomi (Masalan: 16-Stol yoki VIP-1)"
-              className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-amber-500"
+              className="flex-1 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
             />
             <button
               type="submit"
@@ -633,7 +738,7 @@ export default function AdminSettingsTab({
       )}
 
       {/* 4-BLOK: BACKUP & RESTORE */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-xs border border-gray-100 dark:border-gray-700 space-y-5">
         <h3 className="text-lg font-black text-gray-900 dark:text-white">
           💾 Ma'lumotlar Bazasini Zaxiralash (Backup & Restore)
         </h3>

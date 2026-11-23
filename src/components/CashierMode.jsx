@@ -3,6 +3,7 @@ import useSticky from '../hooks/useSticky';
 import CashierOrderList from './CashierOrderList';
 import CashierReceipt from './CashierReceipt';
 import CashierPaymentControls from './CashierPaymentControls';
+import { calcOrderTotals } from '../utils/orderTotals';
 
 // ==========================================
 // 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
@@ -212,6 +213,7 @@ export default function CashierMode({
   const [mixedCash, setMixedCash] = useState('');
   const [mixedCard, setMixedCard] = useState('');
   const [debtorName, setDebtorName] = useState('');
+  const [debtorPhone, setDebtorPhone] = useState('');
 
   // CRM (Mijoz va Bonus) statelari
   const [customerPhone, setCustomerPhone] = useState('');
@@ -340,20 +342,13 @@ export default function CashierMode({
       };
     }
 
-    const items = Array.isArray(selectedOrder.items) ? selectedOrder.items : [];
-    const subTotal = items.reduce((sum, item) => {
-      if (!item) return sum;
-      const price = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;
-      const qty = Number(item.quantity ?? item.qty ?? 1) || 0;
-      return sum + (price * qty);
-    }, 0);
-
-    const isTakeaway = selectedOrder.table === 'Olib ketish';
-    const effectiveFeePercent = isTakeaway
-      ? 0
-      : Number(selectedOrder.serviceFee !== undefined ? selectedOrder.serviceFee : serviceFee) || 0;
-
-    const serviceFeeAmount = Math.round((subTotal * effectiveFeePercent) / 100);
+    const base = calcOrderTotals({
+      items: selectedOrder.items,
+      serviceFeePercent: selectedOrder.serviceFee ?? serviceFee,
+      table: selectedOrder.table
+    });
+    const { subTotal, serviceFeeAmount } = base;
+    const effectiveFeePercent = base.serviceFee;
     const grossTotal = subTotal + serviceFeeAmount;
 
     let discountAmount = 0;
@@ -366,7 +361,8 @@ export default function CashierMode({
       discountAmount = Math.min(grossTotal, rawDiscVal);
     }
 
-    const afterDiscountTotal = Math.max(0, grossTotal - discountAmount);
+    discountAmount = Math.min(grossTotal, Math.max(0, Math.round(discountAmount)));
+    const afterDiscountTotal = grossTotal - discountAmount;
 
     const customerAvailableBonus = Number(matchedCustomer?.bonusBalance || 0);
     const maxUsableBonus = paymentMethod === 'Qarz'
@@ -376,7 +372,13 @@ export default function CashierMode({
     const rawRequestedBonus = Math.max(0, Number(useBonusAmount) || 0);
     const usedBonusAmount = Math.min(maxUsableBonus, rawRequestedBonus);
 
-    const finalTotal = Math.max(0, afterDiscountTotal - usedBonusAmount);
+    const finalTotal = calcOrderTotals({
+      items: selectedOrder.items,
+      serviceFeePercent: effectiveFeePercent,
+      table: selectedOrder.table,
+      discountAmount,
+      usedBonus: usedBonusAmount
+    }).total;
 
     const tierInfo = getCustomerTierInfo(matchedCustomer?.totalSpent || 0);
     const hasCustomer = Boolean(matchedCustomer || customerPhone.trim().length >= 4);
@@ -407,6 +409,7 @@ export default function CashierMode({
     setMixedCash('');
     setMixedCard('');
     setDebtorName('');
+    setDebtorPhone('');
     setCustomerPhone('');
     setCustomerName('');
     setUseBonusAmount('');
@@ -782,8 +785,10 @@ export default function CashierMode({
     }
 
     const cleanDebtor = debtorName.trim();
-    if (paymentMethod === 'Qarz' && !cleanDebtor) {
-      alert("⛔️ Iltimos, qarzga yozish uchun qarzdor mijozning ismi va telefon raqamini kiriting!");
+    const cleanDebtorPhone = debtorPhone.trim();
+    // Qarz uchun ism VA telefon majburiy (B8): kamida 9 ta raqam
+    if (paymentMethod === 'Qarz' && (!cleanDebtor || cleanPhoneDigits(cleanDebtorPhone).length < 9)) {
+      alert("⛔️ Qarzga yozish uchun mijozning ismi va to'liq telefon raqamini (kamida 9 ta raqam) kiriting!");
       return;
     }
 
@@ -838,7 +843,8 @@ export default function CashierMode({
         cardAmount: paymentMethod === 'Plastik' ? totals.finalTotal : paymentMethod === 'Aralash' ? cardAmount : 0,
         paymeAmount: paymentMethod === 'Payme' ? totals.finalTotal : 0,
         clickAmount: paymentMethod === 'Click' ? totals.finalTotal : 0,
-        debtorName: paymentMethod === 'Qarz' ? cleanDebtor : ''
+        debtorName: paymentMethod === 'Qarz' ? cleanDebtor : '',
+        debtorPhone: paymentMethod === 'Qarz' ? cleanDebtorPhone : ''
       };
 
       const closedOrderObject = {
@@ -862,6 +868,7 @@ export default function CashierMode({
         finalTotal: totals.finalTotal,
         total: totals.finalTotal,
         debtorName: paymentMethod === 'Qarz' ? cleanDebtor : (selectedOrder.debtorName || ''),
+        debtorPhone: paymentMethod === 'Qarz' ? cleanDebtorPhone : (selectedOrder.debtorPhone || ''),
         paymentDetails,
         cashierName: currentUser?.name || 'Kassir',
         closeTime: closeTimeStr,
@@ -980,30 +987,41 @@ export default function CashierMode({
   // ==========================================
   // 12. QARZNI SO'NDIRISH VA CHEKNI O'CHIRISH
   // ==========================================
-  const handlePayOffDebt = (debtOrder) => {
+  // Qarz yopilganda (B7): haqiqiy to'lov turi yoziladi, sotuv sanasi (closeTime, closedAtMs) o'zgarmaydi
+  const handlePayOffDebt = (debtOrder, method = 'Naqd') => {
     if (!debtOrder) return;
-    const debtAmount = Number(debtOrder.finalTotal ?? debtOrder.total ?? 0) || 0;
+    const payMethod = ['Naqd', 'Plastik', 'Click', 'Payme'].includes(method) ? method : 'Naqd';
+    const debtAmount = Number(debtOrder.total ?? debtOrder.finalTotal ?? 0) || 0;
     const debtor = debtOrder.debtorName || debtOrder.paymentDetails?.debtorName || "Noma'lum mijoz";
-
-    if (!window.confirm(`💰 "${debtor}" ning ${debtAmount.toLocaleString()} so'm qarzini to'landi deb tasdiqlaysizmi?`)) {
-      return;
-    }
-
-    const paidTime = new Date().toLocaleString();
+    const paidAtMs = Date.now();
 
     updateOrders(prev =>
       (Array.isArray(prev) ? prev : []).map(o =>
         o && String(o.id) === String(debtOrder.id)
-          ? { ...o, status: "To'langan", paymentMethod: 'Naqd', debtPaidAt: paidTime, closeTime: paidTime }
+          ? {
+              ...o,
+              status: "To'langan",
+              paymentMethod: payMethod,
+              wasDebt: true,
+              debtPaidMethod: payMethod,
+              debtPaidAt: new Date(paidAtMs).toLocaleString(),
+              debtPaidAtMs: paidAtMs,
+              debtPaidBy: currentUser?.name || 'Kassir',
+              paymentDetails: {
+                ...(o.paymentDetails || {}),
+                cashAmount: payMethod === 'Naqd' ? debtAmount : 0,
+                cardAmount: payMethod === 'Plastik' ? debtAmount : 0,
+                clickAmount: payMethod === 'Click' ? debtAmount : 0,
+                paymeAmount: payMethod === 'Payme' ? debtAmount : 0
+              }
+            }
           : o
       )
     );
 
     if (typeof addAuditLog === 'function') {
-      addAuditLog("Qarz to'landi", `${debtor}: +${debtAmount.toLocaleString()} so'm`);
+      addAuditLog("Qarz to'landi", `${debtor}: +${debtAmount.toLocaleString()} so'm (${payMethod})`);
     }
-
-    alert(`✅ "${debtor}" ning ${debtAmount.toLocaleString()} so'm qarzi muvaffaqiyatli yopildi!`);
   };
 
   const handleDeleteOrder = (orderId, tableName = 'Stol') => {
@@ -1064,7 +1082,7 @@ export default function CashierMode({
     <div className="max-w-7xl mx-auto flex flex-col gap-4 pb-6 animate-fade-in">
       
       {/* TEPADAGI JONLI KASSA SEYFI, XARAJAT VA CRM PANELI */}
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4">
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4">
         
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
           <div className="bg-emerald-50/70 dark:bg-emerald-900/20 px-4 py-2.5 rounded-2xl border border-emerald-200/70 dark:border-emerald-800/50 flex justify-between items-center">
@@ -1178,6 +1196,8 @@ export default function CashierMode({
               setMixedCard={handleMixedCardChange}
               debtorName={debtorName}
               setDebtorName={setDebtorName}
+              debtorPhone={debtorPhone}
+              setDebtorPhone={setDebtorPhone}
               customers={safeCustomers}
               customerPhone={customerPhone}
               setCustomerPhone={setCustomerPhone}
@@ -1213,7 +1233,7 @@ export default function CashierMode({
       {isCrmModalOpen && (
         <div
           onClick={() => setIsCrmModalOpen(false)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -1247,7 +1267,7 @@ export default function CashierMode({
                 value={newCrmCustomer.name}
                 onChange={e => setNewCrmCustomer(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="👤 Mijoz ismi *"
-                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
               />
               <input
                 type="tel"
@@ -1255,7 +1275,7 @@ export default function CashierMode({
                 value={newCrmCustomer.phone}
                 onChange={e => setNewCrmCustomer(prev => ({ ...prev, phone: e.target.value }))}
                 placeholder="📞 Tel: 90 123 45 67 *"
-                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
               />
               <input
                 type="number"
@@ -1263,7 +1283,7 @@ export default function CashierMode({
                 value={newCrmCustomer.initialBonus}
                 onChange={e => setNewCrmCustomer(prev => ({ ...prev, initialBonus: e.target.value }))}
                 placeholder="🎁 Boshlang'ich bonus (s)"
-                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+                className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
               />
               <button
                 type="submit"
@@ -1278,7 +1298,7 @@ export default function CashierMode({
               value={crmSearch}
               onChange={e => setCrmSearch(e.target.value)}
               placeholder="🔍 Mijoz ismi yoki telefon raqami bo'yicha qidirish..."
-              className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+              className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
             />
 
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
@@ -1351,7 +1371,7 @@ export default function CashierMode({
       {isExpenseModalOpen && (
         <div
           onClick={() => setIsExpenseModalOpen(false)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-end md:items-center justify-center md:p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -1378,7 +1398,7 @@ export default function CashierMode({
                 <select
                   value={expenseForm.category}
                   onChange={e => setExpenseForm(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-red-500 cursor-pointer"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-red-500 cursor-pointer"
                 >
                   {EXPENSE_CATEGORIES.map(c => (
                     <option key={c.id} value={c.id}>{c.label}</option>
@@ -1401,7 +1421,7 @@ export default function CashierMode({
                       onClick={() => setExpenseForm(prev => ({ ...prev, paymentSource: src.id }))}
                       className={`py-3 px-3 rounded-xl font-black text-xs border-2 transition ${
                         expenseForm.paymentSource === src.id
-                          ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                          ? 'bg-red-600 text-white border-red-600 shadow-xs'
                           : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
                       }`}
                     >
@@ -1425,7 +1445,7 @@ export default function CashierMode({
                     value={expenseForm.amount}
                     onChange={e => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
                     placeholder="Masalan: 50000"
-                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-red-300 dark:border-red-700 font-black text-lg text-gray-900 dark:text-white outline-none focus:border-red-500"
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-red-300 dark:border-red-700 font-black text-lg text-gray-900 dark:text-white outline-hidden focus:border-red-500"
                   />
                 </div>
 
@@ -1438,7 +1458,7 @@ export default function CashierMode({
                     value={expenseForm.recipient}
                     onChange={e => setExpenseForm(prev => ({ ...prev, recipient: e.target.value }))}
                     placeholder="Masalan: Oshpaz Ali"
-                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-red-500"
+                    className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-hidden focus:border-red-500"
                   />
                 </div>
               </div>
@@ -1453,7 +1473,7 @@ export default function CashierMode({
                   value={expenseForm.note}
                   onChange={e => setExpenseForm(prev => ({ ...prev, note: e.target.value }))}
                   placeholder="Masalan: Bozordan ko'kat va 30 ta non olindi"
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-none focus:border-red-500"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-sm text-gray-900 dark:text-white outline-hidden focus:border-red-500"
                 />
               </div>
 
@@ -1481,7 +1501,7 @@ export default function CashierMode({
       {isExpenseListModalOpen && (
         <div
           onClick={() => setIsExpenseListModalOpen(false)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}

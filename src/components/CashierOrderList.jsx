@@ -1,17 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+const DEBT_PAY_METHODS = ['Naqd', 'Plastik', 'Click', 'Payme'];
 
 export default function CashierOrderList({ 
   activeOrders = [], 
+  debtOrders = [],
+  activeTab = 'active',
+  setActiveTab,
   selectedOrder, 
-  onSelectOrder 
+  onSelectOrder,
+  onPayOffDebt,
+  onDeleteOrder
 }) {
   const safeOrders = Array.isArray(activeOrders) ? activeOrders : [];
+  const safeDebts = Array.isArray(debtOrders) ? debtOrders : [];
+  const isDebtTab = activeTab === 'debt';
+  // Qaysi qarz uchun to'lov turi tanlanmoqda
+  const [payingDebtId, setPayingDebtId] = useState(null);
 
   // Chek summasini xavfsiz hisoblash
   const getOrderDisplayTotal = (order) => {
     if (!order) return 0;
-    if (order.finalTotal !== undefined) return Number(order.finalTotal) || 0;
     if (order.total !== undefined) return Number(order.total) || 0;
+    if (order.finalTotal !== undefined) return Number(order.finalTotal) || 0;
 
     if (Array.isArray(order.items)) {
       return order.items.reduce((sum, item) => {
@@ -24,17 +35,104 @@ export default function CashierOrderList({
   };
 
   return (
-    <div className="w-full lg:w-1/3 bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-64 lg:h-full shrink-0">
+    <div className="w-full lg:w-1/3 bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col h-64 lg:h-full shrink-0">
       
       <div className="mb-4">
-        <h2 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-          🧾 Ochiq Cheklar
-        </h2>
-        <p className="text-xs font-bold text-gray-500 mt-1">
-          To'lov kutayotgan stollar ({safeOrders.length} ta)
+        <div className="flex gap-1.5 bg-gray-100 dark:bg-gray-900/60 p-1 rounded-2xl mb-3">
+          {[
+            { id: 'active', label: `🧾 Ochiq (${safeOrders.length})` },
+            { id: 'debt', label: `📝 Qarzlar (${safeDebts.length})` }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => typeof setActiveTab === 'function' && setActiveTab(tab.id)}
+              className={`flex-1 px-3 py-2 rounded-xl font-black text-xs transition ${
+                activeTab === tab.id
+                  ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-300 shadow-xs'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs font-bold text-gray-500">
+          {isDebtTab
+            ? `Nasiyaga yozilgan cheklar (${safeDebts.length} ta)`
+            : `To'lov kutayotgan stollar (${safeOrders.length} ta)`}
         </p>
       </div>
 
+      {isDebtTab ? (
+        <div className="flex-1 overflow-y-auto hide-scrollbar space-y-3 pr-2">
+          {safeDebts.length === 0 ? (
+            <div className="text-center text-gray-400 mt-10 font-bold">Qarzlar yo'q</div>
+          ) : (
+            safeDebts.map(order => {
+              if (!order) return null;
+              const debtor = order.debtorName || order.paymentDetails?.debtorName || "Noma'lum mijoz";
+              const phone = order.debtorPhone || order.paymentDetails?.debtorPhone || order.customerPhone || '';
+              const isPaying = String(payingDebtId) === String(order.id);
+              return (
+                <div
+                  key={order.id}
+                  className="p-4 rounded-2xl border-2 border-orange-100 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-900/10 space-y-2"
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
+                      <h3 className="font-black text-base text-gray-900 dark:text-white truncate">👤 {debtor}</h3>
+                      {phone && <p className="text-xs font-bold text-gray-500">📞 {phone}</p>}
+                      <p className="text-[11px] font-bold text-gray-400 mt-0.5">
+                        {order.table} • {order.closeTime || order.date || ''}
+                      </p>
+                    </div>
+                    <span className="font-black text-sm text-orange-600 dark:text-orange-300 shrink-0">
+                      {getOrderDisplayTotal(order).toLocaleString()} so'm
+                    </span>
+                  </div>
+
+                  {isPaying ? (
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-black uppercase text-gray-500">Qanday to'landi?</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {DEBT_PAY_METHODS.map(m => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => {
+                              if (typeof onPayOffDebt === 'function') onPayOffDebt(order, m);
+                              setPayingDebtId(null);
+                            }}
+                            className="py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition active:scale-95"
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPayingDebtId(null)}
+                        className="w-full py-1.5 rounded-xl text-gray-500 font-black text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        Bekor qilish
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPayingDebtId(order.id)}
+                      className="w-full py-2 rounded-xl bg-white dark:bg-gray-800 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-black text-xs hover:bg-emerald-50 transition"
+                    >
+                      ✅ Qarzni yopish
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
       <div className="flex-1 overflow-y-auto hide-scrollbar space-y-3 pr-2">
         {safeOrders.length === 0 ? (
           <div className="text-center text-gray-400 mt-10 font-bold">
@@ -96,18 +194,34 @@ export default function CashierOrderList({
                   )}
                 </div>
                 
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xl transition-colors shrink-0 ${
-                  isSelected 
-                    ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30' 
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400'
-                }`}>
-                  →
+                <div className="flex items-center gap-2 shrink-0">
+                  {typeof onDeleteOrder === 'function' && (
+                    <button
+                      type="button"
+                      title="Chekni bekor qilish"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteOrder(order.id, order.table || 'Stol');
+                      }}
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm bg-red-50 dark:bg-red-900/30 text-red-500 hover:bg-red-100 transition"
+                    >
+                      🗑
+                    </button>
+                  )}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xl transition-colors ${
+                    isSelected 
+                      ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30' 
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400'
+                  }`}>
+                    →
+                  </div>
                 </div>
               </div>
             );
           })
         )}
       </div>
+      )}
 
     </div>
   );

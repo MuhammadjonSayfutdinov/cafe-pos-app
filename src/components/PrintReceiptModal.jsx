@@ -217,7 +217,7 @@ export default function PrintReceiptModal({
     <div 
       id="receipt-modal-backdrop"
       onClick={() => typeof onClose === 'function' && onClose()}
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-fade-in"
     >
       {/* TERMOPRINTER UCHUN MAXSUS CSS (KESILIB QOLMASLIK KAFOLATI BILAN) */}
       <style>
@@ -289,7 +289,7 @@ export default function PrintReceiptModal({
               type="button"
               onClick={() => setPaperSize('80mm')}
               className={`px-2.5 py-1 rounded-lg text-xs font-black transition ${
-                paperSize === '80mm' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600'
+                paperSize === '80mm' ? 'bg-indigo-600 text-white shadow-xs' : 'text-gray-600'
               }`}
             >
               🖨 80mm
@@ -298,7 +298,7 @@ export default function PrintReceiptModal({
               type="button"
               onClick={() => setPaperSize('58mm')}
               className={`px-2.5 py-1 rounded-lg text-xs font-black transition ${
-                paperSize === '58mm' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600'
+                paperSize === '58mm' ? 'bg-indigo-600 text-white shadow-xs' : 'text-gray-600'
               }`}
             >
               🧾 58mm

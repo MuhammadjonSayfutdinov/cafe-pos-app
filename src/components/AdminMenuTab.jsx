@@ -398,7 +398,7 @@ export default function AdminMenuTab({
   // ==========================================
   return (
     <>
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700 animate-fade-in space-y-5">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-xs border border-gray-100 dark:border-gray-700 animate-fade-in space-y-5">
         
         {/* SARLAVHA VA YANGI QO'SHISH TUGMASI */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -427,7 +427,7 @@ export default function AdminMenuTab({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="🔍 Taom nomini qidiring..."
-              className="w-full pl-4 pr-9 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-amber-500"
+              className="w-full pl-4 pr-9 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
             />
             {searchQuery && (
               <button
@@ -444,7 +444,7 @@ export default function AdminMenuTab({
             <select
               value={filterCategory}
               onChange={e => setFilterCategory(e.target.value)}
-              className="px-3.5 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-700 dark:text-gray-200 outline-none cursor-pointer"
+              className="px-3.5 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-700 dark:text-gray-200 outline-hidden cursor-pointer"
             >
               <option value="Barchasi">📁 Barcha toifalar</option>
               {safeCategories.map(c => (
@@ -464,7 +464,7 @@ export default function AdminMenuTab({
                   onClick={() => setFilterStatus(st.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
                     filterStatus === st.id
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs'
                       : 'text-gray-500 dark:text-gray-400'
                   }`}
                 >
@@ -559,7 +559,7 @@ export default function AdminMenuTab({
                             <span className="font-black text-sm text-gray-800 dark:text-gray-200 block">
                               {liveFoodCost.toLocaleString()} s
                             </span>
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black ${
+                            <span className={`inline-block px-2 py-0.5 rounded-sm text-[10px] font-black ${
                               foodCostPct <= 35
                                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
                                 : foodCostPct <= 55
@@ -621,7 +621,7 @@ export default function AdminMenuTab({
 
       {/* MODAL */}
       {isMenuModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-4 my-8 relative max-h-[92vh] overflow-y-auto">
             
             <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
@@ -648,7 +648,7 @@ export default function AdminMenuTab({
                     required 
                     value={newItemData.name} 
                     onChange={e => setNewItemData({ ...newItemData, name: e.target.value })} 
-                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none focus:border-amber-500 text-gray-900 dark:text-white font-bold" 
+                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-hidden focus:border-amber-500 text-gray-900 dark:text-white font-bold" 
                     placeholder="Masalan: Qozonkabob" 
                   />
                 </div>
@@ -660,7 +660,7 @@ export default function AdminMenuTab({
                   <select 
                     value={newItemData.category} 
                     onChange={e => setNewItemData({ ...newItemData, category: e.target.value })} 
-                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-none text-gray-900 dark:text-white font-bold cursor-pointer"
+                    className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-hidden text-gray-900 dark:text-white font-bold cursor-pointer"
                   >
                     {safeCategories.map(c => (
                       <option key={c} value={c}>{c}</option>
@@ -693,7 +693,7 @@ export default function AdminMenuTab({
                         value={vInp.name}
                         onChange={e => handleVariantChange(idx, 'name', e.target.value)}
                         placeholder="1 porsiya / 0.5 pors"
-                        className="w-2/5 p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 outline-none text-xs font-bold text-gray-900 dark:text-white"
+                        className="w-2/5 p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 outline-hidden text-xs font-bold text-gray-900 dark:text-white"
                       />
                       <input
                         type="number"
@@ -702,7 +702,7 @@ export default function AdminMenuTab({
                         value={vInp.price}
                         onChange={e => handleVariantChange(idx, 'price', e.target.value)}
                         placeholder="Sotish narxi (masalan: 45000)"
-                        className="flex-1 p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 outline-none focus:border-amber-500 text-xs font-black text-gray-900 dark:text-white"
+                        className="flex-1 p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 outline-hidden focus:border-amber-500 text-xs font-black text-gray-900 dark:text-white"
                       />
                       {variantInputs.length > 1 && (
                         <button
@@ -754,14 +754,14 @@ export default function AdminMenuTab({
                       return (
                         <div 
                           key={index} 
-                          className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm space-y-2"
+                          className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-600 shadow-xs space-y-2"
                         >
                           <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
                             <select 
                               required 
                               value={inp.inventoryId} 
                               onChange={e => handleRecipeChange(index, 'inventoryId', e.target.value)}
-                              className="flex-1 min-w-[160px] p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 outline-none font-bold text-xs text-gray-900 dark:text-white cursor-pointer"
+                              className="flex-1 min-w-[160px] p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 outline-hidden font-bold text-xs text-gray-900 dark:text-white cursor-pointer"
                             >
                               <option value="">-- Ombordan tanlang --</option>
                               {safeInventory.map(inv => (
@@ -778,7 +778,7 @@ export default function AdminMenuTab({
                               step="any" 
                               value={inp.qty} 
                               onChange={e => handleRecipeChange(index, 'qty', e.target.value)}
-                              className="w-24 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 outline-none font-black text-xs text-gray-900 dark:text-white text-center"
+                              className="w-24 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 outline-hidden font-black text-xs text-gray-900 dark:text-white text-center"
                               placeholder="Miqdor"
                             />
 
@@ -786,7 +786,7 @@ export default function AdminMenuTab({
                               value={inp.recipeUnit || invMeta.value}
                               onChange={e => handleRecipeChange(index, 'recipeUnit', e.target.value)}
                               disabled={!selectedInv}
-                              className="w-24 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 outline-none font-black text-xs text-amber-600 dark:text-amber-400 cursor-pointer"
+                              className="w-24 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 outline-hidden font-black text-xs text-amber-600 dark:text-amber-400 cursor-pointer"
                             >
                               {(compatibleUnits.length > 0 ? compatibleUnits : [invMeta]).map(u => (
                                 <option key={u.value} value={u.value}>{u.label}</option>

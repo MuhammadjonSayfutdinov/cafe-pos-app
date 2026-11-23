@@ -23,7 +23,7 @@ export default function CashierReceipt({
   const preCheckCount = Number(selectedOrder.preCheckCount) || 0;
 
   return (
-    <div className="flex-1 bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 md:p-6 flex flex-col justify-between min-h-0 overflow-hidden">
+    <div className="flex-1 bg-white dark:bg-gray-800 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 p-5 md:p-6 flex flex-col justify-between min-h-0 overflow-hidden">
       
       {/* CHEK TEPASI */}
       <div>
@@ -55,7 +55,7 @@ export default function CashierReceipt({
               <button
                 type="button"
                 onClick={onPrintPreCheck}
-                className={`px-3.5 py-2 rounded-xl font-black text-xs transition active:scale-95 flex items-center gap-1.5 shadow-sm border ${
+                className={`px-3.5 py-2 rounded-xl font-black text-xs transition active:scale-95 flex items-center gap-1.5 shadow-xs border ${
                   isLockedPreCheck
                     ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 hover:bg-amber-100'
                     : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-indigo-500/20'

@@ -217,7 +217,7 @@ export default function AdminEmployeesTab({
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 dark:border-gray-700 animate-fade-in space-y-5">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 md:p-6 shadow-xs border border-gray-100 dark:border-gray-700 animate-fade-in space-y-5">
         
         {/* SARLAVHA VA YANGI XODIM TUGMASI */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -245,13 +245,13 @@ export default function AdminEmployeesTab({
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="🔍 Xodim ismini qidiring..."
-            className="flex-1 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-blue-500"
+            className="flex-1 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-900 dark:text-white outline-hidden focus:border-blue-500"
           />
 
           <select
             value={filterRole}
             onChange={e => setFilterRole(e.target.value)}
-            className="px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-700 dark:text-gray-200 outline-none cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-700 dark:text-gray-200 outline-hidden cursor-pointer"
           >
             <option value="all">👥 Barcha lavozimlar ({safeUsers.length})</option>
             {roleOptions.map(r => (
@@ -359,7 +359,7 @@ export default function AdminEmployeesTab({
 
       {/* XODIM QO'SHISH / TAHRIRLASH MODALI */}
       {isEmployeeModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center border-b pb-3 dark:border-gray-700">
               <h3 className="font-black text-lg text-gray-900 dark:text-white">
@@ -384,7 +384,7 @@ export default function AdminEmployeesTab({
                   required 
                   value={newEmployeeData.name} 
                   onChange={e => setNewEmployeeData({ ...newEmployeeData, name: e.target.value })} 
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-bold text-gray-900 dark:text-white outline-none focus:border-blue-500" 
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-bold text-gray-900 dark:text-white outline-hidden focus:border-blue-500" 
                   placeholder="Masalan: Sardor" 
                 />
               </div>
@@ -396,7 +396,7 @@ export default function AdminEmployeesTab({
                 <select 
                   value={newEmployeeData.role} 
                   onChange={e => handleRoleChange(e.target.value)} 
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-bold text-gray-900 dark:text-white outline-none cursor-pointer"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-bold text-gray-900 dark:text-white outline-hidden cursor-pointer"
                 >
                   {roleOptions.map(r => (
                     <option key={r.value} value={r.value}>{r.label}</option>
@@ -423,7 +423,7 @@ export default function AdminEmployeesTab({
                   required 
                   value={newEmployeeData.pin} 
                   onChange={e => handlePinChange(e.target.value)} 
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-black tracking-[0.25em] text-gray-900 dark:text-white outline-none focus:border-blue-500" 
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-black tracking-[0.25em] text-gray-900 dark:text-white outline-hidden focus:border-blue-500" 
                   placeholder={`${modalReqPinLen} xonali PIN kiriting...`} 
                 />
               </div>

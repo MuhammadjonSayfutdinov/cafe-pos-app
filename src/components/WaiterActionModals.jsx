@@ -47,7 +47,7 @@ export default function WaiterActionModals({
       {securityPrompt && (
         <div
           onClick={() => setSecurityPrompt(null)}
-          className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[180] flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/75 backdrop-blur-xs z-[180] flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -75,7 +75,7 @@ export default function WaiterActionModals({
                 <select
                   value={cancelReasonInput}
                   onChange={e => setCancelReasonInput(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-900 dark:text-white outline-none focus:border-red-500 cursor-pointer"
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-900 dark:text-white outline-hidden focus:border-red-500 cursor-pointer"
                 >
                   <option value="Mijoz rad etdi">🙅‍♂️ Mijoz taomni rad etdi</option>
                   <option value="Ofitsiant adashib urgan">✍️ Ofitsiant adashib urgan</option>
@@ -99,7 +99,7 @@ export default function WaiterActionModals({
                     if (typeof setPinError === 'function') setPinError('');
                   }}
                   placeholder="••••••"
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-red-300 dark:border-red-700 font-black text-xl text-center tracking-widest text-gray-900 dark:text-white outline-none focus:border-red-500"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-red-300 dark:border-red-700 font-black text-xl text-center tracking-widest text-gray-900 dark:text-white outline-hidden focus:border-red-500"
                 />
                 {pinError && (
                   <p className="text-xs font-black text-red-600 mt-1 text-center">
@@ -138,7 +138,7 @@ export default function WaiterActionModals({
       {transferOrder && (
         <div
           onClick={() => setTransferOrder(null)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -152,7 +152,7 @@ export default function WaiterActionModals({
                 required
                 value={targetTransferTable}
                 onChange={e => setTargetTransferTable(e.target.value)}
-                className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+                className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
               >
                 <option value="">-- Bo'sh stolni tanlang --</option>
                 {freeTablesForAction.map(t => (
@@ -185,7 +185,7 @@ export default function WaiterActionModals({
       {splitOrder && (
         <div
           onClick={() => setSplitOrder(null)}
-          className="fixed inset-0 bg-black/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/65 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -203,7 +203,7 @@ export default function WaiterActionModals({
                   required
                   value={splitTargetTable}
                   onChange={e => setSplitTargetTable(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-900 dark:text-white outline-none focus:border-purple-500"
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-900 dark:text-white outline-hidden focus:border-purple-500"
                 >
                   <option value="">-- Stolni tanlang --</option>
                   {freeTablesForAction.map(t => (

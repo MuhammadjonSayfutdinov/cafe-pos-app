@@ -119,7 +119,7 @@ export default function WaiterCart({
   };
 
   return (
-    <div className="w-full lg:w-96 bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 sm:p-5 flex flex-col justify-between min-h-0 overflow-hidden shrink-0">
+    <div className="w-full lg:w-96 bg-white dark:bg-gray-800 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 p-4 sm:p-5 flex flex-col justify-between min-h-0 overflow-hidden shrink-0">
       
       {/* 1. SAVATCHA TEPASI VA PRE-CHEK QULF INDIKATORI */}
       <div className="pb-3 border-b border-gray-100 dark:border-gray-700 space-y-2 shrink-0">
@@ -258,11 +258,11 @@ export default function WaiterCart({
                         {item.name}
                       </h4>
                       {sentQty > 0 ? (
-                        <span className="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-black text-[9px] uppercase">
+                        <span className="px-1.5 py-0.5 rounded-sm bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-black text-[9px] uppercase">
                           🔒 Oshxonada: {sentQty}
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-black text-[9px] uppercase">
+                        <span className="px-1.5 py-0.5 rounded-sm bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-black text-[9px] uppercase">
                           🆕 Yangi
                         </span>
                       )}
@@ -294,7 +294,7 @@ export default function WaiterCart({
                     <button
                       type="button"
                       onClick={() => changeItemQty(itemKey, 1)}
-                      className="w-8 h-8 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-base flex items-center justify-center shadow-sm transition active:scale-90"
+                      className="w-8 h-8 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-base flex items-center justify-center shadow-xs transition active:scale-90"
                       title="Qo'shish (+1)"
                     >
                       +
@@ -335,7 +335,7 @@ export default function WaiterCart({
                         value={item.note || ''}
                         onChange={e => updateNoteText(itemKey, e.target.value)}
                         placeholder="Masalan: Piyozsiz, kam tuzli..."
-                        className="w-full p-2 rounded-xl bg-white dark:bg-gray-800 border border-indigo-200 dark:border-gray-600 text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-indigo-500"
+                        className="w-full p-2 rounded-xl bg-white dark:bg-gray-800 border border-indigo-200 dark:border-gray-600 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
                       />
                       <div className="flex flex-wrap gap-1">
                         {QUICK_CHEF_NOTES.map(chip => (

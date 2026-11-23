@@ -176,6 +176,11 @@ export default function KitchenMode({
     if (!order) return nowMs;
     const idKey = String(order.id);
 
+    // 0. Dozakaz: oshxonaga qayta tushgan vaqt
+    if (order.kitchenRoundAt && !isNaN(Number(order.kitchenRoundAt))) {
+      return Number(order.kitchenRoundAt);
+    }
+
     // 1. Agar order ichida tayyor timestamp bo'lsa
     if (order.createdAt && !isNaN(Number(order.createdAt))) {
       return Number(order.createdAt);
@@ -274,8 +279,15 @@ export default function KitchenMode({
 
       const slaProgressPct = Math.min(100, Math.round((elapsedSeconds / critSec) * 100));
 
-      // Sex filtri uchun taomlarni tekshirish
-      const items = Array.isArray(order.items) ? order.items : [];
+      // Faqat hali tayyorlanmagan porsiyalar (dozakazda eski taomlar qayta chiqmaydi, B3)
+      const items = (Array.isArray(order.items) ? order.items : [])
+        .map(it => {
+          if (!it) return null;
+          const qty = Number(it.quantity ?? it.qty ?? 1) || 0;
+          const pending = Math.max(0, qty - (Number(it.kitchenDoneQty) || 0));
+          return pending > 0 ? { ...it, quantity: pending, qty: pending } : null;
+        })
+        .filter(Boolean);
       const filteredItemsByStation = stationCategory === 'Barchasi'
         ? items
         : items.filter(it => {
@@ -427,12 +439,28 @@ export default function KitchenMode({
         return {
           ...o,
           status: nextStatus,
+          // Tayyor bo'lganda barcha porsiyalar "pishgan" deb belgilanadi
+          items: nextStatus === 'Tayyor' && Array.isArray(o.items)
+            ? o.items.map(it => (it ? { ...it, kitchenDoneQty: Number(it.quantity ?? it.qty ?? 1) || 0 } : it))
+            : o.items,
           cookingStartedAt: nextStatus === 'Tayyorlanmoqda' ? nowTimeStr : o.cookingStartedAt,
           readyTime: nextStatus === 'Tayyor' ? nowTimeStr : o.readyTime,
           cookDurationSeconds: nextStatus === 'Tayyor' ? order.elapsedSeconds : o.cookDurationSeconds
         };
       })
     );
+
+    // Tayyor bo'lgan buyurtmaning "✓" belgilarini tozalash (dozakazda eski belgi qolmasin)
+    if (nextStatus === 'Tayyor') {
+      const prefix = `${order.id}_`;
+      setCheckedSubItems(prev => {
+        const next = {};
+        Object.keys(prev || {}).forEach(k => {
+          if (!k.startsWith(prefix)) next[k] = prev[k];
+        });
+        return next;
+      });
+    }
 
     if (typeof addAuditLog === 'function') {
       addAuditLog(
@@ -492,7 +520,7 @@ export default function KitchenMode({
       {/* =======================================================
           TEPADAGI SLA TELEMETRIYA VA BOSHQARUV PANELI
           ======================================================= */}
-      <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+      <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 space-y-4">
         
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           {/* Asosiy 2 ta Tab: Buyurtmalar va Stop-List */}
@@ -654,7 +682,7 @@ export default function KitchenMode({
                 {batchSummary.map(([dishName, info]) => (
                   <div
                     key={dishName}
-                    className={`px-3.5 py-2 rounded-2xl border flex items-center gap-2.5 shadow-sm ${
+                    className={`px-3.5 py-2 rounded-2xl border flex items-center gap-2.5 shadow-xs ${
                       info.hasUrgent
                         ? 'bg-red-50 dark:bg-red-900/40 border-red-300 dark:border-red-700'
                         : 'bg-white dark:bg-gray-800 border-amber-200 dark:border-gray-700'
@@ -690,7 +718,7 @@ export default function KitchenMode({
                   onClick={() => setStatusFilter(f.id)}
                   className={`px-3.5 py-2 rounded-xl text-xs font-black whitespace-nowrap transition ${
                     statusFilter === f.id
-                      ? 'bg-indigo-600 text-white shadow-sm'
+                      ? 'bg-indigo-600 text-white shadow-xs'
                       : 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400'
                   }`}
                 >
@@ -711,7 +739,7 @@ export default function KitchenMode({
                   onClick={() => setStationCategory(cat)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition ${
                     stationCategory === cat
-                      ? 'bg-amber-500 text-white shadow-sm'
+                      ? 'bg-amber-500 text-white shadow-xs'
                       : 'bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400'
                   }`}
                 >
@@ -883,7 +911,7 @@ export default function KitchenMode({
                                 <span className={`px-3 py-1 rounded-xl font-black text-sm shrink-0 ${
                                   isSubDone
                                     ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200'
-                                    : 'bg-amber-500 text-white shadow-sm'
+                                    : 'bg-amber-500 text-white shadow-xs'
                                 }`}>
                                   x{qty}
                                 </span>
@@ -928,7 +956,7 @@ export default function KitchenMode({
           2-EKRAN: STOP-LIST BOSHQARUVI (KATEGORIYALAR BILAN)
           ======================================================= */}
       {activeTab === 'stoplist' && (
-        <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
+        <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 space-y-5">
           <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
             <div>
               <h3 className="text-lg font-black text-gray-900 dark:text-white">
@@ -945,13 +973,13 @@ export default function KitchenMode({
                 value={stopSearch}
                 onChange={e => setStopSearch(e.target.value)}
                 placeholder="🔍 Taomni qidiring..."
-                className="px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-none focus:border-red-500"
+                className="px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-red-500"
               />
 
               <select
                 value={stopCategoryFilter}
                 onChange={e => setStopCategoryFilter(e.target.value)}
-                className="px-3.5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-800 dark:text-white outline-none cursor-pointer"
+                className="px-3.5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-800 dark:text-white outline-hidden cursor-pointer"
               >
                 <option value="Barchasi">📁 Barcha toifalar</option>
                 {safeCategories.map(c => (
@@ -986,7 +1014,7 @@ export default function KitchenMode({
                   <span className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 ${
                     isAvailable
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                      : 'bg-red-600 text-white shadow-sm'
+                      : 'bg-red-600 text-white shadow-xs'
                   }`}>
                     {isAvailable ? '🟢 Bor' : '🛑 Tugagan'}
                   </span>
@@ -1001,7 +1029,7 @@ export default function KitchenMode({
           MODAL: SLA TAYMER VA SIGNALIZATSIYA SOZLAMALARI
           ======================================================= */}
       {isSlaModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-5 border border-gray-100 dark:border-gray-700">
             <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-3">
               <h3 className="font-black text-lg text-gray-900 dark:text-white flex items-center gap-2">
@@ -1027,7 +1055,7 @@ export default function KitchenMode({
                   max="60"
                   value={slaConfig.warningMinutes}
                   onChange={e => setSlaConfig(prev => ({ ...prev, warningMinutes: Number(e.target.value) || 10 }))}
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-none focus:border-amber-500"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-amber-500"
                 />
                 <span className="text-[11px] font-bold text-gray-400">
                   Buyurtma shu daqiqaga yetganda sariq rangga kiradi (Standart: 10 daqiqa)
@@ -1044,7 +1072,7 @@ export default function KitchenMode({
                   max="120"
                   value={slaConfig.criticalMinutes}
                   onChange={e => setSlaConfig(prev => ({ ...prev, criticalMinutes: Number(e.target.value) || 20 }))}
-                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-none focus:border-red-500"
+                  className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-red-500"
                 />
                 <span className="text-[11px] font-bold text-gray-400">
                   Buyurtma shu vaqtdan oshsa qizil miltillab, ovozli trevoga chaladi (Standart: 20 daqiqa)

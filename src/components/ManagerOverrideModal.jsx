@@ -31,10 +31,8 @@ export default function ManagerOverrideModal({
       u => u && String(u.role || '').toLowerCase() === 'admin'
     );
 
-    // Agar bazada umuman admin topilmasa, tizim qulflanib qolmasligi uchun fallback
-    return filteredAdmins.length > 0
-      ? filteredAdmins
-      : [{ id: 1, name: 'Admin', role: 'admin', pin: '777777' }];
+    // Standart '777777' zaxirasi olib tashlandi (B6): faqat bazadagi haqiqiy adminlar
+    return filteredAdmins.filter(a => String(a.pin || '').trim().length > 0);
   }, [users]);
 
   // ==========================================

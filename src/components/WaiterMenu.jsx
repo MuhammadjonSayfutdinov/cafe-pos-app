@@ -84,7 +84,7 @@ export default function WaiterMenu({
   }, [cart]);
 
   return (
-    <div className="flex-1 bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 sm:p-5 flex flex-col min-h-0 overflow-hidden">
+    <div className="flex-1 bg-white dark:bg-gray-800 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 p-4 sm:p-5 flex flex-col min-h-0 overflow-hidden">
       
       {/* 1. QIDIRUV VA KATEGORIYALAR PANELI */}
       <div className="space-y-3 pb-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
@@ -94,7 +94,7 @@ export default function WaiterMenu({
             value={currentSearch}
             onChange={e => updateSearch(e.target.value)}
             placeholder="🔍 Taom nomini qidiring..."
-            className="w-full pl-4 pr-10 py-3 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-sm font-black text-gray-900 dark:text-white outline-none focus:border-amber-500 transition"
+            className="w-full pl-4 pr-10 py-3 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-sm font-black text-gray-900 dark:text-white outline-hidden focus:border-amber-500 transition"
           />
           {currentSearch && (
             <button
@@ -162,13 +162,13 @@ export default function WaiterMenu({
                     !isAvailable
                       ? 'bg-gray-100 dark:bg-gray-900/40 border-gray-200 dark:border-gray-800 opacity-60 cursor-not-allowed'
                       : inCartCount > 0
-                      ? 'bg-amber-50/70 dark:bg-amber-900/20 border-amber-400 dark:border-amber-600 shadow-sm cursor-pointer'
+                      ? 'bg-amber-50/70 dark:bg-amber-900/20 border-amber-400 dark:border-amber-600 shadow-xs cursor-pointer'
                       : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200/80 dark:border-gray-700 hover:border-amber-400 hover:shadow-md cursor-pointer active:scale-[0.98]'
                   }`}
                 >
                   {/* Savatchadagi soni badge */}
                   {inCartCount > 0 && (
-                    <span className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-amber-500 text-white font-black text-xs shadow-sm">
+                    <span className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-amber-500 text-white font-black text-xs shadow-xs">
                       ✓ {inCartCount} ta
                     </span>
                   )}
@@ -204,7 +204,7 @@ export default function WaiterMenu({
                                   handleAddDish(dish, v);
                                 }
                               }}
-                              className="py-2 px-2 rounded-xl bg-white dark:bg-gray-800 hover:bg-amber-500 hover:text-white border border-amber-300 dark:border-gray-600 text-left transition active:scale-95 shadow-sm"
+                              className="py-2 px-2 rounded-xl bg-white dark:bg-gray-800 hover:bg-amber-500 hover:text-white border border-amber-300 dark:border-gray-600 text-left transition active:scale-95 shadow-xs"
                             >
                               <span className="text-[10px] font-bold block truncate opacity-80">
                                 {v.name}
@@ -221,7 +221,7 @@ export default function WaiterMenu({
                         <span className="font-black text-base text-amber-600 dark:text-amber-400">
                           {mainPrice.toLocaleString()} <span className="text-xs">so'm</span>
                         </span>
-                        <span className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-sm">
+                        <span className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-xs">
                           + Qo'shish
                         </span>
                       </div>
