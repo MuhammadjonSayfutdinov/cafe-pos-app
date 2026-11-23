@@ -8,6 +8,7 @@ import { getRecordTimeMs } from '../utils/dates';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
 import { getTelegramConfig, sendTelegramMessage, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
+import { CloseShiftModal } from './ShiftPanel';
 
 // ===============================================
 // 1. O'LCHOV BIRLIKLARI KONVERTORI (TANNARX UCHUN)
@@ -1029,80 +1030,9 @@ export default function StatsMode({
     URL.revokeObjectURL(url);
   };
 
-  const handleCloseShift = async () => {
-    const activeShiftExpenses = safeExpenses.filter(e => e && e.status !== ORDER_STATUS.ARCHIVED);
-
-    if (currentShiftPaidOrders.length === 0 && activeShiftExpenses.length === 0) {
-      notify("ℹ️ Hozirgi smenada yopilishi kerak bo'lgan yangi cheklar yoki xarajatlar yo'q!");
-      return;
-    }
-
-    const shiftRev = currentShiftPaidOrders.reduce((s, o) => s + getOrderFinalAmount(o), 0);
-    const shiftCost = currentShiftPaidOrders.reduce((s, o) => s + getOrderFoodCost(o), 0);
-    const shiftExp = activeShiftExpenses
-      .filter(e => !e.isInkassatsiya && e.category !== 'Inkassatsiya')
-      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-    const shiftNet = shiftRev - shiftCost - shiftExp;
-
-    const openWarning = openActiveOrders.length > 0
-      ? `\n\n⚠️ Eslatma: Zalda hali yopilmagan ${openActiveOrders.length} ta faol stol (${openTablesAmount.toLocaleString()} so'm) mavjud. Ular keyingi smenada ochiq qoladi.`
-      : '';
-
-    const confirmMsg = 
-      `⚠️ Diqqat! Z-Otchyotni (Smenani) yopmoqchimisiz?\n\n` +
-      `• Yopilgan cheklar: ${currentShiftPaidOrders.length} ta\n` +
-      `• Smena tushumi: ${shiftRev.toLocaleString()} so'm\n` +
-      `• Xomashyo tannarxi (COGS): -${shiftCost.toLocaleString()} so'm\n` +
-      `• Kunlik xarajatlar: -${shiftExp.toLocaleString()} so'm\n` +
-      `• Haqiqiy Sof Foyda: +${shiftNet.toLocaleString()} so'm\n\n` +
-      `Tasdiqlasangiz, barcha cheklar va xarajatlar Arxivga o'tkaziladi hamda joriy kassa nollanadi.${openWarning}`;
-
-    if (!await confirmAsync(confirmMsg)) return;
-
-    const archiveDateStr = new Date().toLocaleString();
-
-    updateOrdersState(prev => {
-      const list = Array.isArray(prev) && prev.length > 0 ? prev : safeOrders;
-      return list.map(order => {
-        if (order && order.status === ORDER_STATUS.PAID) {
-          return { ...order, status: ORDER_STATUS.ARCHIVED, archiveDate: archiveDateStr };
-        }
-        return order;
-      });
-    });
-
-    updateExpensesState(prev => {
-      const list = Array.isArray(prev) ? prev : safeExpenses;
-      return list.map(exp => {
-        if (exp && exp.status !== ORDER_STATUS.ARCHIVED) {
-          return { ...exp, status: ORDER_STATUS.ARCHIVED, archiveDate: archiveDateStr };
-        }
-        return exp;
-      });
-    });
-
-    sendReportToTelegram('Smena Yopildi (Z-Otchyot)');
-
-    const logDetails = `Smena yopildi: Tushum ${shiftRev.toLocaleString()} s | Xarajat: -${shiftExp.toLocaleString()} s | Sof foyda: +${shiftNet.toLocaleString()} s`;
-    if (typeof addAuditLog === 'function') {
-      addAuditLog("Z-Otchyot (Smena Yopildi)", logDetails);
-    } else {
-      const writeAudit = typeof setAuditLogs === 'function' ? setAuditLogs : setStickyAuditLogs;
-      writeAudit(prev => [
-        {
-          id: `${Date.now()}_${Math.random()}`,
-          date: archiveDateStr,
-          action: "Z-Otchyot (Smena Yopildi)",
-          details: logDetails,
-          userName: currentUser?.name || 'Admin',
-          role: currentUser?.role || 'admin'
-        },
-        ...(Array.isArray(prev) ? prev : [])
-      ]);
-    }
-
-    notify(`✅ Smena muvaffaqiyatli yopildi!\nSof foyda: +${shiftNet.toLocaleString()} so'm`);
-  };
+  // Smenani yopish: Kassa bilan bir xil oyna (sanalgan naqd, farq, Z-hisobot) - ShiftPanel.jsx
+  const [isCloseShiftOpen, setIsCloseShiftOpen] = useState(false);
+  const handleCloseShift = () => setIsCloseShiftOpen(true);
 
   // ===============================================
   // 11. RENDER (UI KOMPONENTLAR)
@@ -2443,7 +2373,20 @@ export default function StatsMode({
           onClose={() => setReprintOrderData(null)}
         />
       )}
-      
+
+      {isCloseShiftOpen && (
+        <CloseShiftModal
+          orders={safeOrders}
+          expenses={safeExpenses}
+          setOrders={updateOrdersState}
+          setExpenses={updateExpensesState}
+          currentUser={currentUser}
+          cafeName={stickyCafeName}
+          addAuditLog={addAuditLog}
+          onClose={() => setIsCloseShiftOpen(false)}
+          onClosed={() => setIsCloseShiftOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constant
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
+import ShiftPanel from './ShiftPanel';
+import { getOpenShift } from '../shift/shiftReport';
 
 // ==========================================
 // 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
@@ -244,6 +246,10 @@ export default function CashierMode({
     return safeOrders.filter(o => o && o.status === ORDER_STATUS.DEBT);
   }, [safeOrders]);
 
+  // Kassa smenasi (src/components/ShiftPanel.jsx)
+  const [shifts] = useSticky('pos_shifts', []);
+  const openShift = getOpenShift(shifts);
+
   const currentShiftPaidOrders = useMemo(() => {
     return safeOrders.filter(o => o && o.status === ORDER_STATUS.PAID);
   }, [safeOrders]);
@@ -282,7 +288,8 @@ export default function CashierMode({
       }
     });
 
-    const expectedCashInDrawer = cashSalesIn - cashExpensesOut;
+    // Smena boshidagi naqd pul ham kassada bo'ladi
+    const expectedCashInDrawer = (Number(openShift?.openingCash) || 0) + cashSalesIn - cashExpensesOut;
 
     return {
       cashSalesIn,
@@ -292,7 +299,7 @@ export default function CashierMode({
       totalOutflow: cashExpensesOut + cardExpensesOut,
       expectedCashInDrawer
     };
-  }, [currentShiftPaidOrders, currentShiftExpenses]);
+  }, [currentShiftPaidOrders, currentShiftExpenses, openShift]);
 
   const selectedOrder = useMemo(() => {
     if (!selectedOrderId) return null;
@@ -539,6 +546,10 @@ export default function CashierMode({
       notify("Iltimos, xarajat summasini to'g'ri kiriting!");
       return;
     }
+    if (!openShift) {
+      notify('⚠️ Avval smenani oching: xarajat smena hisobotiga kiradi');
+      return;
+    }
     if (!cleanNote) {
       notify("Iltimos, xarajat sababini (izohni) kiriting!");
       return;
@@ -569,6 +580,7 @@ export default function CashierMode({
       recipient: cleanRecipient || '-',
       note: cleanNote,
       cashierName: currentUser?.name || 'Kassir',
+      shiftId: openShift.id,
       status: 'Faol'
     };
 
@@ -743,6 +755,10 @@ export default function CashierMode({
   // ==========================================
   const handlePaymentSubmit = () => {
     if (!selectedOrder) return;
+    if (!openShift) {
+      notify('⚠️ Avval smenani oching (yuqoridagi "Smenani ochish" tugmasi)');
+      return;
+    }
 
     let cashAmount = 0;
     let cardAmount = 0;
@@ -848,6 +864,7 @@ export default function CashierMode({
         cashierName: currentUser?.name || 'Kassir',
         closeTime: closeTimeStr,
         closedAtMs: Date.now(),
+        shiftId: openShift?.id || null,
         inventoryDeducted: true,
         hasCall: false
       };
@@ -965,6 +982,10 @@ export default function CashierMode({
   // Qarz yopilganda (B7): haqiqiy to'lov turi yoziladi, sotuv sanasi (closeTime, closedAtMs) o'zgarmaydi
   const handlePayOffDebt = (debtOrder, method = 'Naqd') => {
     if (!debtOrder) return;
+    if (!openShift) {
+      notify('⚠️ Avval smenani oching: qarz puli kassaga tushadi');
+      return;
+    }
     const payMethod = ['Naqd', 'Plastik', 'Click', 'Payme'].includes(method) ? method : 'Naqd';
     const debtAmount = Number(debtOrder.total ?? debtOrder.finalTotal ?? 0) || 0;
     const debtor = debtOrder.debtorName || debtOrder.paymentDetails?.debtorName || "Noma'lum mijoz";
@@ -982,6 +1003,7 @@ export default function CashierMode({
               debtPaidAt: new Date(paidAtMs).toLocaleString(),
               debtPaidAtMs: paidAtMs,
               debtPaidBy: currentUser?.name || 'Kassir',
+              debtPaidShiftId: openShift.id,
               paymentDetails: {
                 ...(o.paymentDetails || {}),
                 cashAmount: payMethod === PAYMENT_METHOD.CASH ? debtAmount : 0,
@@ -1055,6 +1077,17 @@ export default function CashierMode({
   // ==========================================
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-4 pb-6 animate-fade-in">
+
+      {/* KASSA SMENASI: ochish / yopish / Z-hisobot */}
+      <ShiftPanel
+        orders={safeOrders}
+        expenses={safeExpenses}
+        setOrders={updateOrders}
+        setExpenses={updateExpenses}
+        currentUser={currentUser}
+        cafeName={resolvedCafeName}
+        addAuditLog={addAuditLog}
+      />
       
       {/* TEPADAGI JONLI KASSA SEYFI, XARAJAT VA CRM PANELI */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4">
