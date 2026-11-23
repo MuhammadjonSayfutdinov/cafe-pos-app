@@ -7,6 +7,7 @@ import PrintReceiptModal from './PrintReceiptModal';
 import { getRecordTimeMs } from '../utils/dates';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
 import { getTelegramConfig, sendTelegramMessage, escapeHtml } from '../utils/telegramNotifier';
+import { notify, confirmAsync } from '../utils/notify';
 
 // ===============================================
 // 1. O'LCHOV BIRLIKLARI KONVERTORI (TANNARX UCHUN)
@@ -977,9 +978,9 @@ export default function StatsMode({
     const res = await sendReportToTelegram();
     setTgSending(false);
     if (res.ok) {
-      alert('✅ Hisobot Telegramga muvaffaqiyatli yuborildi!');
+      notify('✅ Hisobot Telegramga muvaffaqiyatli yuborildi!');
     } else {
-      alert(`❌ ${res.error}`);
+      notify(`❌ ${res.error}`);
     }
   };
 
@@ -1028,11 +1029,11 @@ export default function StatsMode({
     URL.revokeObjectURL(url);
   };
 
-  const handleCloseShift = () => {
+  const handleCloseShift = async () => {
     const activeShiftExpenses = safeExpenses.filter(e => e && e.status !== ORDER_STATUS.ARCHIVED);
 
     if (currentShiftPaidOrders.length === 0 && activeShiftExpenses.length === 0) {
-      alert("ℹ️ Hozirgi smenada yopilishi kerak bo'lgan yangi cheklar yoki xarajatlar yo'q!");
+      notify("ℹ️ Hozirgi smenada yopilishi kerak bo'lgan yangi cheklar yoki xarajatlar yo'q!");
       return;
     }
 
@@ -1056,7 +1057,7 @@ export default function StatsMode({
       `• Haqiqiy Sof Foyda: +${shiftNet.toLocaleString()} so'm\n\n` +
       `Tasdiqlasangiz, barcha cheklar va xarajatlar Arxivga o'tkaziladi hamda joriy kassa nollanadi.${openWarning}`;
 
-    if (!window.confirm(confirmMsg)) return;
+    if (!await confirmAsync(confirmMsg)) return;
 
     const archiveDateStr = new Date().toLocaleString();
 
@@ -1100,7 +1101,7 @@ export default function StatsMode({
       ]);
     }
 
-    alert(`✅ Smena muvaffaqiyatli yopildi!\nSof foyda: +${shiftNet.toLocaleString()} so'm`);
+    notify(`✅ Smena muvaffaqiyatli yopildi!\nSof foyda: +${shiftNet.toLocaleString()} so'm`);
   };
 
   // ===============================================

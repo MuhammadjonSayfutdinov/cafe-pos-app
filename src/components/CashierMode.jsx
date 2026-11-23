@@ -6,6 +6,7 @@ import CashierPaymentControls from './CashierPaymentControls';
 import { calcOrderTotals } from '../utils/orderTotals';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
+import { notify, confirmAsync } from '../utils/notify';
 
 // ==========================================
 // 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
@@ -490,13 +491,13 @@ export default function CashierMode({
     const initBonus = Math.max(0, Number(newCrmCustomer.initialBonus) || 0);
 
     if (!cleanName || cleanPhone.length < 7) {
-      alert("Iltimos, mijoz ismini va to'g'ri telefon raqamini kiriting!");
+      notify("Iltimos, mijoz ismini va to'g'ri telefon raqamini kiriting!");
       return;
     }
 
     const exists = safeCustomers.some(c => cleanPhoneDigits(c?.phone) === cleanPhone);
     if (exists) {
-      alert("⛔️ Ushbu telefon raqamli mijoz bazada allaqachon mavjud!");
+      notify("⛔️ Ushbu telefon raqamli mijoz bazada allaqachon mavjud!");
       return;
     }
 
@@ -518,27 +519,27 @@ export default function CashierMode({
     }
   };
 
-  const handleDeleteCustomer = (cust) => {
+  const handleDeleteCustomer = async (cust) => {
     if (!cust) return;
-    if (!window.confirm(`Rostdan ham "${cust.name}" ni mijozlar bazasidan o'chirmoqchimisiz?`)) return;
+    if (!await confirmAsync(`Rostdan ham "${cust.name}" ni mijozlar bazasidan o'chirmoqchimisiz?`)) return;
     updateCustomers(prev => (Array.isArray(prev) ? prev : []).filter(c => c.id !== cust.id));
   };
 
   // ==========================================
   // 9. KASSADAN XARAJAT / CHIQIM QO'SHISH
   // ==========================================
-  const handleSaveExpense = (e) => {
+  const handleSaveExpense = async (e) => {
     e.preventDefault();
     const amountNum = Number(expenseForm.amount);
     const cleanNote = (expenseForm.note || '').trim();
     const cleanRecipient = (expenseForm.recipient || '').trim();
 
     if (isNaN(amountNum) || amountNum <= 0) {
-      alert("Iltimos, xarajat summasini to'g'ri kiriting!");
+      notify("Iltimos, xarajat summasini to'g'ri kiriting!");
       return;
     }
     if (!cleanNote) {
-      alert("Iltimos, xarajat sababini (izohni) kiriting!");
+      notify("Iltimos, xarajat sababini (izohni) kiriting!");
       return;
     }
 
@@ -546,7 +547,7 @@ export default function CashierMode({
       expenseForm.paymentSource === 'Naqd' &&
       amountNum > cashDrawerSummary.expectedCashInDrawer
     ) {
-      const proceed = window.confirm(
+      const proceed = await confirmAsync(
         `⚠️ Diqqat! Hozir seyfda ${cashDrawerSummary.expectedCashInDrawer.toLocaleString()} so'm naqd pul bor.\n` +
         `Siz ${amountNum.toLocaleString()} so'm chiqim kiritmoqdasiz. Davom etamizmi?`
       );
@@ -605,8 +606,8 @@ export default function CashierMode({
 
   const handleDeleteExpense = (expItem) => {
     if (!expItem) return;
-    const performDelete = () => {
-      if (!window.confirm(`"${expItem.note}" (-${Number(expItem.amount).toLocaleString()} s) xarajat yozuvini o'chirasizmi?`)) return;
+    const performDelete = async () => {
+      if (!await confirmAsync(`"${expItem.note}" (-${Number(expItem.amount).toLocaleString()} s) xarajat yozuvini o'chirasizmi?`)) return;
       updateExpenses(prev => (Array.isArray(prev) ? prev : []).filter(e => e && String(e.id) !== String(expItem.id)));
     };
 
@@ -750,7 +751,7 @@ export default function CashierMode({
       cardAmount = Math.max(0, Number(mixedCard) || 0);
 
       if (Math.round(cashAmount + cardAmount) !== Math.round(totals.finalTotal)) {
-        alert(
+        notify(
           `⛔️ Diqqat! Aralash to'lovda Naqd (${cashAmount.toLocaleString()} s) va Plastik (${cardAmount.toLocaleString()} s) yig'indisi jami to'lanadigan summaga (${totals.finalTotal.toLocaleString()} s) teng bo'lishi shart!`
         );
         return;
@@ -761,7 +762,7 @@ export default function CashierMode({
     const cleanDebtorPhone = debtorPhone.trim();
     // Qarz uchun ism VA telefon majburiy (B8): kamida 9 ta raqam
     if (paymentMethod === PAYMENT_METHOD.DEBT && (!cleanDebtor || cleanPhoneDigits(cleanDebtorPhone).length < 9)) {
-      alert("⛔️ Qarzga yozish uchun mijozning ismi va to'liq telefon raqamini (kamida 9 ta raqam) kiriting!");
+      notify("⛔️ Qarzga yozish uchun mijozning ismi va to'liq telefon raqamini (kamida 9 ta raqam) kiriting!");
       return;
     }
 
@@ -1000,9 +1001,9 @@ export default function CashierMode({
   const handleDeleteOrder = (orderId, tableName = 'Stol') => {
     if (!orderId) return;
 
-    const performDelete = () => {
+    const performDelete = async () => {
       const targetOrder = safeOrders.find(o => o && String(o.id) === String(orderId));
-      if (!window.confirm(`⚠️ Rostdan ham "${tableName}" buyurtmasini butunlay o'chirmoqchimisiz?`)) return;
+      if (!await confirmAsync(`⚠️ Rostdan ham "${tableName}" buyurtmasini butunlay o'chirmoqchimisiz?`)) return;
 
       updateOrders(prev =>
         (Array.isArray(prev) ? prev : []).filter(o => o && String(o.id) !== String(orderId))

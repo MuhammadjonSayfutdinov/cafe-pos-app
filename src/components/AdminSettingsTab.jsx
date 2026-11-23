@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 import { detectTelegramChatId, sendTelegramMessage, escapeHtml, getTelegramConfig, DEFAULT_TELEGRAM_CONFIG } from '../utils/telegramNotifier';
+import { notify, confirmAsync } from '../utils/notify';
 
 // Telegram sozlamalari: yagona joy - src/utils/telegramNotifier.js (B12)
 const readTelegramConfig = getTelegramConfig;
@@ -114,12 +115,12 @@ export default function AdminSettingsTab({
     const feeNumber = Number(tempServiceFee);
 
     if (!cleanedName) {
-      alert("Iltimos, Kafe nomini kiriting!");
+      notify("Iltimos, Kafe nomini kiriting!");
       return;
     }
 
     if (isNaN(feeNumber) || feeNumber < 0 || feeNumber > 100) {
-      alert("Xizmat haqi 0% va 100% oralig'ida bo'lishi kerak!");
+      notify("Xizmat haqi 0% va 100% oralig'ida bo'lishi kerak!");
       return;
     }
 
@@ -210,7 +211,7 @@ export default function AdminSettingsTab({
     if (!trimmed) return;
 
     if (safeTables.some(t => t.toLowerCase() === trimmed.toLowerCase())) {
-      alert(`"${trimmed}" nomli stol allaqachon mavjud!`);
+      notify(`"${trimmed}" nomli stol allaqachon mavjud!`);
       return;
     }
 
@@ -223,13 +224,13 @@ export default function AdminSettingsTab({
     setNewTableName('');
   };
 
-  const handleDeleteTable = (tableName) => {
+  const handleDeleteTable = async (tableName) => {
     if (activeTableNames.includes(tableName)) {
-      alert(`⛔️ "${tableName}" da hozir yopilmagan faol buyurtma bor! Avval stol hisobini yoping.`);
+      notify(`⛔️ "${tableName}" da hozir yopilmagan faol buyurtma bor! Avval stol hisobini yoping.`);
       return;
     }
 
-    if (window.confirm(`Rostdan ham "${tableName}" ni zal ro'yxatidan o'chirmoqchimisiz?`)) {
+    if (await confirmAsync(`Rostdan ham "${tableName}" ni zal ro'yxatidan o'chirmoqchimisiz?`)) {
       if (typeof setTables === 'function') {
         setTables(prev => (Array.isArray(prev) ? prev : []).filter(t => t !== tableName));
       }
@@ -282,16 +283,16 @@ export default function AdminSettingsTab({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target?.result);
         const problems = validateBackup(parsed);
         if (problems.length > 0) {
-          alert(`❌ Zaxira fayli rad etildi:\n\n• ${problems.slice(0, 6).join('\n• ')}`);
+          notify(`❌ Zaxira fayli rad etildi:\n\n• ${problems.slice(0, 6).join('\n• ')}`);
           return;
         }
 
-        if (!window.confirm("⚠️ Diqqat! Tanlangan zaxira faylidagi ma'lumotlar hozirgi baza ustiga yoziladi. Tasdiqlaysizmi?")) {
+        if (!await confirmAsync("⚠️ Diqqat! Tanlangan zaxira faylidagi ma'lumotlar hozirgi baza ustiga yoziladi. Tasdiqlaysizmi?")) {
           return;
         }
 
@@ -333,7 +334,7 @@ export default function AdminSettingsTab({
           if (typeof addAuditLog === 'function') {
             addAuditLog('Zaxira tiklandi', `Fayl: ${file.name} (${parsed.exportedAt || "sana noma'lum"})`);
           }
-          alert("✅ Zaxira nusxa muvaffaqiyatli tiklandi!");
+          notify("✅ Zaxira nusxa muvaffaqiyatli tiklandi!");
         };
 
         if (typeof requireAdminOverride === 'function') {
@@ -342,7 +343,7 @@ export default function AdminSettingsTab({
           applyRestore();
         }
       } catch {
-        alert("❌ Xatolik! Tanlangan fayl yaroqsiz yoki buzilgan.");
+        notify("❌ Xatolik! Tanlangan fayl yaroqsiz yoki buzilgan.");
       }
     };
     reader.readAsText(file);
@@ -350,9 +351,9 @@ export default function AdminSettingsTab({
   };
 
   const handleClearOrdersOnly = () => {
-    const performClear = () => {
+    const performClear = async () => {
       // Ochiq cheklar va qarzlar saqlanadi: faqat yopilgan (to'langan/arxiv) cheklar o'chiriladi
-      if (window.confirm("⚠️ To'langan va arxivdagi cheklar tarixi o'chiriladi. Ochiq cheklar va qarzlar saqlanadi. Tasdiqlaysizmi?")) {
+      if (await confirmAsync("⚠️ To'langan va arxivdagi cheklar tarixi o'chiriladi. Ochiq cheklar va qarzlar saqlanadi. Tasdiqlaysizmi?")) {
         if (typeof setOrders === 'function') {
           setOrders(prev => (Array.isArray(prev) ? prev : []).filter(
             o => o && ![ORDER_STATUS.PAID, ORDER_STATUS.ARCHIVED].includes(o.status)
@@ -361,7 +362,7 @@ export default function AdminSettingsTab({
         if (typeof addAuditLog === 'function') {
           addAuditLog('Cheklar tarixi tozalandi', "To'langan va arxivdagi cheklar o'chirildi");
         }
-        alert("✅ Cheklar tarixi tozalandi!");
+        notify("✅ Cheklar tarixi tozalandi!");
       }
     };
 
@@ -373,8 +374,8 @@ export default function AdminSettingsTab({
   };
 
   const handleFactoryReset = () => {
-    const performReset = () => {
-      if (window.confirm("🛑 Barcha ma'lumotlar o'chirilib, dastur zavod holatiga qaytadi. Davom etamizmi?")) {
+    const performReset = async () => {
+      if (await confirmAsync("🛑 Barcha ma'lumotlar o'chirilib, dastur zavod holatiga qaytadi. Davom etamizmi?")) {
         window.localStorage.clear();
         window.location.reload();
       }

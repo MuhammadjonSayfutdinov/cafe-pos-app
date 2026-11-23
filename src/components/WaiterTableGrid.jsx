@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
+import { notify } from '../utils/notify';
 
 // =========================================================
 // SOATBAY TARIF SHABLONLARI (VIP-KABINA / PS5 / BILLIARD)
@@ -207,7 +208,7 @@ export default function WaiterTableGrid({
     e.preventDefault();
     if (!bookingModalTable) return;
     if (!bookingForm.customerName.trim() || !bookingForm.time.trim()) {
-      alert("Iltimos, mehmon ismini va kelish vaqtini kiriting!");
+      notify("Iltimos, mehmon ismini va kelish vaqtini kiriting!");
       return;
     }
 
@@ -241,7 +242,7 @@ export default function WaiterTableGrid({
     if (!timerModalTable) return;
     const rate = Number(timerForm.hourlyRate);
     if (isNaN(rate) || rate <= 0) {
-      alert("Iltimos, 1 soatlik tarif narxini to'g'ri kiriting!");
+      notify("Iltimos, 1 soatlik tarif narxini to'g'ri kiriting!");
       return;
     }
 

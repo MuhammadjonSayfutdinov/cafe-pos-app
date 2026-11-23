@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { notify, confirmAsync } from '../utils/notify';
 
 // Ombor uchun tayyor toifalar ro'yxati
 const inventoryCategories = [
@@ -211,7 +212,7 @@ export default function WarehouseStockTab({
     const cost = Number(itemData.costPrice || 0);
 
     if (!name || isNaN(min) || isNaN(qty) || min < 0 || qty < 0 || isNaN(cost) || cost < 0) {
-      alert("Iltimos, ma'lumotlarni to'g'ri (manfiy bo'lmagan) raqamlarda kiriting!"); 
+      notify("Iltimos, ma'lumotlarni to'g'ri (manfiy bo'lmagan) raqamlarda kiriting!"); 
       return;
     }
 
@@ -219,7 +220,7 @@ export default function WarehouseStockTab({
       i => i && String(i.name || '').trim().toLowerCase() === name.toLowerCase() && i.id !== editingItem?.id
     );
     if (isDuplicate) {
-      alert(`⛔️ "${name}" nomli mahsulot omborda allaqachon mavjud!`);
+      notify(`⛔️ "${name}" nomli mahsulot omborda allaqachon mavjud!`);
       return;
     }
 
@@ -297,8 +298,8 @@ export default function WarehouseStockTab({
     setIsItemModalOpen(false);
   };
 
-  const handleDeleteInventory = (id, name) => {
-    if (window.confirm(`Rostdan ham "${name}" mahsulotini ombordan butunlay o'chirilsinmi?`)) {
+  const handleDeleteInventory = async (id, name) => {
+    if (await confirmAsync(`Rostdan ham "${name}" mahsulotini ombordan butunlay o'chirilsinmi?`)) {
       if (typeof setInventory === 'function') {
         setInventory(prev => prev.filter(i => i.id !== id));
       }
@@ -348,7 +349,7 @@ export default function WarehouseStockTab({
 
     const rawEnteredAmount = Number(updateAmount);
     if (isNaN(rawEnteredAmount) || rawEnteredAmount < 0) {
-      alert("Iltimos, miqdorni to'g'ri raqamlarda kiriting!"); 
+      notify("Iltimos, miqdorni to'g'ri raqamlarda kiriting!"); 
       return;
     }
 
@@ -378,7 +379,7 @@ export default function WarehouseStockTab({
     } else if (updateType === 'chiqim') {
       if (amountInBaseUnit <= 0) return;
       if (amountInBaseUnit > currentStockQty) {
-        alert(`⛔️ Omborda yetarli qoldiq yo'q! Joriy qoldiq: ${currentStockQty} ${itemBaseUnit}`);
+        notify(`⛔️ Omborda yetarli qoldiq yo'q! Joriy qoldiq: ${currentStockQty} ${itemBaseUnit}`);
         return;
       }
       newQtyInBase = Number(Math.max(0, currentStockQty - amountInBaseUnit).toFixed(6));

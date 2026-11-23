@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ORDER_STATUS } from '../constants/orderStatus';
+import { confirmAsync } from '../utils/notify';
 
 const QUICK_CHEF_NOTES = [
   "Piyozsiz",
@@ -145,8 +146,8 @@ export default function WaiterCart({
           {safeCart.length > 0 && typeof setCart === 'function' && !resolvedOrder ? (
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm("Savatchadagi barcha taomlarni tozalaymizmi?")) {
+              onClick={async () => {
+                if (await confirmAsync("Savatchadagi barcha taomlarni tozalaymizmi?")) {
                   setCart([]);
                 }
               }}

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { notify, confirmAsync } from '../utils/notify';
 
 export default function AdminEmployeesTab({ 
   users = [], 
@@ -112,12 +113,12 @@ export default function AdminEmployeesTab({
     const requiredLength = getRequiredPinLength(newEmployeeData.role);
 
     if (!safeName || !safePin) { 
-      alert("Iltimos, xodim ismini va PIN-kodni kiriting!"); 
+      notify("Iltimos, xodim ismini va PIN-kodni kiriting!"); 
       return; 
     }
 
     if (safePin.length !== requiredLength) {
-      alert(`Xato! "${getRoleBadge(newEmployeeData.role)}" lavozimi uchun PIN-kod aynan ${requiredLength} xonali raqam bo'lishi shart!`);
+      notify(`Xato! "${getRoleBadge(newEmployeeData.role)}" lavozimi uchun PIN-kod aynan ${requiredLength} xonali raqam bo'lishi shart!`);
       return;
     }
 
@@ -125,7 +126,7 @@ export default function AdminEmployeesTab({
       u => u && String(u.name || '').trim().toLowerCase() === safeName.toLowerCase() && u.id !== editingEmployee?.id
     );
     if (isNameTaken) {
-      alert(`"${safeName}" ismli xodim allaqachon mavjud!`);
+      notify(`"${safeName}" ismli xodim allaqachon mavjud!`);
       return;
     }
 
@@ -133,7 +134,7 @@ export default function AdminEmployeesTab({
       u => u && String(u.pin || '').trim() === safePin && u.id !== editingEmployee?.id
     );
     if (isPinTaken) { 
-      alert("Bu PIN-kod boshqa xodimda band! Iltimos, boshqa PIN-kod tanlang."); 
+      notify("Bu PIN-kod boshqa xodimda band! Iltimos, boshqa PIN-kod tanlang."); 
       return; 
     }
 
@@ -172,21 +173,21 @@ export default function AdminEmployeesTab({
     setIsEmployeeModalOpen(false);
   };
 
-  const handleDeleteEmployee = (emp) => {
+  const handleDeleteEmployee = async (emp) => {
     if (currentUser && emp.id === currentUser.id) {
-      alert("⛔️ Siz hozir ushbu profil orqali tizimda o'tiribsiz! O'zingizni o'chira olmaysiz.");
+      notify("⛔️ Siz hozir ushbu profil orqali tizimda o'tiribsiz! O'zingizni o'chira olmaysiz.");
       return;
     }
 
     if (emp.role === 'admin') {
       const adminCount = safeUsers.filter(u => u.role === 'admin').length;
       if (adminCount <= 1) {
-        alert("⛔️ Tizimda kamida 1 ta Admin qolishi shart!");
+        notify("⛔️ Tizimda kamida 1 ta Admin qolishi shart!");
         return;
       }
     }
 
-    if (window.confirm(`Rostdan ham "${emp.name}" (${getRoleBadge(emp.role)}) xodimini o'chirmoqchimisiz?`)) {
+    if (await confirmAsync(`Rostdan ham "${emp.name}" (${getRoleBadge(emp.role)}) xodimini o'chirmoqchimisiz?`)) {
       if (typeof setUsers === 'function') {
         setUsers(prev => prev.filter(u => u.id !== emp.id));
       }

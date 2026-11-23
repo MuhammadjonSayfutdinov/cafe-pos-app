@@ -8,6 +8,7 @@ import { orderTotalsFields, getItemQty, getItemPrice } from '../utils/orderTotal
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
+import { notify, confirmAsync } from '../utils/notify';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -736,8 +737,8 @@ export default function WaiterMode({
     );
   };
 
-  const handleCancelReservation = (tableName) => {
-    if (!window.confirm(`"${tableName}" uchun qilingan bronni bekor qilasizmi?`)) return;
+  const handleCancelReservation = async (tableName) => {
+    if (!await confirmAsync(`"${tableName}" uchun qilingan bronni bekor qilasizmi?`)) return;
     setReservations(prev => {
       const next = { ...(prev || {}) };
       delete next[tableName];
@@ -787,8 +788,8 @@ export default function WaiterMode({
     });
   };
 
-  const handleCancelTableTimer = (tableName) => {
-    if (!window.confirm(`"${tableName}" dagi soatbay vaqt hisoblagichni bekor qilasizmi?`)) return;
+  const handleCancelTableTimer = async (tableName) => {
+    if (!await confirmAsync(`"${tableName}" dagi soatbay vaqt hisoblagichni bekor qilasizmi?`)) return;
     setTableTimers(prev => {
       const next = { ...(prev || {}) };
       delete next[tableName];
@@ -796,13 +797,13 @@ export default function WaiterMode({
     });
   };
 
-  const handleFinishTimerAndAddToOrder = (tableName, timerStats) => {
+  const handleFinishTimerAndAddToOrder = async (tableName, timerStats) => {
     if (!timerStats) return;
     const lineItemName = `${timerStats.serviceTitle} (${timerStats.durationHuman})`;
     const lineItemPrice = Number(timerStats.currentCost) || 0;
 
     if (
-      !window.confirm(
+      !await confirmAsync(
         `⏱️ "${tableName}" vaqt hisobini yakunlab, chekka qo'shamizmi?\n\n• Vaqt: ${timerStats.durationHuman}\n• Summa: ${lineItemPrice.toLocaleString()} so'm`
       )
     ) {
@@ -913,7 +914,7 @@ export default function WaiterMode({
     });
 
     if (movedItems.length === 0 || remainingItems.length === 0) {
-      alert("Chekni bo'lish uchun kamida 1 ta taomni yangi stolga ajrating va eski stolda ham kamida 1 ta taom qolsin!");
+      notify("Chekni bo'lish uchun kamida 1 ta taomni yangi stolga ajrating va eski stolda ham kamida 1 ta taom qolsin!");
       return;
     }
 

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { confirmAsync } from '../utils/notify';
 
 // O'lchov birliklarini konvertatsiya qilish yordamchisi
 const UNIT_FACTORS = {
@@ -201,8 +202,8 @@ export default function WarehouseHistoryTab({
   const handleClearHistory = () => {
     if (typeof setInventoryLogs !== 'function' || safeLogs.length === 0) return;
 
-    const performClear = () => {
-      if (window.confirm("Rostdan ham barcha ombor harakatlari tarixini o'chirib tozalamoqchimisiz? (Ombor qoldig'i o'zgarmaydi)")) {
+    const performClear = async () => {
+      if (await confirmAsync("Rostdan ham barcha ombor harakatlari tarixini o'chirib tozalamoqchimisiz? (Ombor qoldig'i o'zgarmaydi)")) {
         setInventoryLogs([]);
         if (typeof addAuditLog === 'function') {
           addAuditLog("Ombor tarixi tozalandi", "Ombor harakatlari jurnali tozalandi");

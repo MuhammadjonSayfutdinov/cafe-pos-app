@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { notify, confirmAsync } from '../utils/notify';
 
 export default function AdminCategoriesTab({ 
   menuCategories = [], 
@@ -43,7 +44,7 @@ export default function AdminCategoriesTab({
     e.preventDefault();
     const safeCat = catName.trim();
     if (!safeCat) {
-      alert("Iltimos, toifa nomini kiriting!");
+      notify("Iltimos, toifa nomini kiriting!");
       return;
     }
 
@@ -52,7 +53,7 @@ export default function AdminCategoriesTab({
       (c, i) => String(c).toLowerCase() === safeCat.toLowerCase() && i !== editingIndex
     );
     if (isDuplicate) {
-      alert("Bu nomdagi toifa allaqachon mavjud!");
+      notify("Bu nomdagi toifa allaqachon mavjud!");
       return;
     }
 
@@ -100,9 +101,9 @@ export default function AdminCategoriesTab({
   // ==========================================
   // 3. TOIFANI O'CHIRISH VA TARTIBLASH MANTIG'I
   // ==========================================
-  const handleDeleteCategory = (index, name) => {
+  const handleDeleteCategory = async (index, name) => {
     if (safeCategories.length <= 1) {
-      alert("Tizimda kamida bitta asosiy toifa qolishi shart!");
+      notify("Tizimda kamida bitta asosiy toifa qolishi shart!");
       return;
     }
 
@@ -113,7 +114,7 @@ export default function AdminCategoriesTab({
       ? `"${name}" toifasida ${linkedItemsCount} ta taom mavjud.\n\nToifani o'chirsangiz, undagi taomlar avtomatik "${fallbackCategory}" toifasiga o'tkaziladi. Davom etasizmi?`
       : `Rostdan ham "${name}" toifasini o'chirmoqchimisiz?`;
 
-    if (window.confirm(confirmMessage)) {
+    if (await confirmAsync(confirmMessage)) {
       if (typeof setMenuCategories === 'function') {
         setMenuCategories(prev => prev.filter((_, i) => i !== index));
       }
