@@ -3,6 +3,7 @@ import useSticky from '../hooks/useSticky';
 import CashierOrderList from './CashierOrderList';
 import CashierReceipt from './CashierReceipt';
 import CashierPaymentControls from './CashierPaymentControls';
+import { calcOrderTotals } from '../utils/orderTotals';
 
 // ==========================================
 // 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
@@ -340,20 +341,13 @@ export default function CashierMode({
       };
     }
 
-    const items = Array.isArray(selectedOrder.items) ? selectedOrder.items : [];
-    const subTotal = items.reduce((sum, item) => {
-      if (!item) return sum;
-      const price = Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0;
-      const qty = Number(item.quantity ?? item.qty ?? 1) || 0;
-      return sum + (price * qty);
-    }, 0);
-
-    const isTakeaway = selectedOrder.table === 'Olib ketish';
-    const effectiveFeePercent = isTakeaway
-      ? 0
-      : Number(selectedOrder.serviceFee !== undefined ? selectedOrder.serviceFee : serviceFee) || 0;
-
-    const serviceFeeAmount = Math.round((subTotal * effectiveFeePercent) / 100);
+    const base = calcOrderTotals({
+      items: selectedOrder.items,
+      serviceFeePercent: selectedOrder.serviceFee ?? serviceFee,
+      table: selectedOrder.table
+    });
+    const { subTotal, serviceFeeAmount } = base;
+    const effectiveFeePercent = base.serviceFee;
     const grossTotal = subTotal + serviceFeeAmount;
 
     let discountAmount = 0;
@@ -366,7 +360,8 @@ export default function CashierMode({
       discountAmount = Math.min(grossTotal, rawDiscVal);
     }
 
-    const afterDiscountTotal = Math.max(0, grossTotal - discountAmount);
+    discountAmount = Math.min(grossTotal, Math.max(0, Math.round(discountAmount)));
+    const afterDiscountTotal = grossTotal - discountAmount;
 
     const customerAvailableBonus = Number(matchedCustomer?.bonusBalance || 0);
     const maxUsableBonus = paymentMethod === 'Qarz'
@@ -376,7 +371,13 @@ export default function CashierMode({
     const rawRequestedBonus = Math.max(0, Number(useBonusAmount) || 0);
     const usedBonusAmount = Math.min(maxUsableBonus, rawRequestedBonus);
 
-    const finalTotal = Math.max(0, afterDiscountTotal - usedBonusAmount);
+    const finalTotal = calcOrderTotals({
+      items: selectedOrder.items,
+      serviceFeePercent: effectiveFeePercent,
+      table: selectedOrder.table,
+      discountAmount,
+      usedBonus: usedBonusAmount
+    }).total;
 
     const tierInfo = getCustomerTierInfo(matchedCustomer?.totalSpent || 0);
     const hasCustomer = Boolean(matchedCustomer || customerPhone.trim().length >= 4);

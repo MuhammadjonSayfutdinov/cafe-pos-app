@@ -176,6 +176,11 @@ export default function KitchenMode({
     if (!order) return nowMs;
     const idKey = String(order.id);
 
+    // 0. Dozakaz: oshxonaga qayta tushgan vaqt
+    if (order.kitchenRoundAt && !isNaN(Number(order.kitchenRoundAt))) {
+      return Number(order.kitchenRoundAt);
+    }
+
     // 1. Agar order ichida tayyor timestamp bo'lsa
     if (order.createdAt && !isNaN(Number(order.createdAt))) {
       return Number(order.createdAt);
@@ -274,8 +279,15 @@ export default function KitchenMode({
 
       const slaProgressPct = Math.min(100, Math.round((elapsedSeconds / critSec) * 100));
 
-      // Sex filtri uchun taomlarni tekshirish
-      const items = Array.isArray(order.items) ? order.items : [];
+      // Faqat hali tayyorlanmagan porsiyalar (dozakazda eski taomlar qayta chiqmaydi, B3)
+      const items = (Array.isArray(order.items) ? order.items : [])
+        .map(it => {
+          if (!it) return null;
+          const qty = Number(it.quantity ?? it.qty ?? 1) || 0;
+          const pending = Math.max(0, qty - (Number(it.kitchenDoneQty) || 0));
+          return pending > 0 ? { ...it, quantity: pending, qty: pending } : null;
+        })
+        .filter(Boolean);
       const filteredItemsByStation = stationCategory === 'Barchasi'
         ? items
         : items.filter(it => {
@@ -427,12 +439,28 @@ export default function KitchenMode({
         return {
           ...o,
           status: nextStatus,
+          // Tayyor bo'lganda barcha porsiyalar "pishgan" deb belgilanadi
+          items: nextStatus === 'Tayyor' && Array.isArray(o.items)
+            ? o.items.map(it => (it ? { ...it, kitchenDoneQty: Number(it.quantity ?? it.qty ?? 1) || 0 } : it))
+            : o.items,
           cookingStartedAt: nextStatus === 'Tayyorlanmoqda' ? nowTimeStr : o.cookingStartedAt,
           readyTime: nextStatus === 'Tayyor' ? nowTimeStr : o.readyTime,
           cookDurationSeconds: nextStatus === 'Tayyor' ? order.elapsedSeconds : o.cookDurationSeconds
         };
       })
     );
+
+    // Tayyor bo'lgan buyurtmaning "✓" belgilarini tozalash (dozakazda eski belgi qolmasin)
+    if (nextStatus === 'Tayyor') {
+      const prefix = `${order.id}_`;
+      setCheckedSubItems(prev => {
+        const next = {};
+        Object.keys(prev || {}).forEach(k => {
+          if (!k.startsWith(prefix)) next[k] = prev[k];
+        });
+        return next;
+      });
+    }
 
     if (typeof addAuditLog === 'function') {
       addAuditLog(

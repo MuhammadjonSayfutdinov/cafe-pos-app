@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 // MAXSUS HOOK
 import useSticky from './hooks/useSticky';
+import { orderTotalsFields, getItemQty, getItemPrice } from './utils/orderTotals';
 
 // KOMPONENTLAR
 import LockScreen from './components/LockScreen';
@@ -40,6 +41,11 @@ const initialMenuItems = [
     ] 
   }
 ];
+
+// Yopilgan (to'langan, qarzga yozilgan, arxivlangan) buyurtmalar statusi
+const CLOSED_STATUSES = ["To'langan", 'Qarz', 'Arxiv'];
+// Oshxona hali ishlayotgan statuslar
+const KITCHEN_STATUSES = ['Yangi', 'Tayyorlanmoqda'];
 
 const initialCategories = ['Asosiy', 'Ichimlik', 'Shirinlik', 'Boshqalar'];
 const initialTables = ['1-Stol', '2-Stol', '3-Stol', '4-Stol', '5-Stol', 'VIP-1', 'VIP-2', 'Olib ketish'];
@@ -209,59 +215,10 @@ export default function App() {
   };
 
   // ==========================================
-  // 5. BUYURTMALAR VA OMBOR MANTIG'I
+  // 5. BUYURTMALAR (QR-menyu uchun)
   // ==========================================
-  const deductInventoryForItems = (cartItems, tableLabel) => {
-    if (!Array.isArray(inventory) || inventory.length === 0) return;
-
-    let invUpdated = false;
-    const newInventory = [...inventory];
-    const newLogs = [];
-
-    cartItems.forEach(orderItem => {
-      const menuObj = menuItems.find(m => m.id === orderItem.id || m.name === orderItem.baseName || m.name === orderItem.name);
-      const recipe = menuObj?.recipe || menuObj?.ingredients;
-
-      if (Array.isArray(recipe) && recipe.length > 0) {
-        const itemQty = Number(orderItem.quantity || orderItem.qty || 1);
-        recipe.forEach(ing => {
-          const invIdx = newInventory.findIndex(
-            i => String(i.id) === String(ing.inventoryId ?? ing.productId ?? ing.id) || i.name === ing.name
-          );
-          if (invIdx !== -1) {
-            const deductAmount = Number(ing.qty ?? ing.amount ?? ing.quantity ?? 0) * itemQty;
-            newInventory[invIdx] = {
-              ...newInventory[invIdx],
-              quantity: Math.max(0, Number(newInventory[invIdx].quantity || 0) - deductAmount)
-            };
-            invUpdated = true;
-            newLogs.push({
-              id: `${Date.now()}_${Math.random()}`,
-              date: new Date().toLocaleString(),
-              itemName: newInventory[invIdx].name,
-              productName: newInventory[invIdx].name,
-              type: 'chiqim_avto',
-              diffAmount: `-${deductAmount}`,
-              amount: deductAmount,
-              unit: newInventory[invIdx].unit || 'dona',
-              note: `Sotuv (${tableLabel}: ${orderItem.name} x${itemQty})`,
-              reason: `Sotuv (${tableLabel}: ${orderItem.name} x${itemQty})`,
-              user: currentUser?.name || 'QR-Mijoz'
-            });
-          }
-        });
-      }
-    });
-
-    if (invUpdated) {
-      setInventory(newInventory);
-      if (newLogs.length > 0) {
-        setInventoryLogs(prev => [...newLogs, ...(Array.isArray(prev) ? prev : [])]);
-      }
-    }
-  };
-
-  // Universal Buyurtma Qabul Qilish (Ham WaiterMode, ham CustomerQRView uchun)
+  // Ombor bu yerda AYIRILMAYDI: yagona joy - kassada to'lov (CashierMode). (B1)
+  // Ofitsiant buyurtmalari WaiterMode.handleSubmitOrder orqali yoziladi.
   const handleOrderSubmit = (arg1, arg2) => {
     let targetTable = guestTable || '1-Stol';
     let incomingItems = [];
@@ -282,183 +239,66 @@ export default function App() {
     if (incomingItems.length === 0) return;
 
     const normalizedItems = incomingItems.map(item => {
-      const q = Number(item.quantity ?? item.qty ?? 1) || 1;
+      const q = getItemQty(item) || 1;
       return {
         ...item,
         cartItemId: item.cartItemId || `${Date.now()}_${Math.random()}`,
-        price: Number(item.price ?? item.variants?.[0]?.price ?? 0),
+        price: getItemPrice(item),
         quantity: q,
-        qty: q,
-        sentQty: q
+        sentQty: q,
+        kitchenDoneQty: 0
       };
     });
 
-    deductInventoryForItems(normalizedItems, targetTable);
+    const nowMs = Date.now();
+    const nowTime = new Date(nowMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     setOrders(prevOrders => {
       const safeOrders = Array.isArray(prevOrders) ? prevOrders : [];
-      
+
       const existingOrderIndex = safeOrders.findIndex(
-        o => o && o.table === targetTable && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
+        o => o && o.table === targetTable && !CLOSED_STATUSES.includes(o.status)
       );
 
       if (existingOrderIndex !== -1 && targetTable !== 'Olib ketish') {
         const updatedOrders = [...safeOrders];
         const existingOrder = updatedOrders[existingOrderIndex];
-        const combinedItems = [...(existingOrder.items || []), ...normalizedItems];
-
-        const newSubtotal = combinedItems.reduce(
-          (sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || it.qty || 1)),
-          0
+        // Dozakaz (B3): eski taomlar qayta pishirilmaydi, oshxona faqat yangi porsiyalarni ko'radi
+        const isPastKitchen = !KITCHEN_STATUSES.includes(existingOrder.status);
+        const prevItems = (Array.isArray(existingOrder.items) ? existingOrder.items : []).map(it =>
+          it && isPastKitchen && it.kitchenDoneQty === undefined
+            ? { ...it, kitchenDoneQty: getItemQty(it) }
+            : it
         );
-        const newServiceFeeAmount = Math.round((newSubtotal * serviceFee) / 100);
-        const newTotal = newSubtotal + newServiceFeeAmount;
+        const combinedItems = [...prevItems, ...normalizedItems];
 
         updatedOrders[existingOrderIndex] = {
           ...existingOrder,
           items: combinedItems,
-          subTotal: newSubtotal,
-          subtotal: newSubtotal,
-          serviceFeeAmount: newServiceFeeAmount,
-          total: newTotal,
-          finalTotal: newTotal,
-          status: 'Yangi',
-          updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          ...orderTotalsFields(existingOrder, combinedItems, existingOrder.serviceFee ?? serviceFee),
+          status: isPastKitchen ? 'Yangi' : existingOrder.status,
+          kitchenRoundAt: isPastKitchen ? nowMs : existingOrder.kitchenRoundAt,
+          updatedAt: nowTime
         };
 
         return updatedOrders;
       }
 
-      const subtotal = normalizedItems.reduce(
-        (sum, it) => sum + (Number(it.price || 0) * Number(it.quantity || it.qty || 1)),
-        0
-      );
-      const isTakeaway = targetTable === 'Olib ketish';
-      const serviceFeeAmount = isTakeaway ? 0 : Math.round((subtotal * serviceFee) / 100);
-      const total = subtotal + serviceFeeAmount;
-
       const newOrder = {
-        id: Date.now().toString(),
-        createdAt: Date.now(),
+        id: String(nowMs),
+        createdAt: nowMs,
         table: targetTable,
         waiter: currentUser?.name || 'QR-Menyu (Mijoz)',
-        waiterName: currentUser?.name || 'QR-Menyu (Mijoz)',
         items: normalizedItems,
-        subTotal: subtotal,
-        subtotal,
-        serviceFee: isTakeaway ? 0 : serviceFee,
-        serviceFeePercent: isTakeaway ? 0 : serviceFee,
-        serviceFeeAmount,
-        total,
-        finalTotal: total,
         status: 'Yangi',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        date: new Date().toLocaleDateString()
+        time: nowTime,
+        date: new Date(nowMs).toLocaleDateString()
       };
 
-      return [newOrder, ...safeOrders];
+      return [{ ...newOrder, ...orderTotalsFields(newOrder, normalizedItems, serviceFee) }, ...safeOrders];
     });
 
     addAuditLog("Buyurtma yaratildi", `${targetTable} uchun ${normalizedItems.length} xil taom qo'shildi`);
-  };
-
-  // Buyurtma statusini yangilash
-  const handleUpdateStatus = (orderId, newStatus, extraData = {}) => {
-    setOrders(prev => {
-      const safePrev = Array.isArray(prev) ? prev : [];
-      return safePrev.map(o => {
-        if (String(o.id) === String(orderId)) {
-          return {
-            ...o,
-            ...extraData,
-            status: newStatus,
-            updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          };
-        }
-        return o;
-      });
-    });
-    addAuditLog("Status o'zgardi", `Buyurtma #${String(orderId).slice(-4)} -> ${newStatus}`);
-  };
-
-  // ==========================================
-  // 6. STOLNI KO'CHIRISH VA CHEKNI BO'LISH
-  // ==========================================
-  const handleTransferTable = (fromTable, toTable) => {
-    if (!fromTable || !toTable || fromTable === toTable) return;
-
-    setOrders(prev => {
-      const safePrev = Array.isArray(prev) ? prev : [];
-      return safePrev.map(o => {
-        if (o.table === fromTable && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)) {
-          return { ...o, table: toTable };
-        }
-        return o;
-      });
-    });
-
-    addAuditLog("Stol ko'chirildi", `${fromTable} -> ${toTable}`);
-  };
-
-  const handleSplitOrder = (orderId, itemsToMove, targetTable) => {
-    if (!orderId || !Array.isArray(itemsToMove) || itemsToMove.length === 0 || !targetTable) return;
-
-    setOrders(prev => {
-      const safePrev = Array.isArray(prev) ? [...prev] : [];
-      const sourceIndex = safePrev.findIndex(o => String(o.id) === String(orderId));
-      if (sourceIndex === -1) return safePrev;
-
-      const sourceOrder = safePrev[sourceIndex];
-      const movedIds = new Set(itemsToMove.map(i => i.cartItemId || i.id));
-      const remainingItems = (sourceOrder.items || []).filter(
-        i => !movedIds.has(i.cartItemId || i.id)
-      );
-
-      const remSubtotal = remainingItems.reduce(
-        (s, it) => s + (Number(it.price || 0) * Number(it.quantity || it.qty || 1)),
-        0
-      );
-      const remService = Math.round((remSubtotal * serviceFee) / 100);
-
-      safePrev[sourceIndex] = {
-        ...sourceOrder,
-        items: remainingItems,
-        subTotal: remSubtotal,
-        subtotal: remSubtotal,
-        serviceFeeAmount: remService,
-        total: remSubtotal + remService,
-        finalTotal: remSubtotal + remService
-      };
-
-      const moveSubtotal = itemsToMove.reduce(
-        (s, it) => s + (Number(it.price || 0) * Number(it.quantity || it.qty || 1)),
-        0
-      );
-      const moveService = Math.round((moveSubtotal * serviceFee) / 100);
-
-      const newSplitOrder = {
-        id: Date.now().toString(),
-        createdAt: Date.now(),
-        table: targetTable,
-        waiter: sourceOrder.waiter,
-        waiterName: sourceOrder.waiterName || sourceOrder.waiter,
-        items: itemsToMove,
-        subTotal: moveSubtotal,
-        subtotal: moveSubtotal,
-        serviceFee,
-        serviceFeePercent: serviceFee,
-        serviceFeeAmount: moveService,
-        total: moveSubtotal + moveService,
-        finalTotal: moveSubtotal + moveService,
-        status: sourceOrder.status,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        date: new Date().toLocaleDateString()
-      };
-
-      return [newSplitOrder, ...safePrev];
-    });
-
-    addAuditLog("Chek bo'lindi", `Buyurtma #${String(orderId).slice(-4)} dan ${targetTable} ga bo'lindi`);
   };
 
   // ==========================================
@@ -624,10 +464,6 @@ export default function App() {
             orders={orders}
             setOrders={setOrders}
             cafeName={cafeName}
-            onOrderSubmit={handleOrderSubmit}
-            onUpdateStatus={handleUpdateStatus}
-            onTransferTable={handleTransferTable}
-            onSplitOrder={handleSplitOrder}
             onShowQrTable={handleShowQrTable}
             onPrintReceipt={(orderObj) => setReceiptToPrint(orderObj)}
             waiterCalls={waiterCalls}
@@ -658,7 +494,6 @@ export default function App() {
             cafeName={cafeName}
             serviceFee={serviceFee}
             currentUser={currentUser}
-            onUpdateStatus={handleUpdateStatus}
             onPrintReceipt={(orderObj) => setReceiptToPrint(orderObj)}
             setReceiptToPrint={setReceiptToPrint}
             requireAdminOverride={requireAdminOverride}
@@ -674,7 +509,6 @@ export default function App() {
             menuItems={menuItems}
             setMenuItems={setMenuItems}
             menuCategories={menuCategories}
-            onUpdateStatus={handleUpdateStatus}
             currentUser={currentUser}
             addAuditLog={addAuditLog}
           />
