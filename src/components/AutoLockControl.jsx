@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 
 // =========================================================
 // VAQT VARIANTLARI (TELEFON VA KOMPYUTER SOZLAMALARIDEK)
@@ -196,12 +197,17 @@ export default function AutoLockControl({
     const cleanPin = String(enteredPin || '').trim();
     if (!cleanPin) return;
 
-    // 1. Joriy foydalanuvchining o'z PIN-kodi yoki Admin universal PIN-kodi
+    const lockLeftMs = getPinLockRemainingMs('autolock');
+    if (lockLeftMs > 0) {
+      setPinError(`⛔️ Bloklangan: ${Math.ceil(lockLeftMs / 1000)} soniya kuting.`);
+      setPinInput('');
+      return;
+    }
+
+    // 1. Joriy foydalanuvchining o'z PIN-kodi (universal "1111/0000" kodlar olib tashlandi, B6)
     const currentPin = String(currentUser?.pin || currentUser?.password || '').trim();
-    if (
-      (currentPin && cleanPin === currentPin) ||
-      ['1111', '0000', '111111', '1234'].includes(cleanPin)
-    ) {
+    if (currentPin && cleanPin === currentPin) {
+      resetPinGuard('autolock');
       setIsScreenLocked(false);
       setPinInput('');
       setPinError('');
@@ -225,6 +231,7 @@ export default function AutoLockControl({
     );
 
     if (matchedOtherUser) {
+      resetPinGuard('autolock');
       setIsScreenLocked(false);
       setPinInput('');
       setPinError('');
@@ -235,7 +242,12 @@ export default function AutoLockControl({
       return;
     }
 
-    setPinError("❌ PIN-kod noto'g'ri!");
+    const { attemptsLeft, lockedMs } = registerPinFailure('autolock');
+    setPinError(
+      lockedMs > 0
+        ? `⛔️ Juda ko'p xato! ${Math.ceil(lockedMs / 1000)} soniya kuting.`
+        : `❌ PIN-kod noto'g'ri! (${attemptsLeft} ta urinish qoldi)`
+    );
     setPinInput('');
   }, [currentUser, users, onSwitchUser]);
 

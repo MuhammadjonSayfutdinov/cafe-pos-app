@@ -5,6 +5,7 @@ import WaiterMenu from './WaiterMenu';
 import WaiterCart from './WaiterCart';
 import WaiterActionModals from './WaiterActionModals';
 import { orderTotalsFields, getItemQty, getItemPrice } from '../utils/orderTotals';
+import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -282,6 +283,11 @@ export default function WaiterMode({
     if (!securityPrompt) return;
 
     const cleanPin = pinInput.trim();
+    const lockLeftMs = getPinLockRemainingMs('waiter_override');
+    if (lockLeftMs > 0) {
+      setPinError(`⛔️ Bloklangan: ${Math.ceil(lockLeftMs / 1000)} soniya kuting.`);
+      return;
+    }
     const adminUsers = (Array.isArray(stickyUsers) ? stickyUsers : []).filter(
       u => u && String(u.role || '').toLowerCase() === 'admin'
     );
@@ -292,9 +298,15 @@ export default function WaiterMode({
 
     // Faqat haqiqiy admin PIN qabul qilinadi (oldin '0000', '123456' kabi kodlar ham o'tardi)
     if (!matchedAdmin) {
-      setPinError("❌ Admin PIN-kodi noto'g'ri!");
+      const { attemptsLeft, lockedMs } = registerPinFailure('waiter_override');
+      setPinError(
+        lockedMs > 0
+          ? `⛔️ Juda ko'p xato! ${Math.ceil(lockedMs / 1000)} soniya kuting.`
+          : `❌ Admin PIN-kodi noto'g'ri! (${attemptsLeft} ta urinish qoldi)`
+      );
       return;
     }
+    resetPinGuard('waiter_override');
 
     const adminLabel = matchedAdmin?.name || 'Admin';
     const callback = securityPrompt.onConfirm;

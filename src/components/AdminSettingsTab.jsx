@@ -22,6 +22,57 @@ const readTelegramConfig = () => {
   }
 };
 
+// ==========================================
+// ZAXIRA FAYLINI TEKSHIRISH (B5)
+// ==========================================
+const VALID_ROLES = ['admin', 'warehouse', 'cashier', 'waiter', 'kitchen'];
+const isPlainObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+
+const validateBackup = (data) => {
+  const errors = [];
+  if (!isPlainObject(data)) return ["Fayl JSON obyekt emas"];
+
+  const arrayKeys = ['tables', 'menuCategories', 'menuItems', 'users', 'inventory', 'inventoryLogs', 'orders'];
+  arrayKeys.forEach(k => {
+    if (data[k] !== undefined && !Array.isArray(data[k])) errors.push(`"${k}" ro'yxat bo'lishi kerak`);
+  });
+  if (errors.length) return errors;
+
+  if (data.serviceFee !== undefined) {
+    const fee = Number(data.serviceFee);
+    if (!Number.isFinite(fee) || fee < 0 || fee > 100) errors.push("Xizmat haqi 0-100 oralig'ida bo'lishi kerak");
+  }
+  if ((data.menuItems || []).some(m => !isPlainObject(m) || !String(m.name || '').trim())) {
+    errors.push("Menyuda nomsiz yoki buzilgan taom bor");
+  }
+  if ((data.orders || []).some(o => !isPlainObject(o) || o.id === undefined || !Array.isArray(o.items))) {
+    errors.push("Buyurtmalar ro'yxatida buzilgan yozuv bor");
+  }
+  if ((data.inventory || []).some(i => !isPlainObject(i) || i.id === undefined || !String(i.name || '').trim())) {
+    errors.push("Omborda buzilgan yozuv bor");
+  }
+
+  if (Array.isArray(data.users)) {
+    const users = data.users;
+    if (users.some(u => !isPlainObject(u) || !String(u.name || '').trim() || !VALID_ROLES.includes(u.role))) {
+      errors.push("Xodimlar ro'yxatida noto'g'ri yozuv yoki rol bor");
+    }
+    const withPins = users.filter(u => isPlainObject(u) && u.pin !== undefined);
+    if (withPins.length > 0) {
+      const badPin = withPins.some(u => {
+        const len = ['admin', 'warehouse'].includes(u.role) ? 6 : 4;
+        return !new RegExp(`^\\d{${len}}$`).test(String(u.pin));
+      });
+      if (badPin) errors.push("Xodim PIN kodi formati noto'g'ri (admin/ombor 6, qolganlar 4 xonali)");
+      const pins = withPins.map(u => String(u.pin));
+      if (new Set(pins).size !== pins.length) errors.push("Ikki xodimda bir xil PIN kod bor");
+    }
+    if (!users.some(u => isPlainObject(u) && u.role === 'admin')) errors.push("Faylda birorta admin yo'q");
+  }
+
+  return errors;
+};
+
 export default function AdminSettingsTab({ 
   cafeName = 'Premium Cafe', 
   setCafeName, 
@@ -252,20 +303,28 @@ export default function AdminSettingsTab({
   };
 
   const handleExportBackup = () => {
+    // PIN kodlar va Telegram tokeni faylga yozilmaydi (B5)
+    const safeUsersForExport = (Array.isArray(users) ? users : []).map(u => {
+      if (!u || typeof u !== 'object') return u;
+      const { pin: _pin, password: _password, ...rest } = u;
+      return rest;
+    });
+    const { botToken: _botToken, ...safeTelegramConfig } = telegramConfig || {};
+
     const backupPayload = {
-      version: '2.0',
+      version: '3.0',
       exportedAt: new Date().toISOString(),
       cafeName,
       serviceFee,
       tables: safeTables,
       menuCategories,
       menuItems,
-      users,
+      users: safeUsersForExport,
       inventory,
       inventoryLogs,
       orders: safeOrders,
       auditLogs,
-      telegramConfig
+      telegramConfig: safeTelegramConfig
     };
 
     const blob = new Blob([JSON.stringify(backupPayload, null, 2)], {
@@ -289,24 +348,62 @@ export default function AdminSettingsTab({
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result);
-        if (!parsed || typeof parsed !== 'object') throw new Error("Noto'g'ri fayl");
+        const problems = validateBackup(parsed);
+        if (problems.length > 0) {
+          alert(`❌ Zaxira fayli rad etildi:\n\n• ${problems.slice(0, 6).join('\n• ')}`);
+          return;
+        }
 
         if (!window.confirm("⚠️ Diqqat! Tanlangan zaxira faylidagi ma'lumotlar hozirgi baza ustiga yoziladi. Tasdiqlaysizmi?")) {
           return;
         }
 
-        if (parsed.cafeName && typeof setCafeName === 'function') setCafeName(parsed.cafeName);
-        if (parsed.serviceFee !== undefined && typeof setServiceFee === 'function') setServiceFee(Number(parsed.serviceFee));
-        if (Array.isArray(parsed.tables) && typeof setTables === 'function') setTables(parsed.tables);
-        if (Array.isArray(parsed.menuCategories) && typeof setMenuCategories === 'function') setMenuCategories(parsed.menuCategories);
-        if (Array.isArray(parsed.menuItems) && typeof setMenuItems === 'function') setMenuItems(parsed.menuItems);
-        if (Array.isArray(parsed.users) && typeof setUsers === 'function') setUsers(parsed.users);
-        if (Array.isArray(parsed.inventory) && typeof setInventory === 'function') setInventory(parsed.inventory);
-        if (Array.isArray(parsed.inventoryLogs) && typeof setInventoryLogs === 'function') setInventoryLogs(parsed.inventoryLogs);
-        if (Array.isArray(parsed.orders) && typeof setOrders === 'function') setOrders(parsed.orders);
-        if (parsed.telegramConfig) setTelegramConfig(parsed.telegramConfig);
+        const applyRestore = () => {
+          if (parsed.cafeName && typeof setCafeName === 'function') setCafeName(String(parsed.cafeName));
+          if (parsed.serviceFee !== undefined && typeof setServiceFee === 'function') setServiceFee(Number(parsed.serviceFee));
+          if (Array.isArray(parsed.tables) && typeof setTables === 'function') setTables(parsed.tables);
+          if (Array.isArray(parsed.menuCategories) && typeof setMenuCategories === 'function') setMenuCategories(parsed.menuCategories);
+          if (Array.isArray(parsed.menuItems) && typeof setMenuItems === 'function') setMenuItems(parsed.menuItems);
+          if (Array.isArray(parsed.users) && typeof setUsers === 'function') {
+            const fileHasPins = parsed.users.some(u => u && u.pin !== undefined);
+            if (fileHasPins) {
+              setUsers(parsed.users);
+            } else {
+              // Yangi formatda PIN yo'q: hozirgi PIN kodlar saqlanadi, PIN-siz yangi xodim qo'shilmaydi
+              setUsers(prev => {
+                const current = Array.isArray(prev) ? prev : [];
+                return parsed.users
+                  .map(u => {
+                    const existing = current.find(c => c && String(c.id) === String(u.id));
+                    return existing ? { ...u, pin: existing.pin } : null;
+                  })
+                  .filter(Boolean)
+                  .concat(current.filter(c => c && !parsed.users.some(u => String(u.id) === String(c.id))));
+              });
+            }
+          }
+          if (Array.isArray(parsed.inventory) && typeof setInventory === 'function') setInventory(parsed.inventory);
+          if (Array.isArray(parsed.inventoryLogs) && typeof setInventoryLogs === 'function') setInventoryLogs(parsed.inventoryLogs);
+          if (Array.isArray(parsed.orders) && typeof setOrders === 'function') setOrders(parsed.orders);
+          if (isPlainObject(parsed.telegramConfig)) {
+            // Fayldagi token bo'lmasa, hozirgi token saqlanadi
+            setTelegramConfig(prev => ({
+              ...prev,
+              ...parsed.telegramConfig,
+              botToken: parsed.telegramConfig.botToken || prev?.botToken || ''
+            }));
+          }
+          if (typeof addAuditLog === 'function') {
+            addAuditLog('Zaxira tiklandi', `Fayl: ${file.name} (${parsed.exportedAt || "sana noma'lum"})`);
+          }
+          alert("✅ Zaxira nusxa muvaffaqiyatli tiklandi!");
+        };
 
-        alert("✅ Zaxira nusxa muvaffaqiyatli tiklandi!");
+        if (typeof requireAdminOverride === 'function') {
+          requireAdminOverride('Zaxira nusxadan bazani tiklash', applyRestore);
+        } else {
+          applyRestore();
+        }
       } catch {
         alert("❌ Xatolik! Tanlangan fayl yaroqsiz yoki buzilgan.");
       }
@@ -317,8 +414,16 @@ export default function AdminSettingsTab({
 
   const handleClearOrdersOnly = () => {
     const performClear = () => {
-      if (window.confirm("⚠️ Barcha yopilgan va ochiq cheklar tarixi o'chiriladi. Tasdiqlaysizmi?")) {
-        if (typeof setOrders === 'function') setOrders([]);
+      // Ochiq cheklar va qarzlar saqlanadi: faqat yopilgan (to'langan/arxiv) cheklar o'chiriladi
+      if (window.confirm("⚠️ To'langan va arxivdagi cheklar tarixi o'chiriladi. Ochiq cheklar va qarzlar saqlanadi. Tasdiqlaysizmi?")) {
+        if (typeof setOrders === 'function') {
+          setOrders(prev => (Array.isArray(prev) ? prev : []).filter(
+            o => o && !["To'langan", 'Arxiv'].includes(o.status)
+          ));
+        }
+        if (typeof addAuditLog === 'function') {
+          addAuditLog('Cheklar tarixi tozalandi', "To'langan va arxivdagi cheklar o'chirildi");
+        }
         alert("✅ Cheklar tarixi tozalandi!");
       }
     };

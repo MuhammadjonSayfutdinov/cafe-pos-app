@@ -1,4 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
+
+const PIN_GUARD_SCOPE = 'login';
 
 export default function LockScreen({ 
   cafeName = 'Restoran POS', 
@@ -22,6 +25,20 @@ export default function LockScreen({
   const [tableFilter, setTableFilter] = useState('free'); // 'free' (Bo'shlar) | 'all' (Barchasi)
 
   const requiredPinLength = selectedGroup === 'management' ? 6 : 4;
+
+  // Xato urinishlar cheklovi (B6): 5 marta xato -> 30 soniya, keyin har safar 2 baravar
+  const [lockRemainingMs, setLockRemainingMs] = useState(() => getPinLockRemainingMs(PIN_GUARD_SCOPE));
+  const isLocked = lockRemainingMs > 0;
+
+  useEffect(() => {
+    if (!isLocked) return undefined;
+    const timer = setInterval(() => {
+      const left = getPinLockRemainingMs(PIN_GUARD_SCOPE);
+      setLockRemainingMs(left);
+      if (left <= 0) setError('');
+    }, 500);
+    return () => clearInterval(timer);
+  }, [isLocked]);
 
   // ==========================================
   // 2. BO'SH VA BAND STOLLARNI ANIQLASH MANTIG'I
@@ -85,6 +102,7 @@ export default function LockScreen({
   };
 
   const handleNumberClick = (num) => {
+    if (isLocked || getPinLockRemainingMs(PIN_GUARD_SCOPE) > 0) return;
     if (pin.length >= requiredPinLength) return;
     const nextPin = pin + num;
     setPin(nextPin);
@@ -115,12 +133,19 @@ export default function LockScreen({
     });
 
     if (matchedUser) {
+      resetPinGuard(PIN_GUARD_SCOPE);
       if (typeof onLogin === 'function') {
         onLogin(matchedUser);
       }
       handleClosePinModal();
     } else {
-      setError("❌ PIN-kod noto'g'ri! Qaytadan urinib ko'ring.");
+      const { attemptsLeft, lockedMs } = registerPinFailure(PIN_GUARD_SCOPE);
+      if (lockedMs > 0) {
+        setLockRemainingMs(lockedMs);
+        setError(`⛔️ Juda ko'p xato urinish! ${Math.ceil(lockedMs / 1000)} soniya kuting.`);
+      } else {
+        setError(`❌ PIN-kod noto'g'ri! Yana ${attemptsLeft} ta urinish qoldi.`);
+      }
       setTimeout(() => {
         setPin('');
       }, 400);
@@ -252,7 +277,11 @@ export default function LockScreen({
               })}
             </div>
 
-            {error && (
+            {isLocked ? (
+              <p className="text-center text-xs font-black text-red-500 mb-4">
+                ⛔️ Kirish vaqtincha bloklandi: {Math.ceil(lockRemainingMs / 1000)} soniya kuting
+              </p>
+            ) : error && (
               <p className="text-center text-xs font-black text-red-500 mb-4 animate-bounce">
                 {error}
               </p>

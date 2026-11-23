@@ -50,8 +50,11 @@ const KITCHEN_STATUSES = ['Yangi', 'Tayyorlanmoqda'];
 const initialCategories = ['Asosiy', 'Ichimlik', 'Shirinlik', 'Boshqalar'];
 const initialTables = ['1-Stol', '2-Stol', '3-Stol', '4-Stol', '5-Stol', 'VIP-1', 'VIP-2', 'Olib ketish'];
 
+// Birinchi ishga tushirish uchun. Admin kirgach almashtirishi kerak (ogohlantirish chiqadi).
+const DEFAULT_ADMIN_PIN = '777777';
+
 const initialUsers = [
-  { id: 1, name: 'Admin', role: 'admin', pin: '777777' },
+  { id: 1, name: 'Admin', role: 'admin', pin: DEFAULT_ADMIN_PIN },
   { id: 2, name: 'Sardor', role: 'cashier', pin: '1111' },
   { id: 3, name: 'Ali', role: 'waiter', pin: '2222', canSeeSales: true },
   { id: 4, name: 'Oshpaz', role: 'kitchen', pin: '3333' },
@@ -100,7 +103,7 @@ export default function App() {
       // 1. Agar xotirada Admin paroli 4 xonali (7777) bo'lib qolgan bo'lsa, 6 xonaliga (777777) o'zgartiramiz
       const adminIndex = safeUsers.findIndex(u => u.role === 'admin');
       if (adminIndex !== -1 && safeUsers[adminIndex].pin === '7777') {
-        safeUsers[adminIndex] = { ...safeUsers[adminIndex], pin: '777777' };
+        safeUsers[adminIndex] = { ...safeUsers[adminIndex], pin: DEFAULT_ADMIN_PIN };
         isUpdated = true;
       }
 
@@ -454,6 +457,15 @@ export default function App() {
 
       {/* --- ASOSIY ISHCHI MODULLAR --- */}
       <main className="p-3 md:p-5 max-w-[1600px] mx-auto">
+
+        {/* Standart admin PIN hali almashtirilmagan bo'lsa ogohlantirish (B6) */}
+        {currentUser.role === 'admin' && String(
+          (Array.isArray(users) ? users : []).find(u => u && String(u.id) === String(currentUser.id))?.pin ?? currentUser.pin
+        ) === DEFAULT_ADMIN_PIN && (
+          <div className="mb-4 p-3 rounded-2xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs sm:text-sm font-black">
+            ⚠️ Admin hali standart PIN ({DEFAULT_ADMIN_PIN}) bilan ishlayapti. Boshqaruv → "Xodimlar va Parollar" bo'limida PIN kodni almashtiring.
+          </div>
+        )}
         
         {/* 1. OFITSIANT TERMINALI */}
         {currentActiveView === 'waiter' && (
