@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PAYMENT_METHOD } from '../constants/orderStatus';
+import useSticky from '../hooks/useSticky';
+import QrCodeSvg from '../qr/QrCodeSvg';
+import { QR_BASE_URL_KEY, buildTableQrUrl, isLocalOnlyUrl } from '../qr/tableQrUrl';
 
 // =========================================================================
 // 1. STOL UCHUN QR-KOD GENERATSIYA VA CHOP ETISH OYNASI (TableQrModal)
@@ -10,19 +13,14 @@ export function TableQrModal({
   onClose 
 }) {
   const [copiedLink, setCopiedLink] = useState(false);
-  const [imgError, setImgError] = useState(false);
+  // Sayt manzili: Admin -> Tizim Sozlamalari -> QR stikerlar (bo'sh bo'lsa joriy manzil)
+  const [qrBaseUrl] = useSticky(QR_BASE_URL_KEY, '');
 
   const safeTable = String(table || '1-Stol');
 
   // Mijoz skaner qiladigan to'liq URL manzil
-  const targetMenuUrl = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    const base = window.location.origin + window.location.pathname;
-    return `${base}?table=${encodeURIComponent(safeTable)}`;
-  }, [safeTable]);
-
-  // QR kodni avtomatik generatsiya qilish
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(targetMenuUrl)}`;
+  const targetMenuUrl = useMemo(() => buildTableQrUrl(qrBaseUrl, safeTable), [qrBaseUrl, safeTable]);
+  const isLocalOnly = isLocalOnlyUrl(qrBaseUrl);
 
   // Escape bosilganda yopish
   useEffect(() => {
@@ -112,30 +110,20 @@ export function TableQrModal({
           
           {/* QR Kod Tasviri */}
           <div className="bg-amber-50/70 dark:bg-white p-5 rounded-3xl border-4 border-dashed border-amber-400 inline-block mb-5 shadow-xs">
-            {!imgError ? (
-              <img 
-                src={qrUrl} 
-                alt={`QR Code ${safeTable}`} 
-                onError={() => setImgError(true)}
-                className="w-48 h-48 mx-auto object-contain" 
-              />
-            ) : (
-              <div className="w-48 h-48 mx-auto flex flex-col items-center justify-center bg-white text-black p-3">
-                <div 
-                  className="w-36 h-36 bg-cover"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0xMCAxMGgzMHYzMEgxMHptMTAgMTBoMTB2MTBIMjB6bTQwLTQwaDMwdjMwSDYwem0xMCAxMGgxMHYxMEg3MHpNMTAgNjBoMzB2MzBIMTB6bTEwIDEwaDEwdjEwSDIwem0zMC02MGgyMHYxMEg1MHptMCA0MGgyMHYzMEg1MHpNNzAgNjBoMjB2MTBINzB6IiBmaWxsPSJibGFjayIvPjwvc3ZnPg==")`
-                  }}
-                />
-                <span className="text-[10px] font-black mt-1">{safeTable}</span>
-              </div>
-            )}
+            {/* Qurilmaning o'zida chiziladi: internetsiz ishlaydi, havola begona serverga ketmaydi */}
+            <QrCodeSvg value={targetMenuUrl} ecc="Q" title={`QR Code ${safeTable}`} className="w-48 h-48 mx-auto block" />
           </div>
           
           <p className="text-xs text-gray-600 dark:text-gray-300 mb-2 font-bold leading-relaxed px-2">
             📱 Telefon kamerangizni QR-kodga yo'naltiring, menyuni ko'ring va ofitsiantni kutmasdan buyurtma bering!
           </p>
         </div>
+
+        {isLocalOnly && (
+          <p className="no-print mt-3 text-[11px] font-bold text-amber-700 dark:text-amber-400 leading-snug">
+            ⚠️ Bu manzil faqat shu Wi-Fi ichida ochiladi. Admin → Tizim Sozlamalari → "QR stikerlar" da saytning internetdagi manzilini yozing.
+          </p>
+        )}
 
         {/* Havolani nusxalash (no-print) */}
         <div className="no-print mt-4 mb-5">

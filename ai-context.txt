@@ -73,6 +73,10 @@ Avtorizatsiya va umumiy:
 
 Mijoz (QR):
   CustomerQRView (915), CustomerMode (926)
+  src/qr/PublicQrApp.jsx, qrApi.js   ?table=... sahifasi (kirishsiz, supabase/qr.sql)
+  src/qr/qrEncode.js, QrCodeSvg.jsx  QR kod yaratish (kutubxonasiz, tashqi xizmatsiz)
+  src/qr/tableQrUrl.js               stol havolasi; sayt manzili pos_qr_base_url
+  QrStickerSheet                     barcha stollar uchun A4 stiker varag'i (Admin -> Sozlamalar)
 
 Kuryer (yetkazib berish):
   CourierMode, DeliveryOrderModal (ofitsiant ekranidan ochiladi), utils/delivery.js
@@ -116,6 +120,7 @@ pos_customers     mijozlar (bonus) pos_expenses    xarajatlar
 pos_audit_logs    audit jurnali   pos_service_fee  xizmat foizi (10)
 pos_cafe_name     kafe nomi       pos_theme        dark/light (boolean)
 pos_override_enabled  admin PIN himoyasi yoqilganmi (boolean)
+pos_qr_base_url   stol QR kodi ochadigan sayt manzili ('' = joriy manzil)
 
 pos_menu (taom):
   { id, name, category, is_available, variants: [{id, name, price}],

@@ -4,6 +4,7 @@ import { detectTelegramChatId, sendTelegramMessage, escapeHtml, getTelegramConfi
 import { notify, confirmAsync } from '../utils/notify';
 import { localWrite } from '../sync/engine';
 import AdminSyncSection from './AdminSyncSection';
+import QrStickerSheet from './QrStickerSheet';
 import { VALID_ROLES } from '../constants/roles';
 
 // Telegram sozlamalari: yagona joy - src/utils/telegramNotifier.js (B12)
@@ -89,6 +90,7 @@ export default function AdminSettingsTab({
     serviceFee !== undefined ? String(serviceFee) : '10'
   );
   const [newTableName, setNewTableName] = useState('');
+  const [showQrSheet, setShowQrSheet] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Telegram Bot sozlamalari (Bevoista localStorage bilan ishlaydi)
@@ -623,10 +625,17 @@ export default function AdminSettingsTab({
       {/* 3-BLOK: ZAL STOLLARINI BOSHQARISH */}
       {safeTables.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-xs border border-gray-100 dark:border-gray-700 space-y-5">
-          <div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h3 className="text-lg font-black text-gray-900 dark:text-white">
               🪑 Zal Stollari va Kabinalar Boshqaruvi ({safeTables.length} ta)
             </h3>
+            <button
+              type="button"
+              onClick={() => setShowQrSheet(true)}
+              className="px-4 py-2.5 rounded-xl bg-gray-900 dark:bg-white hover:bg-gray-700 dark:hover:bg-gray-200 text-white dark:text-gray-900 font-black text-xs uppercase tracking-wider shadow-md transition active:scale-95 whitespace-nowrap"
+            >
+              🖨️ QR stikerlar
+            </button>
           </div>
 
           <form onSubmit={handleAddTable} className="flex flex-col sm:flex-row gap-3">
@@ -676,6 +685,15 @@ export default function AdminSettingsTab({
               );
             })}
           </div>
+
+          {showQrSheet && (
+            <QrStickerSheet
+              tables={safeTables}
+              cafeName={cafeName}
+              addAuditLog={addAuditLog}
+              onClose={() => setShowQrSheet(false)}
+            />
+          )}
         </div>
       )}
 

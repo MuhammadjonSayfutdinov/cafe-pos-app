@@ -10,6 +10,12 @@ const friendlyError = (e) => {
   return msg.replace(/^.*?ERROR:\s*/i, '') || 'Xatolik yuz berdi';
 };
 
+// Mijoz QR sahifasi ishlashi uchun bulut sozlanganmi (stiker varag'ida ogohlantirish uchun)
+export const isQrBackendConfigured = () => {
+  const env = import.meta.env;
+  return Boolean((env.MODE === 'e2e' && env.VITE_FAKE_SYNC_URL) || (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY));
+};
+
 export async function createQrApi() {
   const env = import.meta.env;
   let call;

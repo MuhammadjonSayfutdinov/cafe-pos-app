@@ -9,7 +9,9 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
 - **Oshxona (KDS):** buyurtmalar navbati, kechikish ogohlantirishi (SLA), stop-list; dozakazda faqat yangi porsiyalar chiqadi
 - **Kassa:** naqd, plastik, Click/Payme, aralash va qarzga to'lov; chegirma, bonus/keshbek, pre-chek, qarzlar ro'yxati;
   smena ochish/yopish, sanalgan naqd va farq, Z-hisobot (chop etish, Telegram), smenalar tarixi
-- **Mijoz QR-menyusi:** stoldagi QR kod orqali o'z telefonidan buyurtma (ofitsiant tasdiqlaydi), ofitsiantni chaqirish
+- **Mijoz QR-menyusi:** stoldagi QR kod orqali o'z telefonidan buyurtma (ofitsiant tasdiqlaydi), ofitsiantni chaqirish.
+  Barcha stollar uchun QR stikerlarni bitta A4 varaqda chop etish: Boshqaruv → Tizim Sozlamalari → "🖨️ QR stikerlar"
+  (QR kod qurilmaning o'zida yaratiladi, internet shart emas)
 - **Kuryer (yetkazib berish):** ofitsiant ekranida "🛵 Yangi yetkazish" (telefon, manzil, mo'ljal, yetkazish narxi;
   doimiy mijozning manzili o'zi to'ladi), kuryer o'z telefonida buyurtmani oladi, tayyor bo'lgach yo'lga chiqadi,
   yetkazgach mijoz qanday to'laganini belgilaydi; pulni kassaga topshiradi, kassir chekni yopadi.
@@ -84,6 +86,7 @@ src/
   constants/roles.js      xodim rollari (bo'limlar) va PIN uzunligi
   hooks/useSticky.js      localStorage bilan sinxron state
   sync/                   bulutda sinxronlash (dvigatel, Supabase transporti)
+  qr/                     mijoz QR-menyusi (PublicQrApp), QR kod yaratish (qrEncode.js), stol havolasi (tableQrUrl.js)
   utils/
     ids.js                noyob id (bir nechta qurilmada to'qnashmaydi)
     orderTotals.js        buyurtma summasini hisoblashning yagona joyi

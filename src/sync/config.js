@@ -33,7 +33,8 @@ export const KV_KEYS = Object.freeze([
   'pos_table_timers',
   'pos_waiter_payroll_rules',
   'pos_revenue_target_limit',
-  'pos_delivery_fee' // yetkazish narxi (standart)
+  'pos_delivery_fee', // yetkazish narxi (standart)
+  'pos_qr_base_url' // stol QR kodi ochadigan sayt manzili (src/qr/tableQrUrl.js)
 ]);
 
 export const isRecordCollection = (key) => Object.prototype.hasOwnProperty.call(RECORD_COLLECTIONS, key);
