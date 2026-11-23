@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { notify, confirmAsync } from '../utils/notify';
+import { newId } from '../utils/ids';
 
 export default function AdminUsersTab({ 
   users = [], 
@@ -163,7 +164,7 @@ export default function AdminUsersTab({
     } else {
       // YANGI XODIM QO'SHISH REJIMI
       const newUser = {
-        id: Date.now(),
+        id: newId('user_'),
         name: cleanName,
         role: formData.role,
         pin: cleanPin,

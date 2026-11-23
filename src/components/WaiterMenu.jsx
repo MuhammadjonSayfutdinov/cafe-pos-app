@@ -15,7 +15,8 @@ export default function WaiterMenu({
   setSearchTerm: setSearchTermProp,
   cart = [],
   onAddToCart,
-  addToCart
+  addToCart,
+  getStock // (dish, variant) => { portions, limitingName } - ombor qoldig'i (ixtiyoriy)
 }) {
   // Ichki fallback state (Agar prop uzatilmagan bo'lsa ham mustaqil ishlaydi)
   const [localCategory, setLocalCategory] = useState('Barchasi');
@@ -148,6 +149,8 @@ export default function WaiterMenu({
               const hasMultipleVariants = variants.length > 1;
               const mainPrice = Number(variants[0]?.price ?? dish.price ?? 0) || 0;
               const inCartCount = cartCountByDishName[dish.name] || 0;
+              const stock = typeof getStock === 'function' ? getStock(dish, variants[0]) : null;
+              const stockLeft = stock && Number.isFinite(stock.portions) ? stock.portions : null;
 
               return (
                 <div
@@ -180,6 +183,16 @@ export default function WaiterMenu({
                     <h4 className="font-black text-sm sm:text-base text-gray-900 dark:text-white leading-snug">
                       {dish.name}
                     </h4>
+                    {isAvailable && stockLeft !== null && stockLeft === 0 && (
+                      <span data-stock="0" className="mt-1 inline-block px-2 py-0.5 rounded-lg bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-[10px] font-black">
+                        ⚠️ Omborda yetarli emas{stock.limitingName ? ` (${stock.limitingName})` : ''}
+                      </span>
+                    )}
+                    {isAvailable && stockLeft !== null && stockLeft > 0 && stockLeft <= 5 && (
+                      <span data-stock={stockLeft} className="mt-1 inline-block px-2 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-[10px] font-black">
+                        📦 {stockLeft} porsiyaga yetadi
+                      </span>
+                    )}
                   </div>
 
                   {/* Pastki qism: Narxi yoki Porsiya variantlari tugmalari */}

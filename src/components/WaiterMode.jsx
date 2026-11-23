@@ -9,6 +9,8 @@ import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../uti
 import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
+import { newId } from '../utils/ids';
+import { reservedByOpenOrders, stockStatus } from '../utils/inventoryCalc';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -46,6 +48,7 @@ export default function WaiterMode({
   categories: altCategoriesProp,
   cafeName: cafeNameProp,
   serviceFee = 10,
+  inventory: inventoryProp,
   currentUser,
   onPrintReceipt,
   setReceiptToPrint,
@@ -97,6 +100,9 @@ export default function WaiterMode({
   }, [categoriesProp, altCategoriesProp, stickyCategories, safeMenu]);
 
   const resolvedCafeName = cafeNameProp || stickyCafeName || 'Premium Cafe';
+
+  const [stickyInventory] = useSticky('pos_inventory', []);
+  const safeInventory = Array.isArray(inventoryProp) ? inventoryProp : (Array.isArray(stickyInventory) ? stickyInventory : []);
 
   // Buyurtmalarni FAQAT bitta joy orqali yozish (App.jsx bo'lsa o'sha, aks holda o'zining nusxasi).
   // Ikkalasiga birdan yozilsa, yangilanish ikki marta qo'llanadi (masalan, buyurtma ikki marta qo'shiladi).
@@ -305,11 +311,32 @@ export default function WaiterMode({
     }
   };
 
-  const handleAddToCart = useCallback((dishItem, chosenVariant = null, customNote = '') => {
+  // Ochiq buyurtmalar va savatdagi yuborilmagan porsiyalar band qilgan masalliq (ombor nazorati)
+  const reservedStock = useMemo(() => reservedByOpenOrders(
+    safeOrders, safeMenu, safeInventory,
+    cart.map(c => ({ item: c, qty: Math.max(0, (Number(c.quantity ?? c.qty ?? 1) || 0) - (Number(c.sentQty) || 0)) }))
+  ), [safeOrders, safeMenu, safeInventory, cart]);
+
+  const getStock = useCallback(
+    (dish, variant) => stockStatus(dish, variant, safeInventory, reservedStock),
+    [safeInventory, reservedStock]
+  );
+
+  const handleAddToCart = useCallback(async (dishItem, chosenVariant = null, customNote = '') => {
     if (!dishItem || dishItem.is_available === false) return;
 
     const variants = Array.isArray(dishItem.variants) ? dishItem.variants : [];
     const activeVariant = chosenVariant || (variants.length > 0 ? variants[0] : null);
+
+    // Omborda masalliq yetmasa ogohlantiramiz (ombor ma'lumoti noaniq bo'lishi mumkin: taqiqlamaymiz)
+    const stock = stockStatus(dishItem, activeVariant, safeInventory, reservedStock);
+    if (stock.portions <= 0) {
+      const proceed = await confirmAsync(
+        `⚠️ "${dishItem.name}" uchun omborda masalliq yetmaydi${stock.limitingName ? ` (${stock.limitingName})` : ''}.\nBaribir qo'shilsinmi?`,
+        { confirmText: "Baribir qo'shish", danger: true }
+      );
+      if (!proceed) return;
+    }
 
     const itemPrice = Number(
       activeVariant?.price ?? dishItem.price ?? variants[0]?.price ?? 0
@@ -360,7 +387,7 @@ export default function WaiterMode({
         }
       ];
     });
-  }, []);
+  }, [safeInventory, reservedStock]);
 
   // 🔒 Miqdorni o'zgartirish (+1 / -1) -> Oshxona va Kassani DARHOL yangilaydi!
   const handleUpdateQuantity = useCallback((targetIdentifier, delta = 0) => {
@@ -671,7 +698,7 @@ export default function WaiterMode({
       );
     } else {
       const baseOrder = {
-        id: String(nowMs),
+        id: newId(),
         createdAt: nowMs,
         table: selectedTable,
         waiter: currentUser?.name || 'Ofitsiant',
@@ -837,7 +864,7 @@ export default function WaiterMode({
       );
     } else {
       const baseOrder = {
-        id: Date.now().toString(),
+        id: newId(),
         createdAt: Date.now(),
         table: tableName,
         waiter: currentUser?.name || 'Ofitsiant',
@@ -921,7 +948,7 @@ export default function WaiterMode({
     const feePct = splitOrder.serviceFee ?? serviceFee;
     const splitBase = {
       ...splitOrder,
-      id: `${Date.now()}`,
+      id: newId(),
       table: splitTargetTable,
       items: movedItems,
       // Pre-chek eski chekka tegishli, yangi chekka o'tmaydi
@@ -1017,6 +1044,7 @@ export default function WaiterMode({
               cart={cart}
               onAddToCart={handleAddToCart}
               addToCart={handleAddToCart}
+              getStock={getStock}
               onUpdateQuantity={handleUpdateQuantity}
             />
 

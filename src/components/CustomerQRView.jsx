@@ -263,12 +263,25 @@ export default function CustomerQRView({
   const cartServiceFee = Math.round((totalCartAmount * serviceFeePercent) / 100);
   const cartGrandTotal = totalCartAmount + cartServiceFee;
 
-  const handleSubmitOrder = () => {
-    if (cart.length === 0) return;
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const handleSubmitOrder = async () => {
+    if (cart.length === 0 || isSubmitting) return;
+
+    let result = null;
     if (typeof onSubmitOrder === 'function') {
-      // App.jsx dagi funksiya (cart) yoki (table, cart) kutishiga moslashuvchan chaqiruv
-      onSubmitOrder(cart, table);
+      // App.jsx dagi funksiya (cart) yoki (table, cart) kutishiga moslashuvchan chaqiruv.
+      // Mijoz telefonidagi QR sahifada natija qaytadi: { ok, message | error }
+      setIsSubmitting(true);
+      try {
+        result = await onSubmitOrder(cart, table);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+    if (result && result.ok === false) {
+      showToast(`❌ ${result.error || "Buyurtma yuborilmadi"}`);
+      return; // savat saqlanib qoladi
     }
 
     // Lokal buyurtmalar tarixiga ham yozib qo'yamiz
@@ -287,14 +300,18 @@ export default function CustomerQRView({
     localStorage.removeItem(cartStorageKey);
     setIsCartModalOpen(false);
     setActiveTab('my_orders');
-    showToast("🚀 Buyurtmangiz oshxonaga yuborildi!");
+    showToast(result?.message || "🚀 Buyurtmangiz oshxonaga yuborildi!");
   };
 
-  const handleCallWaiterClick = () => {
+  const handleCallWaiterClick = async () => {
     if (isWaiterCalled) return;
 
     if (typeof onCallWaiter === 'function') {
-      onCallWaiter(table);
+      const result = await onCallWaiter(table);
+      if (result && result.ok === false) {
+        showToast(`❌ ${result.error || "Ofitsiantni chaqirib bo'lmadi"}`);
+        return;
+      }
     }
 
     setIsWaiterCalled(true);
@@ -560,13 +577,23 @@ export default function CustomerQRView({
                       </div>
 
                       <span className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase ${
-                        ord.status === ORDER_STATUS.READY
+                        ord.status === 'rejected'
+                          ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                          : ord.status === 'pending'
+                          ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
+                          : ord.status === ORDER_STATUS.READY
                           ? 'bg-emerald-500 text-white animate-pulse'
                           : ord.status === ORDER_STATUS.DELIVERED
                           ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
                           : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
                       }`}>
-                        {ord.status === ORDER_STATUS.READY 
+                        {ord.status === 'pending'
+                          ? '⏳ Ofitsiant tasdiqlashini kutmoqda'
+                          : ord.status === 'rejected'
+                          ? '❌ Rad etildi'
+                          : ord.status === 'accepted'
+                          ? '✅ Qabul qilindi, tayyorlanmoqda'
+                          : ord.status === ORDER_STATUS.READY 
                           ? '🥘 Tayyor!' 
                           : ord.status === ORDER_STATUS.DELIVERED 
                           ? '✅ Yetkazildi' 
@@ -902,9 +929,10 @@ export default function CustomerQRView({
               <button 
                 type="button"
                 onClick={handleSubmitOrder}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-emerald-500/30 active:scale-95 transition"
+                disabled={isSubmitting}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-emerald-500/30 active:scale-95 transition"
               >
-                BUYURTMANI TASDIQLASH 🚀
+                {isSubmitting ? 'YUBORILMOQDA...' : 'BUYURTMANI TASDIQLASH 🚀'}
               </button>
             </div>
 

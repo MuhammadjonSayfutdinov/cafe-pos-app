@@ -1,7 +1,7 @@
 # PROGRESS — cafe-pos-app
 
 Oxirgi yangilanish: 2026-11-23
-Joriy bosqich: **3-bosqich (backend)**. 0, 1 va 2-bosqichlar bajarildi (1-bosqich: PR #1; 2-bosqich: `ikkinchi-bosqich` branch).
+Joriy bosqich: **pilot**. 3-bosqich (Supabase) va 4-bosqichning asosiy funksiyalari `tortinchi-bosqich` branch'ida. Sozlash: `SUPABASE.md`.
 
 > Bu fayl Claude uchun yozilgan. Barcha kodni faqat Claude yozadi (Gemini ishlatilmaydi).
 > Yangi chatda birinchi navbatda shu faylni va `ai-context.txt` ni o'qi.
@@ -38,7 +38,8 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 
 ## Joriy vazifa
 
-**3-bosqich, 1-qadam:** backend variantini tanlash (pastdagi "Qarorlar" jadvali). Qaror qabul qilinmaguncha kod yozilmaydi.
+**Pilot:** foydalanuvchi `supabase/qr.sql` ni ishga tushiradi, saytni Vercel'ga joylaydi, kafeda sinaydi.
+Keyin pilot natijasiga qarab: PIN tekshiruvini serverga ko'chirish, Click/Payme, fiskal chek, Vitest.
 Kichik ishlar (istalgan vaqtda): `barcha-kodlar.txt` (eskirgan kod nusxasi) va `preview.html` kerakmi, ko'rib chiqish.
 
 ## Vazifa → kerakli fayllar
@@ -96,17 +97,17 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 - [x] B11 (`useSticky`), B12 (`telegramNotifier.js`), B13 (`src/utils/notify.js`: toast va tasdiqlash oynasi)
 
 ### 3-bosqich. Backend (1–2 hafta)
-- [ ] Variant tanlash (qarorlar bo'limiga qarang)
-- [ ] `useSticky` o'rniga serverdan o'qiydigan hooklar
-- [ ] QR-menyu buyurtmasi haqiqatan yetib borishi
-- [ ] PIN, audit jurnali, Telegram tokenini serverga ko'chirish
+- [x] Variant tanlash: Supabase (pilot uchun)
+- [x] Sinxronlash qatlami `src/sync/` (useSticky o'zgarmadi: localStorage + yozuv darajasida bulut sinxroni, oflayn navbat, realtime)
+- [x] QR-menyu: mijoz telefonidan buyurtma (`supabase/qr.sql`, `src/qr/`), ofitsiant tasdig'i bilan, narx serverda
+- [ ] PIN tekshiruvini serverga ko'chirish (hozir ma'lumot RLS bilan himoyalangan, PIN qurilmada tekshiriladi)
 
 ### 4-bosqich. Kafe uchun funksiyalar
-- [ ] Smena ochish/yopish, haqiqiy Z-hisobot
-- [ ] Oflayn rejim (PWA)
+- [x] Smena ochish/yopish, haqiqiy Z-hisobot (`ShiftPanel.jsx`, `src/shift/shiftReport.js`, `pos_shifts`)
+- [x] Oflayn rejim (PWA): manifest, service worker (`src/pwa/`, `vite.config.js` plagini), `vercel.json`
 - [ ] Click/Payme integratsiyasi
 - [ ] Onlayn-kassa va fiskal chek talablarini tekshirish (O'zbekiston)
-- [ ] Texnologik karta bo'yicha ayirish, manfiy qoldiqdan himoya
+- [x] Texnologik karta bo'yicha ayirish, qoldiq ogohlantirishi, kamomad yozuvi (`src/utils/inventoryCalc.js`)
 
 ### 5-bosqich. Sifat
 - [ ] `Vitest`: summa, chegirma, bonus, ombor hisobi
@@ -118,7 +119,8 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 |--------|-------|-------|
 | Ombor qachon ayiriladi | To'lovda (`CashierMode.deductOrderIngredientsFromStock`). Sabab: ofitsiant buyurtmasi `App.jsx` dan o'tmaydi, kassadagi kod birlik va porsiyani hisoblaydi, bekor qilingan chekni qaytarish shart emas | qabul qilindi |
 | Taom statusi | Taomda `kitchenDoneQty`; dozakazda oshxona faqat qolgan porsiyani ko'radi | qabul qilindi |
-| Backend | Supabase (tez) yoki Node + SQLite/PostgreSQL + WebSocket | tanlanmagan |
+| Backend | Supabase (pilot). Haqiqiy ishga o'tishda shaxsiy ma'lumotlar qonuni sababli mahalliy serverga ko'chish (`supabaseTransport.js` almashtiriladi) | qabul qilindi |
+| Id lar | `src/utils/ids.js` (`newId`): bir nechta qurilmada `Date.now()` to'qnashardi | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
 ## Commit jurnali
@@ -134,6 +136,11 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 6 | useSticky, konstantalar, migratsiya, ErrorBoundary | 4f520b7 | [x] |
 | 7 | Telegram kodi bitta joyda | dbcf7fc | [x] |
 | 8 | alert/confirm o'rniga toast va oyna | ef25712 | [x] |
+| 9 | Supabase bilan bulutda sinxronlash | 78fa71f | [x] |
+| 10 | PWA (oflayn, o'rnatish) | cdfe026 | [x] |
+| 11 | Mijoz telefonidan QR-buyurtma | a3ea5a4 | [x] |
+| 12 | Kassa smenasi va Z-hisobot | 7338932 | [x] |
+| 13 | Ombor nazorati va kamomad | 285e607 | [x] |
 
 ## Yangi chatning birinchi xabari
 

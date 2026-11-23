@@ -7,15 +7,20 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
 
 - **Ofitsiant:** stollar xaritasi, buyurtma va dozakaz, chekni bo'lish, stolni ko'chirish, bron, VIP soatbay taymer
 - **Oshxona (KDS):** buyurtmalar navbati, kechikish ogohlantirishi (SLA), stop-list; dozakazda faqat yangi porsiyalar chiqadi
-- **Kassa:** naqd, plastik, Click/Payme, aralash va qarzga to'lov; chegirma, bonus/keshbek, pre-chek, qarzlar ro'yxati
-- **Ombor:** qoldiqlar, kirim/chiqim tarixi, texnologik karta bo'yicha avtomatik ayirish (to'lov paytida)
+- **Kassa:** naqd, plastik, Click/Payme, aralash va qarzga to'lov; chegirma, bonus/keshbek, pre-chek, qarzlar ro'yxati;
+  smena ochish/yopish, sanalgan naqd va farq, Z-hisobot (chop etish, Telegram), smenalar tarixi
+- **Mijoz QR-menyusi:** stoldagi QR kod orqali o'z telefonidan buyurtma (ofitsiant tasdiqlaydi), ofitsiantni chaqirish
+- **Ombor:** qoldiqlar, kirim/chiqim tarixi, texnologik karta bo'yicha avtomatik ayirish (to'lov paytida);
+  ofitsiant menyusida "N porsiyaga yetadi / yetarli emas" belgisi, yetmasa kamomad yozuvi
 - **Statistika:** tushum, tannarx, sof foyda, ofitsiantlar maoshi, Z-hisobot (Telegram'ga yuborish)
 - **Admin:** menyu, kategoriyalar, xodimlar va PIN kodlar, audit jurnali, zaxira nusxa, Telegram sozlamalari
 - **Xavfsizlik:** xavfli amallar admin PIN bilan tasdiqlanadi, 5 ta xato PIN'dan keyin vaqtincha bloklash
+- **Planshetga o'rnatish (PWA):** bosh ekranga qo'shiladi, internet uzilib sahifa yangilansa ham ochiladi
 
 ## Texnologiyalar
 
-React 19, Vite 7, Tailwind CSS 4. Backend yo'q: ma'lumotlar brauzerning `localStorage`ida saqlanadi.
+React 19, Vite 7, Tailwind CSS 4. Ma'lumotlar qurilmada (`localStorage`) saqlanadi; ixtiyoriy ravishda
+**Supabase** orqali bir nechta qurilma o'rtasida sinxronlanadi (sozlash: [SUPABASE.md](SUPABASE.md)).
 
 ## Ishga tushirish
 
@@ -52,8 +57,8 @@ Admin standart PIN bilan ishlasa, ekranning tepasida ogohlantirish chiqib turadi
 
 ## Ma'lumotlar haqida muhim
 
-- Ma'lumotlar faqat shu brauzer va shu qurilmada saqlanadi. Boshqa qurilmalar bilan sinxronlash
-  hozircha yo'q (backend 3-bosqichda rejalashtirilgan).
+- Supabase sozlanmagan bo'lsa, ma'lumotlar faqat shu brauzer va shu qurilmada saqlanadi.
+  Bir nechta qurilmani (ofitsiant, oshxona, kassa) ulash uchun: [SUPABASE.md](SUPABASE.md).
 - Brauzer tarixi yoki sayt ma'lumotlari tozalansa, hamma narsa o'chadi. **Muntazam zaxira nusxa oling:**
   Boshqaruv → Tizim Sozlamalari → zaxira nusxani yuklab olish.
 - Zaxira fayliga PIN kodlar va Telegram bot tokeni yozilmaydi. Tokenni alohida, xavfsiz joyda saqlang.
@@ -62,13 +67,17 @@ Admin standart PIN bilan ishlasa, ekranning tepasida ogohlantirish chiqib turadi
 ## Loyiha tuzilishi
 
 ```
+supabase/schema.sql       Supabase jadvallari va xavfsizlik qoidalari
+scripts/                  sinov uchun soxta sinxron server
 src/
   App.jsx                 global state, rollar bo'yicha ekranlar, QR-buyurtma
   main.jsx                ishga tushirish: migratsiya, ErrorBoundary, bildirishnomalar
   components/             ekranlar (Waiter*, Cashier*, Kitchen*, Warehouse*, Stats*, Admin*)
   constants/orderStatus.js  buyurtma statuslari va to'lov turlari
   hooks/useSticky.js      localStorage bilan sinxron state
+  sync/                   bulutda sinxronlash (dvigatel, Supabase transporti)
   utils/
+    ids.js                noyob id (bir nechta qurilmada to'qnashmaydi)
     orderTotals.js        buyurtma summasini hisoblashning yagona joyi
     dates.js              sana bilan ishlash (millisekund bo'yicha)
     pinGuard.js           xato PIN urinishlarini cheklash

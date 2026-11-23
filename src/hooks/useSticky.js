@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { notify } from '../utils/notify';
+import { SAME_TAB_EVENT } from '../sync/config';
+import { localWrite } from '../sync/engine';
 
 // localStorage bilan sinxron state (B11).
 //
@@ -9,8 +11,6 @@ import { notify } from '../utils/notify';
 //
 // Endi: funksional yangilanish (prev => ...) har doim localStorage'dagi ENG SO'NGGI
 // qiymatdan hisoblanadi va darhol yoziladi. Yozib bo'lmasa, foydalanuvchiga xabar chiqadi.
-
-const SAME_TAB_EVENT = 'local-storage-update';
 
 // Yozib bo'lmagan (xotira to'lgan) qiymatlar: keyingi hisob shulardan davom etadi
 const unsavedValues = new Map();
@@ -65,6 +65,8 @@ export function useSticky(key, defaultValue) {
     try {
       if (window.localStorage.getItem(key) === null && !unsavedValues.has(key)) {
         writeValue(key, defaultRef.current);
+        // Birinchi qurilmaning boshlang'ich ma'lumotlari bulutga ham chiqsin
+        localWrite(key, defaultRef.current);
       }
     } catch {
       // localStorage mavjud emas
@@ -78,6 +80,8 @@ export function useSticky(key, defaultValue) {
     if (next === undefined || next === latest) return;
 
     writeValue(key, next);
+    // Bulutga sinxronlash (sozlanmagan bo'lsa hech narsa qilmaydi)
+    localWrite(key, next);
     setValue(next);
     window.dispatchEvent(new CustomEvent(SAME_TAB_EVENT, { detail: { key, newValue: next } }));
   }, [key]);
@@ -99,6 +103,8 @@ export function useSticky(key, defaultValue) {
 
     const handleSameTab = (event) => {
       if (event.detail?.key === key) {
+        // Serverdan kelgan qiymat saqlanmagan mahalliy nusxadan ustun
+        if (event.detail.source === 'remote') unsavedValues.delete(key);
         setValue(event.detail.newValue);
       }
     };

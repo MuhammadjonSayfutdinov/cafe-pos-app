@@ -7,6 +7,10 @@ import { calcOrderTotals } from '../utils/orderTotals';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
+import { newId } from '../utils/ids';
+import ShiftPanel from './ShiftPanel';
+import { getOpenShift } from '../shift/shiftReport';
+import { itemUsage, normalizeUnit } from '../utils/inventoryCalc';
 
 // ==========================================
 // 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
@@ -58,43 +62,7 @@ const EXPENSE_CATEGORIES = [
   { id: 'Boshqa', label: '📌 Boshqa xarajatlar', isInkassatsiya: false }
 ];
 
-// ==========================================
-// 3. O'LCHOV BIRLIKLARI KONVERTORI (OMBOR UCHUN)
-// ==========================================
-const UNIT_FACTORS = {
-  gr: { family: 'weight', factor: 1 },
-  kg: { family: 'weight', factor: 1000 },
-  tonna: { family: 'weight', factor: 1000000 },
-  ml: { family: 'volume', factor: 1 },
-  litr: { family: 'volume', factor: 1000 }
-};
-
-const normalizeUnit = (unitStr) => {
-  const u = String(unitStr || 'kg').trim().toLowerCase();
-  if (['g', 'gr', 'gram', 'gramm'].includes(u)) return 'gr';
-  if (['kg', 'kilogram', 'kilogramm', 'kilo'].includes(u)) return 'kg';
-  if (['t', 'ton', 'tonna', 'tn'].includes(u)) return 'tonna';
-  if (['ml', 'millilitr'].includes(u)) return 'ml';
-  if (['l', 'lt', 'litr', 'liter'].includes(u)) return 'litr';
-  return u;
-};
-
-const convertRecipeToInventoryUnit = (amount, fromUnit, toInvUnit) => {
-  const num = Number(amount) || 0;
-  const fromNorm = normalizeUnit(fromUnit || toInvUnit);
-  const toNorm = normalizeUnit(toInvUnit);
-
-  if (fromNorm === toNorm) return num;
-
-  const fromMeta = UNIT_FACTORS[fromNorm];
-  const toMeta = UNIT_FACTORS[toNorm];
-
-  if (fromMeta && toMeta && fromMeta.family === toMeta.family) {
-    const inBase = num * fromMeta.factor;
-    return Number((inBase / toMeta.factor).toFixed(6));
-  }
-  return num;
-};
+// O'lchov birliklari va retsept hisobi: src/utils/inventoryCalc.js
 
 // ==========================================
 // 4. ICHKI XAVFSIZ TELEGRAM XABAR YUBORGICH
@@ -243,6 +211,10 @@ export default function CashierMode({
     return safeOrders.filter(o => o && o.status === ORDER_STATUS.DEBT);
   }, [safeOrders]);
 
+  // Kassa smenasi (src/components/ShiftPanel.jsx)
+  const [shifts] = useSticky('pos_shifts', []);
+  const openShift = getOpenShift(shifts);
+
   const currentShiftPaidOrders = useMemo(() => {
     return safeOrders.filter(o => o && o.status === ORDER_STATUS.PAID);
   }, [safeOrders]);
@@ -281,7 +253,8 @@ export default function CashierMode({
       }
     });
 
-    const expectedCashInDrawer = cashSalesIn - cashExpensesOut;
+    // Smena boshidagi naqd pul ham kassada bo'ladi
+    const expectedCashInDrawer = (Number(openShift?.openingCash) || 0) + cashSalesIn - cashExpensesOut;
 
     return {
       cashSalesIn,
@@ -291,7 +264,7 @@ export default function CashierMode({
       totalOutflow: cashExpensesOut + cardExpensesOut,
       expectedCashInDrawer
     };
-  }, [currentShiftPaidOrders, currentShiftExpenses]);
+  }, [currentShiftPaidOrders, currentShiftExpenses, openShift]);
 
   const selectedOrder = useMemo(() => {
     if (!selectedOrderId) return null;
@@ -502,7 +475,7 @@ export default function CashierMode({
     }
 
     const created = {
-      id: `cust_${Date.now()}`,
+      id: newId('cust_'),
       name: cleanName,
       phone: newCrmCustomer.phone.trim(),
       bonusBalance: initBonus,
@@ -538,6 +511,10 @@ export default function CashierMode({
       notify("Iltimos, xarajat summasini to'g'ri kiriting!");
       return;
     }
+    if (!openShift) {
+      notify('⚠️ Avval smenani oching: xarajat smena hisobotiga kiradi');
+      return;
+    }
     if (!cleanNote) {
       notify("Iltimos, xarajat sababini (izohni) kiriting!");
       return;
@@ -568,6 +545,7 @@ export default function CashierMode({
       recipient: cleanRecipient || '-',
       note: cleanNote,
       cashierName: currentUser?.name || 'Kassir',
+      shiftId: openShift.id,
       status: 'Faol'
     };
 
@@ -621,115 +599,69 @@ export default function CashierMode({
   // ==========================================
   // 10. OMBORDAN MASALLIQLARNI AVTOMATIK AYIRISH
   // ==========================================
+  // Ombordan ayirish (yagona joy, B1). Hisob: src/utils/inventoryCalc.js
+  // Masalliq yetmasa qoldiq 0 ga tushadi va "kamomad" yozuvi qoldiriladi (jim yo'qolmaydi).
   const deductOrderIngredientsFromStock = (orderToDeduct) => {
     if (!orderToDeduct || orderToDeduct.inventoryDeducted) return [];
     if (!Array.isArray(orderToDeduct.items) || safeInventory.length === 0) return [];
 
-    const deductionsByInvId = {};
-
+    const deductions = {};
     orderToDeduct.items.forEach(cartItem => {
       if (!cartItem) return;
-      const itemQty = Number(cartItem.quantity ?? cartItem.qty ?? 1) || 0;
-      if (itemQty <= 0) return;
-
-      const matchedMenu = safeMenu.find(
-        m => m && (
-          String(m.id) === String(cartItem.id) ||
-          m.name === cartItem.baseName ||
-          m.name === cartItem.name
-        )
-      );
-
-      const mainMenuPrice = Number(matchedMenu?.variants?.[0]?.price ?? matchedMenu?.price ?? 0) || 0;
-      const soldItemPrice = Number(cartItem.price ?? mainMenuPrice) || 0;
-      const portionFactor = (mainMenuPrice > 0 && soldItemPrice > 0)
-        ? Math.min(2, Math.max(0.25, soldItemPrice / mainMenuPrice))
-        : 1;
-
-      const recipeList = matchedMenu?.recipe || cartItem?.recipe;
-      if (!Array.isArray(recipeList) || recipeList.length === 0) return;
-
-      recipeList.forEach(r => {
-        if (!r) return;
-        const targetId = String(r.inventoryId ?? r.productId ?? r.id ?? '');
-        const invItem = safeInventory.find(i => i && String(i.id) === targetId);
-        if (!invItem) return;
-
-        const invBaseUnit = normalizeUnit(invItem.unit || 'kg');
-        let singlePortionInBase = Number(r.qty ?? r.amount ?? 0) || 0;
-
-        if (r.rawQty !== undefined && r.recipeUnit) {
-          singlePortionInBase = convertRecipeToInventoryUnit(r.rawQty, r.recipeUnit, invBaseUnit);
-        }
-
-        const totalUsedInBase = Number((singlePortionInBase * portionFactor * itemQty).toFixed(6));
-        if (totalUsedInBase <= 0) return;
-
-        if (!deductionsByInvId[targetId]) {
-          deductionsByInvId[targetId] = {
-            invItem,
-            baseUnit: invBaseUnit,
-            totalDeduct: 0,
-            dishes: []
-          };
-        }
-
-        deductionsByInvId[targetId].totalDeduct = Number(
-          (deductionsByInvId[targetId].totalDeduct + totalUsedInBase).toFixed(6)
-        );
-        deductionsByInvId[targetId].dishes.push(`${cartItem.name} (x${itemQty})`);
+      const qty = Number(cartItem.quantity ?? cartItem.qty ?? 1) || 0;
+      itemUsage(cartItem, safeMenu, safeInventory).forEach((amount, id) => {
+        if (!deductions[id]) deductions[id] = { total: 0, dishes: [] };
+        deductions[id].total = Number((deductions[id].total + amount).toFixed(6));
+        deductions[id].dishes.push(`${cartItem.name} (x${qty})`);
       });
     });
-
-    const deductionKeys = Object.keys(deductionsByInvId);
-    if (deductionKeys.length === 0) return [];
+    if (Object.keys(deductions).length === 0) return [];
 
     const nowStr = new Date().toLocaleString();
     const lowStockAlerts = [];
     const newLogs = [];
 
-    const updatedInventoryList = safeInventory.map(inv => {
-      if (!inv) return inv;
-      const d = deductionsByInvId[String(inv.id)];
-      if (!d) return inv;
-
+    safeInventory.forEach(inv => {
+      const d = inv && deductions[String(inv.id)];
+      if (!d) return;
       const currentQty = Number(inv.quantity ?? inv.qty ?? 0) || 0;
-      const nextQty = Math.max(0, Number((currentQty - d.totalDeduct).toFixed(6)));
+      const nextQty = Math.max(0, Number((currentQty - d.total).toFixed(6)));
+      const shortage = Number((d.total - currentQty).toFixed(6));
       const minLim = Number(inv.minLimit ?? 0) || 0;
+      const unit = normalizeUnit(inv.unit || 'kg');
+      const note = `${orderToDeduct.table}: ${d.dishes.join(', ')}`;
 
-      if (nextQty <= minLim) {
+      if (nextQty <= minLim || shortage > 0) {
         lowStockAlerts.push({
-          id: inv.id,
-          name: inv.name,
-          quantity: nextQty,
-          minLimit: minLim,
-          unit: inv.unit
+          id: inv.id, name: inv.name, quantity: nextQty, minLimit: minLim, unit: inv.unit,
+          shortage: shortage > 0 ? shortage : 0
         });
       }
-
+      // Haqiqatda ayirilgan miqdor (yetmagan qism alohida "kamomad" yozuvida)
+      const deducted = Number((currentQty - nextQty).toFixed(6));
       newLogs.push({
-        id: `${Date.now()}_${Math.random()}`,
-        date: nowStr,
-        type: 'Sotuv (Avto)',
-        itemName: inv.name,
-        productName: inv.name,
-        diffAmount: `-${d.totalDeduct}`,
-        amount: d.totalDeduct,
-        unit: d.baseUnit,
-        note: `${orderToDeduct.table}: ${d.dishes.join(', ')}`,
-        reason: `${orderToDeduct.table}: ${d.dishes.join(', ')}`,
-        user: currentUser?.name || 'Kassir'
+        id: newId('invlog_'), date: nowStr, type: 'Sotuv (Avto)', itemName: inv.name, productName: inv.name,
+        diffAmount: `-${deducted}`, amount: deducted, unit, note, reason: note, user: currentUser?.name || 'Kassir'
       });
-
-      return {
-        ...inv,
-        quantity: nextQty,
-        qty: nextQty,
-        lastUpdated: nowStr
-      };
+      if (shortage > 0) {
+        newLogs.push({
+          id: newId('invlog_'), date: nowStr, type: 'kamomad', itemName: inv.name, productName: inv.name,
+          // Qoldiqni o'zgartirmaydi: faqat yetmagan miqdor qayd etiladi
+          diffAmount: `0 (${shortage} yetmadi)`, amount: shortage, unit,
+          note: `Kamomad: retsept bo'yicha ${d.total} ${unit} kerak edi, omborda ${currentQty} ${unit} bor edi (${note})`,
+          reason: 'Omborda yetmadi', user: currentUser?.name || 'Kassir'
+        });
+      }
     });
 
-    updateInventory(updatedInventoryList);
+    // Eng so'nggi saqlangan ombor qiymatidan hisoblaymiz (boshqa qurilma o'zgarishi o'chib ketmasin)
+    updateInventory(prev => (Array.isArray(prev) ? prev : safeInventory).map(inv => {
+      const d = inv && deductions[String(inv.id)];
+      if (!d) return inv;
+      const currentQty = Number(inv.quantity ?? inv.qty ?? 0) || 0;
+      const nextQty = Math.max(0, Number((currentQty - d.total).toFixed(6)));
+      return { ...inv, quantity: nextQty, qty: nextQty, lastUpdated: nowStr };
+    }));
     if (newLogs.length > 0) {
       updateInventoryLogs(prev => [...newLogs, ...(Array.isArray(prev) ? prev : [])]);
     }
@@ -742,6 +674,10 @@ export default function CashierMode({
   // ==========================================
   const handlePaymentSubmit = () => {
     if (!selectedOrder) return;
+    if (!openShift) {
+      notify('⚠️ Avval smenani oching (yuqoridagi "Smenani ochish" tugmasi)');
+      return;
+    }
 
     let cashAmount = 0;
     let cardAmount = 0;
@@ -800,7 +736,7 @@ export default function CashierMode({
         updatedCustomerBalance = totals.earnedCashback;
 
         const newCustomerRecord = {
-          id: `cust_${Date.now()}`,
+          id: newId('cust_'),
           name: finalCustomerName,
           phone: finalCustomerPhone,
           bonusBalance: updatedCustomerBalance,
@@ -847,6 +783,7 @@ export default function CashierMode({
         cashierName: currentUser?.name || 'Kassir',
         closeTime: closeTimeStr,
         closedAtMs: Date.now(),
+        shiftId: openShift?.id || null,
         inventoryDeducted: true,
         hasCall: false
       };
@@ -916,7 +853,9 @@ export default function CashierMode({
           [
             `⚠️ <b>OMBOR OGOHLANTIRISHI (${escapeHtml(resolvedCafeName)})</b>`,
             ...lowStockAlerts.map(
-              it => `🔻 <b>${escapeHtml(it.name)}:</b> ${it.quantity} ${escapeHtml(it.unit)} qoldi`
+              it => it.shortage > 0
+                ? `⛔ <b>${escapeHtml(it.name)}:</b> ${it.shortage} ${escapeHtml(it.unit)} YETMADI (kamomad)`
+                : `🔻 <b>${escapeHtml(it.name)}:</b> ${it.quantity} ${escapeHtml(it.unit)} qoldi`
             )
           ],
           'notifyOnLowStock'
@@ -964,6 +903,10 @@ export default function CashierMode({
   // Qarz yopilganda (B7): haqiqiy to'lov turi yoziladi, sotuv sanasi (closeTime, closedAtMs) o'zgarmaydi
   const handlePayOffDebt = (debtOrder, method = 'Naqd') => {
     if (!debtOrder) return;
+    if (!openShift) {
+      notify('⚠️ Avval smenani oching: qarz puli kassaga tushadi');
+      return;
+    }
     const payMethod = ['Naqd', 'Plastik', 'Click', 'Payme'].includes(method) ? method : 'Naqd';
     const debtAmount = Number(debtOrder.total ?? debtOrder.finalTotal ?? 0) || 0;
     const debtor = debtOrder.debtorName || debtOrder.paymentDetails?.debtorName || "Noma'lum mijoz";
@@ -981,6 +924,7 @@ export default function CashierMode({
               debtPaidAt: new Date(paidAtMs).toLocaleString(),
               debtPaidAtMs: paidAtMs,
               debtPaidBy: currentUser?.name || 'Kassir',
+              debtPaidShiftId: openShift.id,
               paymentDetails: {
                 ...(o.paymentDetails || {}),
                 cashAmount: payMethod === PAYMENT_METHOD.CASH ? debtAmount : 0,
@@ -1054,6 +998,17 @@ export default function CashierMode({
   // ==========================================
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-4 pb-6 animate-fade-in">
+
+      {/* KASSA SMENASI: ochish / yopish / Z-hisobot */}
+      <ShiftPanel
+        orders={safeOrders}
+        expenses={safeExpenses}
+        setOrders={updateOrders}
+        setExpenses={updateExpenses}
+        currentUser={currentUser}
+        cafeName={resolvedCafeName}
+        addAuditLog={addAuditLog}
+      />
       
       {/* TEPADAGI JONLI KASSA SEYFI, XARAJAT VA CRM PANELI */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { notify, confirmAsync } from '../utils/notify';
+import { newId } from '../utils/ids';
 
 // Birliklar konvertatsiyasi (Retseptdagi gr/kg/ml/litr ni ombordagi birlikka aniq o'girish)
 const RECIPE_UNITS = [
@@ -345,7 +346,7 @@ export default function AdminMenuTab({
       }
     } else {
       const newItem = {
-        id: Date.now(), 
+        id: newId('menu_'), 
         name: safeName, 
         category: newItemData.category || safeCategories[0], 
         is_available: newItemData.is_available, 
