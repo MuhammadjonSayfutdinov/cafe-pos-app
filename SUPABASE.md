@@ -95,10 +95,13 @@ stollarning buyurtmalari ko'rinmaydi.
 
 ## 6. Pilot oldidan tekshiruv ro'yxati
 
+- [ ] Doimiy manzil tanlangan: Vercel → Settings → Domains'da qisqa `.vercel.app` manzil qo'shilgan,
+      eski manzil yangisiga yo'naltirilgan (Redirect). Qurilmalar faqat shu manzildan ulanadi
 - [ ] Admin va barcha xodimlarning PIN kodlari almashtirilgan ("Xodimlar va Parollar")
 - [ ] Menyu, narxlar, stollar va kategoriyalar kiritilgan
 - [ ] Supabase'da ochiq ro'yxatdan o'tish o'chirilgan (3-qadam)
-- [ ] `supabase/qr.sql` ishga tushirilgan, QR stikerlar chop etilgan, telefondan sinov buyurtmasi berilgan
+- [ ] `supabase/qr.sql` ishga tushirilgan, telefondan sinov buyurtmasi berilgan
+- [ ] QR stikerlar **yangi manzildan** ochilgan qurilmada chop etilgan (QR kod qurilma ochilgan manzilni oladi)
 - [ ] Har bir qurilma ulangan, sarlavhada `☁️ Bulut` belgisi ko'rinadi
 - [ ] Sinov: ofitsiant planshetidan buyurtma → oshxona ekranida chiqdi → kassada to'landi
 - [ ] Sinov: Wi-Fi o'chirildi → buyurtma berildi (`📴 Oflayn`) → Wi-Fi yoqildi → boshqa qurilmaga yetib keldi
