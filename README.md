@@ -7,11 +7,15 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
 
 - **Ofitsiant:** stollar xaritasi, buyurtma va dozakaz, chekni bo'lish, stolni ko'chirish, bron, VIP soatbay taymer
 - **Oshxona (KDS):** buyurtmalar navbati, kechikish ogohlantirishi (SLA), stop-list; dozakazda faqat yangi porsiyalar chiqadi
-- **Kassa:** naqd, plastik, Click/Payme, aralash va qarzga to'lov; chegirma, bonus/keshbek, pre-chek, qarzlar ro'yxati
-- **Ombor:** qoldiqlar, kirim/chiqim tarixi, texnologik karta bo'yicha avtomatik ayirish (to'lov paytida)
+- **Kassa:** naqd, plastik, Click/Payme, aralash va qarzga to'lov; chegirma, bonus/keshbek, pre-chek, qarzlar ro'yxati;
+  smena ochish/yopish, sanalgan naqd va farq, Z-hisobot (chop etish, Telegram), smenalar tarixi
+- **Mijoz QR-menyusi:** stoldagi QR kod orqali o'z telefonidan buyurtma (ofitsiant tasdiqlaydi), ofitsiantni chaqirish
+- **Ombor:** qoldiqlar, kirim/chiqim tarixi, texnologik karta bo'yicha avtomatik ayirish (to'lov paytida);
+  ofitsiant menyusida "N porsiyaga yetadi / yetarli emas" belgisi, yetmasa kamomad yozuvi
 - **Statistika:** tushum, tannarx, sof foyda, ofitsiantlar maoshi, Z-hisobot (Telegram'ga yuborish)
 - **Admin:** menyu, kategoriyalar, xodimlar va PIN kodlar, audit jurnali, zaxira nusxa, Telegram sozlamalari
 - **Xavfsizlik:** xavfli amallar admin PIN bilan tasdiqlanadi, 5 ta xato PIN'dan keyin vaqtincha bloklash
+- **Planshetga o'rnatish (PWA):** bosh ekranga qo'shiladi, internet uzilib sahifa yangilansa ham ochiladi
 
 ## Texnologiyalar
 
