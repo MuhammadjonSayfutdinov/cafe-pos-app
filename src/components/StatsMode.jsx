@@ -5,6 +5,7 @@ import StatsPaymentBreakdown from './StatsPaymentBreakdown';
 import StatsPopularItems from './StatsPopularItems';
 import PrintReceiptModal from './PrintReceiptModal';
 import { getRecordTimeMs } from '../utils/dates';
+import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
 
 // ===============================================
 // 1. O'LCHOV BIRLIKLARI KONVERTORI (TANNARX UCHUN)
@@ -380,20 +381,20 @@ export default function StatsMode({
   // 4. CHEKLAR VA XARAJATLARNI SMENA HAMDA SANA ORALIG'IGA QARAB AJRATISH
   // ===============================================
   const currentShiftPaidOrders = useMemo(() => {
-    return safeOrders.filter(o => o && o.status === "To'langan");
+    return safeOrders.filter(o => o && o.status === ORDER_STATUS.PAID);
   }, [safeOrders]);
 
   const archivedPaidOrders = useMemo(() => {
-    return safeOrders.filter(o => o && o.status === 'Arxiv');
+    return safeOrders.filter(o => o && o.status === ORDER_STATUS.ARCHIVED);
   }, [safeOrders]);
 
   const debtOrders = useMemo(() => {
-    return safeOrders.filter(o => o && o.status === 'Qarz');
+    return safeOrders.filter(o => o && o.status === ORDER_STATUS.DEBT);
   }, [safeOrders]);
 
   const openActiveOrders = useMemo(() => {
     return safeOrders.filter(
-      o => o && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
+      o => o && !CLOSED_ORDER_STATUSES.includes(o.status)
     );
   }, [safeOrders]);
 
@@ -422,11 +423,11 @@ export default function StatsMode({
   ]);
 
   const scopedExpenses = useMemo(() => {
-    let baseExp = safeExpenses.filter(e => e && e.status !== 'Arxiv');
+    let baseExp = safeExpenses.filter(e => e && e.status !== ORDER_STATUS.ARCHIVED);
     if (activeDateRange.isFiltered || viewScope === 'all') {
       baseExp = safeExpenses.filter(Boolean);
     } else if (viewScope === 'archived') {
-      baseExp = safeExpenses.filter(e => e && e.status === 'Arxiv');
+      baseExp = safeExpenses.filter(e => e && e.status === ORDER_STATUS.ARCHIVED);
     }
 
     if (!activeDateRange.isFiltered) return baseExp;
@@ -562,9 +563,9 @@ export default function StatsMode({
     let rawCashIn = 0;
     completedOrders.forEach(o => {
       const amt = getOrderFinalAmount(o);
-      if (o.paymentMethod === 'Naqd') {
+      if (o.paymentMethod === PAYMENT_METHOD.CASH) {
         rawCashIn += amt;
-      } else if (o.paymentMethod === 'Aralash') {
+      } else if (o.paymentMethod === PAYMENT_METHOD.MIXED) {
         rawCashIn += Number(o.paymentDetails?.cashAmount ?? o.mixedDetails?.cash ?? 0) || 0;
       }
     });
@@ -618,7 +619,7 @@ export default function StatsMode({
     }
 
     const matchingOrders = safeOrders.filter(o => {
-      if (!o || !["To'langan", 'Arxiv'].includes(o.status)) return false;
+      if (!o || ![ORDER_STATUS.PAID, ORDER_STATUS.ARCHIVED].includes(o.status)) return false;
       const t = parseRecordTimestamp(o);
       return t >= sMs && t <= eMs;
     });
@@ -1050,7 +1051,7 @@ export default function StatsMode({
   };
 
   const handleCloseShift = () => {
-    const activeShiftExpenses = safeExpenses.filter(e => e && e.status !== 'Arxiv');
+    const activeShiftExpenses = safeExpenses.filter(e => e && e.status !== ORDER_STATUS.ARCHIVED);
 
     if (currentShiftPaidOrders.length === 0 && activeShiftExpenses.length === 0) {
       alert("ℹ️ Hozirgi smenada yopilishi kerak bo'lgan yangi cheklar yoki xarajatlar yo'q!");
@@ -1084,8 +1085,8 @@ export default function StatsMode({
     updateOrdersState(prev => {
       const list = Array.isArray(prev) && prev.length > 0 ? prev : safeOrders;
       return list.map(order => {
-        if (order && order.status === "To'langan") {
-          return { ...order, status: 'Arxiv', archiveDate: archiveDateStr };
+        if (order && order.status === ORDER_STATUS.PAID) {
+          return { ...order, status: ORDER_STATUS.ARCHIVED, archiveDate: archiveDateStr };
         }
         return order;
       });
@@ -1094,8 +1095,8 @@ export default function StatsMode({
     updateExpensesState(prev => {
       const list = Array.isArray(prev) ? prev : safeExpenses;
       return list.map(exp => {
-        if (exp && exp.status !== 'Arxiv') {
-          return { ...exp, status: 'Arxiv', archiveDate: archiveDateStr };
+        if (exp && exp.status !== ORDER_STATUS.ARCHIVED) {
+          return { ...exp, status: ORDER_STATUS.ARCHIVED, archiveDate: archiveDateStr };
         }
         return exp;
       });

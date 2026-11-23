@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
 
 export default function PrintReceiptModal({ 
   cafeName: cafeNameProp, 
@@ -157,7 +158,7 @@ export default function PrintReceiptModal({
   const waiterLabel = resolvedOrder.waiterName || resolvedOrder.waiter || 'Ofitsiant';
   const cashierLabel = resolvedOrder.cashierName || 'Kassir';
   const paymentMethodLabel = resolvedOrder.paymentMethod || 'Naqd';
-  const isDebtOrder = paymentMethodLabel === 'Qarz' || resolvedOrder.status === 'Qarz';
+  const isDebtOrder = paymentMethodLabel === PAYMENT_METHOD.DEBT || resolvedOrder.status === ORDER_STATUS.DEBT;
   const debtorPerson = resolvedOrder.debtorName || resolvedOrder.paymentDetails?.debtorName || '';
 
   const displayDateTime = (() => {

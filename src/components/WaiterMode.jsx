@@ -6,6 +6,7 @@ import WaiterCart from './WaiterCart';
 import WaiterActionModals from './WaiterActionModals';
 import { orderTotalsFields, getItemQty, getItemPrice } from '../utils/orderTotals';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
+import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -131,12 +132,14 @@ export default function WaiterMode({
 
   const resolvedCafeName = cafeNameProp || stickyCafeName || 'Premium Cafe';
 
-  // Buyurtmalarni ham App.jsx state'iga, ham localStorage'ga bir vaqtda yozish
+  // Buyurtmalarni FAQAT bitta joy orqali yozish (App.jsx bo'lsa o'sha, aks holda o'zining nusxasi).
+  // Ikkalasiga birdan yozilsa, yangilanish ikki marta qo'llanadi (masalan, buyurtma ikki marta qo'shiladi).
   const updateOrders = useCallback((updater) => {
     if (typeof setOrdersProp === 'function') {
       setOrdersProp(updater);
+    } else {
+      setStickyOrders(updater);
     }
-    setStickyOrders(updater);
   }, [setOrdersProp, setStickyOrders]);
 
   // 🕵️‍♂️ KAFOLATLANGAN AUDIT LOG YOZUVCHISI (App.jsx dan prop kelmasa ham 100% Tarixga yozadi!)
@@ -153,30 +156,11 @@ export default function WaiterMode({
       details
     };
 
+    // useSticky endi darhol va ishonchli yozadi: qo'shimcha to'g'ridan-to'g'ri yozuv kerak emas
     if (typeof addAuditLog === 'function') {
       addAuditLog(action, details);
     } else {
       setStickyAuditLogs(prev => [newEntry, ...(Array.isArray(prev) ? prev : [])]);
-    }
-
-    // LocalStorage'ga to'g'ridan-to'g'ri kafolatli yozish
-    try {
-      const raw = window.localStorage.getItem('pos_audit_logs');
-      const list = raw ? JSON.parse(raw) : [];
-      const isDuplicate =
-        Array.isArray(list) &&
-        list[0] &&
-        list[0].action === action &&
-        list[0].details === details &&
-        Date.now() - Number(String(list[0].id).split('_')[1] || 0) < 1500;
-
-      if (!isDuplicate) {
-        const nextList = [newEntry, ...(Array.isArray(list) ? list : [])];
-        window.localStorage.setItem('pos_audit_logs', JSON.stringify(nextList));
-        window.dispatchEvent(new Event('pos-sticky-update'));
-      }
-    } catch {
-      // ignore storage error
     }
   }, [addAuditLog, currentUser, setStickyAuditLogs]);
 
@@ -207,7 +191,7 @@ export default function WaiterMode({
 
   useEffect(() => {
     const readyOrCalledCount = safeOrders.filter(
-      o => o && (o.status === 'Tayyor' || o.hasCall)
+      o => o && (o.status === ORDER_STATUS.READY || o.hasCall)
     ).length;
 
     if (readyOrCalledCount > prevReadyCountRef.current) {
@@ -223,7 +207,7 @@ export default function WaiterMode({
         o =>
           o &&
           o.table === selectedTable &&
-          !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
+          !CLOSED_ORDER_STATUSES.includes(o.status)
       ) || null
     );
   }, [safeOrders, selectedTable]);
@@ -333,7 +317,7 @@ export default function WaiterMode({
       o =>
         o &&
         o.table === tableName &&
-        !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
+        !CLOSED_ORDER_STATUSES.includes(o.status)
     );
 
     if (existing && Array.isArray(existing.items)) {
@@ -672,7 +656,7 @@ export default function WaiterMode({
     // Buyurtma oshxonadan o'tib bo'lgan bo'lsa, avval yuborilgan porsiyalar tayyor hisoblanadi
     // (kitchenDoneQty maydoni yo'q eski buyurtmalar uchun)
     const orderPastKitchen = Boolean(
-      currentTableOrder && !['Yangi', 'Tayyorlanmoqda'].includes(currentTableOrder.status)
+      currentTableOrder && !KITCHEN_ORDER_STATUSES.includes(currentTableOrder.status)
     );
 
     const normalizedCart = cart.map((item, idx) => {
@@ -704,13 +688,13 @@ export default function WaiterMode({
           if (!o || String(o.id) !== String(currentTableOrder.id)) return o;
           // Dozakaz (B3): butun buyurtma emas, faqat yangi porsiyalar oshxonaga qaytadi.
           // Faqat izoh/miqdor kamaygan bo'lsa status o'zgarmaydi.
-          const isPastKitchen = !['Yangi', 'Tayyorlanmoqda'].includes(o.status);
+          const isPastKitchen = !KITCHEN_ORDER_STATUSES.includes(o.status);
           const backToKitchen = hasNewPortions && isPastKitchen;
           return {
             ...o,
             items: normalizedCart,
             ...orderTotalsFields(o, normalizedCart, feePct),
-            status: backToKitchen ? 'Yangi' : o.status,
+            status: backToKitchen ? ORDER_STATUS.NEW : o.status,
             kitchenRoundAt: backToKitchen ? nowMs : o.kitchenRoundAt
           };
         })
@@ -727,7 +711,7 @@ export default function WaiterMode({
         waiter: currentUser?.name || 'Ofitsiant',
         date: nowDate,
         time: nowTime,
-        status: 'Yangi',
+        status: ORDER_STATUS.NEW,
         items: normalizedCart,
         customerName: activeBooking?.customerName || '',
         customerPhone: activeBooking?.customerPhone || '',
@@ -760,7 +744,7 @@ export default function WaiterMode({
     updateOrders(prev =>
       (Array.isArray(prev) ? prev : []).map(o =>
         o && String(o.id) === String(currentTableOrder.id)
-          ? { ...o, status: 'Yetkazildi' }
+          ? { ...o, status: ORDER_STATUS.DELIVERED }
           : o
       )
     );
@@ -874,7 +858,7 @@ export default function WaiterMode({
     };
 
     const existingOrder = safeOrders.find(
-      o => o && o.table === tableName && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
+      o => o && o.table === tableName && !CLOSED_ORDER_STATUSES.includes(o.status)
     );
 
     if (existingOrder) {
@@ -893,7 +877,7 @@ export default function WaiterMode({
         waiter: currentUser?.name || 'Ofitsiant',
         date: new Date().toLocaleDateString(),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: 'Yetkazildi',
+        status: ORDER_STATUS.DELIVERED,
         items: [timerLineItem]
       };
       const newOrder = { ...baseOrder, ...orderTotalsFields(baseOrder, baseOrder.items, serviceFee) };
@@ -912,7 +896,7 @@ export default function WaiterMode({
   const freeTablesForAction = useMemo(() => {
     const busySet = new Set(
       safeOrders
-        .filter(o => o && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status))
+        .filter(o => o && !CLOSED_ORDER_STATUSES.includes(o.status))
         .map(o => o.table)
     );
     return safeTables.filter(t => t !== 'Olib ketish' && !busySet.has(t));

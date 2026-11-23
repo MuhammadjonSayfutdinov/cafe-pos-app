@@ -4,6 +4,7 @@ import CashierOrderList from './CashierOrderList';
 import CashierReceipt from './CashierReceipt';
 import CashierPaymentControls from './CashierPaymentControls';
 import { calcOrderTotals } from '../utils/orderTotals';
+import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
 
 // ==========================================
 // 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
@@ -261,20 +262,20 @@ export default function CashierMode({
   // ==========================================
   const activeOrders = useMemo(() => {
     return safeOrders.filter(
-      o => o && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
+      o => o && !CLOSED_ORDER_STATUSES.includes(o.status)
     );
   }, [safeOrders]);
 
   const debtOrders = useMemo(() => {
-    return safeOrders.filter(o => o && o.status === 'Qarz');
+    return safeOrders.filter(o => o && o.status === ORDER_STATUS.DEBT);
   }, [safeOrders]);
 
   const currentShiftPaidOrders = useMemo(() => {
-    return safeOrders.filter(o => o && o.status === "To'langan");
+    return safeOrders.filter(o => o && o.status === ORDER_STATUS.PAID);
   }, [safeOrders]);
 
   const currentShiftExpenses = useMemo(() => {
-    return safeExpenses.filter(e => e && e.status !== 'Arxiv');
+    return safeExpenses.filter(e => e && e.status !== ORDER_STATUS.ARCHIVED);
   }, [safeExpenses]);
 
   const cashDrawerSummary = useMemo(() => {
@@ -283,9 +284,9 @@ export default function CashierMode({
 
     currentShiftPaidOrders.forEach(order => {
       const finalAmt = Number(order.finalTotal ?? order.total ?? 0) || 0;
-      if (order.paymentMethod === 'Naqd') {
+      if (order.paymentMethod === PAYMENT_METHOD.CASH) {
         cashSalesIn += finalAmt;
-      } else if (order.paymentMethod === 'Aralash') {
+      } else if (order.paymentMethod === PAYMENT_METHOD.MIXED) {
         const cPart = Number(order.paymentDetails?.cashAmount ?? order.mixedDetails?.cash ?? 0) || 0;
         const kPart = Number(order.paymentDetails?.cardAmount ?? order.mixedDetails?.card ?? 0) || 0;
         cashSalesIn += cPart;
@@ -365,7 +366,7 @@ export default function CashierMode({
     const afterDiscountTotal = grossTotal - discountAmount;
 
     const customerAvailableBonus = Number(matchedCustomer?.bonusBalance || 0);
-    const maxUsableBonus = paymentMethod === 'Qarz'
+    const maxUsableBonus = paymentMethod === PAYMENT_METHOD.DEBT
       ? 0
       : Math.min(customerAvailableBonus, afterDiscountTotal);
 
@@ -382,7 +383,7 @@ export default function CashierMode({
 
     const tierInfo = getCustomerTierInfo(matchedCustomer?.totalSpent || 0);
     const hasCustomer = Boolean(matchedCustomer || customerPhone.trim().length >= 4);
-    const earnedCashback = (hasCustomer && paymentMethod !== 'Qarz' && finalTotal > 0)
+    const earnedCashback = (hasCustomer && paymentMethod !== PAYMENT_METHOD.DEBT && finalTotal > 0)
       ? Math.round((finalTotal * tierInfo.percent) / 100)
       : 0;
 
@@ -772,7 +773,7 @@ export default function CashierMode({
     let cashAmount = 0;
     let cardAmount = 0;
 
-    if (paymentMethod === 'Aralash') {
+    if (paymentMethod === PAYMENT_METHOD.MIXED) {
       cashAmount = Math.max(0, Number(mixedCash) || 0);
       cardAmount = Math.max(0, Number(mixedCard) || 0);
 
@@ -787,14 +788,14 @@ export default function CashierMode({
     const cleanDebtor = debtorName.trim();
     const cleanDebtorPhone = debtorPhone.trim();
     // Qarz uchun ism VA telefon majburiy (B8): kamida 9 ta raqam
-    if (paymentMethod === 'Qarz' && (!cleanDebtor || cleanPhoneDigits(cleanDebtorPhone).length < 9)) {
+    if (paymentMethod === PAYMENT_METHOD.DEBT && (!cleanDebtor || cleanPhoneDigits(cleanDebtorPhone).length < 9)) {
       alert("⛔️ Qarzga yozish uchun mijozning ismi va to'liq telefon raqamini (kamida 9 ta raqam) kiriting!");
       return;
     }
 
     const executeCloseOrder = () => {
       const closeTimeStr = new Date().toLocaleString();
-      const nextStatus = paymentMethod === 'Qarz' ? 'Qarz' : "To'langan";
+      const nextStatus = paymentMethod === PAYMENT_METHOD.DEBT ? ORDER_STATUS.DEBT : ORDER_STATUS.PAID;
 
       // CRM: Mijozning yangi bonus balansini yangilash yoki yangi mijoz yaratish
       let finalCustomerName = '';
@@ -813,7 +814,7 @@ export default function CashierMode({
               ? {
                   ...c,
                   bonusBalance: updatedCustomerBalance,
-                  totalSpent: (Number(c.totalSpent) || 0) + (paymentMethod === 'Qarz' ? 0 : totals.finalTotal),
+                  totalSpent: (Number(c.totalSpent) || 0) + (paymentMethod === PAYMENT_METHOD.DEBT ? 0 : totals.finalTotal),
                   visitsCount: (Number(c.visitsCount) || 0) + 1,
                   lastVisit: new Date().toLocaleDateString()
                 }
@@ -830,7 +831,7 @@ export default function CashierMode({
           name: finalCustomerName,
           phone: finalCustomerPhone,
           bonusBalance: updatedCustomerBalance,
-          totalSpent: paymentMethod === 'Qarz' ? 0 : totals.finalTotal,
+          totalSpent: paymentMethod === PAYMENT_METHOD.DEBT ? 0 : totals.finalTotal,
           visitsCount: 1,
           lastVisit: new Date().toLocaleDateString()
         };
@@ -839,12 +840,12 @@ export default function CashierMode({
       }
 
       const paymentDetails = {
-        cashAmount: paymentMethod === 'Naqd' ? totals.finalTotal : paymentMethod === 'Aralash' ? cashAmount : 0,
-        cardAmount: paymentMethod === 'Plastik' ? totals.finalTotal : paymentMethod === 'Aralash' ? cardAmount : 0,
-        paymeAmount: paymentMethod === 'Payme' ? totals.finalTotal : 0,
-        clickAmount: paymentMethod === 'Click' ? totals.finalTotal : 0,
-        debtorName: paymentMethod === 'Qarz' ? cleanDebtor : '',
-        debtorPhone: paymentMethod === 'Qarz' ? cleanDebtorPhone : ''
+        cashAmount: paymentMethod === PAYMENT_METHOD.CASH ? totals.finalTotal : paymentMethod === PAYMENT_METHOD.MIXED ? cashAmount : 0,
+        cardAmount: paymentMethod === PAYMENT_METHOD.CARD ? totals.finalTotal : paymentMethod === PAYMENT_METHOD.MIXED ? cardAmount : 0,
+        paymeAmount: paymentMethod === PAYMENT_METHOD.PAYME ? totals.finalTotal : 0,
+        clickAmount: paymentMethod === PAYMENT_METHOD.CLICK ? totals.finalTotal : 0,
+        debtorName: paymentMethod === PAYMENT_METHOD.DEBT ? cleanDebtor : '',
+        debtorPhone: paymentMethod === PAYMENT_METHOD.DEBT ? cleanDebtorPhone : ''
       };
 
       const closedOrderObject = {
@@ -867,8 +868,8 @@ export default function CashierMode({
         customerBonusBalance: updatedCustomerBalance,
         finalTotal: totals.finalTotal,
         total: totals.finalTotal,
-        debtorName: paymentMethod === 'Qarz' ? cleanDebtor : (selectedOrder.debtorName || ''),
-        debtorPhone: paymentMethod === 'Qarz' ? cleanDebtorPhone : (selectedOrder.debtorPhone || ''),
+        debtorName: paymentMethod === PAYMENT_METHOD.DEBT ? cleanDebtor : (selectedOrder.debtorName || ''),
+        debtorPhone: paymentMethod === PAYMENT_METHOD.DEBT ? cleanDebtorPhone : (selectedOrder.debtorPhone || ''),
         paymentDetails,
         cashierName: currentUser?.name || 'Kassir',
         closeTime: closeTimeStr,
@@ -890,7 +891,7 @@ export default function CashierMode({
       // 3) Audit Log
       if (typeof addAuditLog === 'function') {
         addAuditLog(
-          paymentMethod === 'Qarz' ? 'Chek qarzga yopildi' : "Chek to'landi",
+          paymentMethod === PAYMENT_METHOD.DEBT ? 'Chek qarzga yopildi' : "Chek to'landi",
           `${closedOrderObject.table}: ${totals.finalTotal.toLocaleString()} s (${paymentMethod})${
             totals.discountAmount > 0 ? ` • Chegirma: -${totals.discountAmount.toLocaleString()} s` : ''
           }`
@@ -915,7 +916,7 @@ export default function CashierMode({
       }
 
       // 5) Oddiy Telegram xabari
-      const isDebt = paymentMethod === 'Qarz';
+      const isDebt = paymentMethod === PAYMENT_METHOD.DEBT;
       const hasDiscount = totals.discountAmount > 0 || totals.usedBonusAmount > 0;
       const tgFlagKey = isDebt ? 'notifyOnDebt' : hasDiscount ? 'notifyOnDiscount' : 'notifyOnEverySale';
 
@@ -1000,7 +1001,7 @@ export default function CashierMode({
         o && String(o.id) === String(debtOrder.id)
           ? {
               ...o,
-              status: "To'langan",
+              status: ORDER_STATUS.PAID,
               paymentMethod: payMethod,
               wasDebt: true,
               debtPaidMethod: payMethod,
@@ -1009,10 +1010,10 @@ export default function CashierMode({
               debtPaidBy: currentUser?.name || 'Kassir',
               paymentDetails: {
                 ...(o.paymentDetails || {}),
-                cashAmount: payMethod === 'Naqd' ? debtAmount : 0,
-                cardAmount: payMethod === 'Plastik' ? debtAmount : 0,
-                clickAmount: payMethod === 'Click' ? debtAmount : 0,
-                paymeAmount: payMethod === 'Payme' ? debtAmount : 0
+                cashAmount: payMethod === PAYMENT_METHOD.CASH ? debtAmount : 0,
+                cardAmount: payMethod === PAYMENT_METHOD.CARD ? debtAmount : 0,
+                clickAmount: payMethod === PAYMENT_METHOD.CLICK ? debtAmount : 0,
+                paymeAmount: payMethod === PAYMENT_METHOD.PAYME ? debtAmount : 0
               }
             }
           : o

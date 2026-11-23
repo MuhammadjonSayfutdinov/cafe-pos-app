@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getRecordTimeMs } from '../utils/dates';
+import { ORDER_STATUS } from '../constants/orderStatus';
 
 // =========================================================
 // BUYURTMA VA XARAJAT SANASINI UNIVERSAL O'QISH YORDAMCHISI
@@ -138,7 +139,7 @@ export default function StatsWaiterPayroll({
     const sourceExpenses = Array.isArray(allExpenses) && allExpenses.length > 0 ? allExpenses : scopedExpenses;
 
     const matchingOrders = (Array.isArray(sourceOrders) ? sourceOrders : []).filter(o => {
-      if (!o || !["To'langan", 'Arxiv'].includes(o.status)) return false;
+      if (!o || ![ORDER_STATUS.PAID, ORDER_STATUS.ARCHIVED].includes(o.status)) return false;
       const t = parseRecordTimeMs(o);
       return t >= startMs && t <= endMs;
     });

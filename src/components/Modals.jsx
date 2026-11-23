@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { PAYMENT_METHOD } from '../constants/orderStatus';
 
 // =========================================================================
 // 1. STOL UCHUN QR-KOD GENERATSIYA VA CHOP ETISH OYNASI (TableQrModal)
@@ -420,7 +421,7 @@ export function ReceiptModal({
         {/* 5. TO'LOV SHAKLI */}
         <div className="text-right text-xs font-bold text-gray-500 mb-4 uppercase tracking-wider">
           <span>To'lov usuli: <strong className="text-gray-900">{paymentMethod}</strong></span>
-          {paymentMethod === 'Aralash' && (
+          {paymentMethod === PAYMENT_METHOD.MIXED && (
             <div className="mt-1 space-y-0.5 text-[11px]">
               {cashPaid > 0 && <span className="block text-gray-800">Naqd: {cashPaid.toLocaleString()} so'm</span>}
               {cardPaid > 0 && <span className="block text-gray-800">Terminal: {cardPaid.toLocaleString()} so'm</span>}

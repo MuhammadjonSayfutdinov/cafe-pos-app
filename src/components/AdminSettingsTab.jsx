@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 
 const DEFAULT_TELEGRAM_CONFIG = {
   enabled: false,
@@ -122,7 +123,7 @@ export default function AdminSettingsTab({
   const safeOrders = Array.isArray(orders) ? orders : [];
 
   const activeTableNames = safeOrders
-    .filter(o => o && !["To'langan", 'Qarz', 'Arxiv'].includes(o.status))
+    .filter(o => o && !CLOSED_ORDER_STATUSES.includes(o.status))
     .map(o => o.table);
 
   const handleSaveSettings = (e) => {
@@ -418,7 +419,7 @@ export default function AdminSettingsTab({
       if (window.confirm("⚠️ To'langan va arxivdagi cheklar tarixi o'chiriladi. Ochiq cheklar va qarzlar saqlanadi. Tasdiqlaysizmi?")) {
         if (typeof setOrders === 'function') {
           setOrders(prev => (Array.isArray(prev) ? prev : []).filter(
-            o => o && !["To'langan", 'Arxiv'].includes(o.status)
+            o => o && ![ORDER_STATUS.PAID, ORDER_STATUS.ARCHIVED].includes(o.status)
           ));
         }
         if (typeof addAuditLog === 'function') {

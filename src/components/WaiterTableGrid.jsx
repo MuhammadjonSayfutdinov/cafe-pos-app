@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 
 // =========================================================
 // SOATBAY TARIF SHABLONLARI (VIP-KABINA / PS5 / BILLIARD)
@@ -117,7 +118,7 @@ export default function WaiterTableGrid({
         o =>
           o &&
           o.table === tableName &&
-          !["To'langan", 'Qarz', 'Arxiv'].includes(o.status)
+          !CLOSED_ORDER_STATUSES.includes(o.status)
       );
 
       const reservation = safeReservations[tableName] || null;
@@ -255,13 +256,13 @@ export default function WaiterTableGrid({
 
   const getStatusBadgeStyle = (status) => {
     switch (status) {
-      case 'Yangi':
+      case ORDER_STATUS.NEW:
         return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300';
-      case 'Tayyorlanmoqda':
+      case ORDER_STATUS.COOKING:
         return 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300';
-      case 'Tayyor':
+      case ORDER_STATUS.READY:
         return 'bg-emerald-500 text-white animate-bounce shadow-md shadow-emerald-500/30';
-      case 'Yetkazildi':
+      case ORDER_STATUS.DELIVERED:
         return 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300';
       default:
         return 'bg-gray-100 text-gray-700';
@@ -399,7 +400,7 @@ export default function WaiterTableGrid({
                   <div className="flex items-center gap-1.5">
                     {isBusy && activeOrder?.status && (
                       <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase ${getStatusBadgeStyle(activeOrder.status)}`}>
-                        {activeOrder.status === 'Tayyor' ? '🔔 Tayyor!' : activeOrder.status}
+                        {activeOrder.status === ORDER_STATUS.READY ? '🔔 Tayyor!' : activeOrder.status}
                       </span>
                     )}
 

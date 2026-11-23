@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ORDER_STATUS } from '../constants/orderStatus';
 
 const DEBT_PAY_METHODS = ['Naqd', 'Plastik', 'Click', 'Payme'];
 
@@ -165,9 +166,9 @@ export default function CashierOrderList({
 
                     {order.status && (
                       <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                        order.status === 'Yetkazildi'
+                        order.status === ORDER_STATUS.DELIVERED
                           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                          : order.status === 'Tayyor'
+                          : order.status === ORDER_STATUS.READY
                           ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
                           : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
                       }`}>
