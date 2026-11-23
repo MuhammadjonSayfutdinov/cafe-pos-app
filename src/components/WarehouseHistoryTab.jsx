@@ -101,7 +101,13 @@ export default function WarehouseHistoryTab({
     let badgeStyle = 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300';
     let barColor = 'bg-orange-500';
 
-    if (typeLower.includes('tayyorlov') || typeLower.includes('zagatovka')) {
+    if (typeLower.includes('kamomad')) {
+      // To'lovda omborda masalliq yetmagan (CashierMode): qoldiq o'zgarmaydi, faqat qayd
+      category = 'reviziya';
+      badgeLabel = '⛔ Kamomad';
+      badgeStyle = 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
+      barColor = 'bg-red-600';
+    } else if (typeLower.includes('tayyorlov') || typeLower.includes('zagatovka')) {
       category = 'prep';
       badgeLabel = rawType;
       badgeStyle = 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';

@@ -527,6 +527,7 @@ export default function App() {
             currentUser={currentUser}
             waiterCanSeeSales={currentUser.role === 'admin' || currentUser.canSeeSales}
             serviceFee={serviceFee}
+            inventory={inventory}
             requireAdminOverride={requireAdminOverride}
             addAuditLog={addAuditLog}
           />
