@@ -28,6 +28,8 @@ bitta bazaga ulashni tushuntiradi. Sozlanmasa ham dastur avvalgidek bitta qurilm
 1. Chap menyudan **SQL Editor** → **New query**.
 2. Loyihadagi [`supabase/schema.sql`](supabase/schema.sql) faylini to'liq nusxalab joylang va **Run** bosing.
 3. "Success" chiqishi kerak. Faylni qayta ishga tushirish xavfsiz: mavjud ma'lumot o'chmaydi.
+4. Mijoz telefonidan QR-buyurtma uchun: yana **New query** oching, [`supabase/qr.sql`](supabase/qr.sql)
+   faylini joylab, **Run** bosing ("Success. No rows returned" chiqishi kerak).
 
 ## 3. Kafe hisobini yarating va ro'yxatdan o'tishni yoping (MUHIM)
 
@@ -79,11 +81,24 @@ Planshet va telefonlar dasturni oddiy havola orqali ochishi uchun:
 
 GitHub'ga yangi commit push qilinganda Vercel saytni avtomatik yangilaydi.
 
+## Mijoz telefonidan QR-buyurtma
+
+1. Ofitsiant ekranida stol kartochkasidagi 📱 tugmasi → QR kodni chop eting va stolga yopishtiring.
+   QR kod `https://sizning-sayt/?table=3-Stol` manzilini ochadi.
+2. Mijoz skanerlaydi → menyu ochiladi (kirish talab qilinmaydi) → savatga qo'shib "Buyurtmani tasdiqlash".
+3. Xodim ekranida "📱 QR-buyurtma: 3-Stol" chiqadi (ovozli signal bilan) → **Qabul qilish** yoki **Rad etish**.
+4. Mijoz "Buyurtmalarim" bo'limida holatni ko'radi: kutilmoqda → qabul qilindi / rad etildi.
+5. Mijoz "🔔 Ofitsiant" tugmasini bossa, xodim qurilmalarida chaqiruv chiqadi.
+
+Mijozga faqat sotuvdagi taomlar nomi va narxi ko'rinadi. Xodimlar, PIN kodlar, mijozlar ro'yxati va boshqa
+stollarning buyurtmalari ko'rinmaydi.
+
 ## 6. Pilot oldidan tekshiruv ro'yxati
 
 - [ ] Admin va barcha xodimlarning PIN kodlari almashtirilgan ("Xodimlar va Parollar")
 - [ ] Menyu, narxlar, stollar va kategoriyalar kiritilgan
 - [ ] Supabase'da ochiq ro'yxatdan o'tish o'chirilgan (3-qadam)
+- [ ] `supabase/qr.sql` ishga tushirilgan, QR stikerlar chop etilgan, telefondan sinov buyurtmasi berilgan
 - [ ] Har bir qurilma ulangan, sarlavhada `☁️ Bulut` belgisi ko'rinadi
 - [ ] Sinov: ofitsiant planshetidan buyurtma → oshxona ekranida chiqdi → kassada to'landi
 - [ ] Sinov: Wi-Fi o'chirildi → buyurtma berildi (`📴 Oflayn`) → Wi-Fi yoqildi → boshqa qurilmaga yetib keldi
@@ -91,8 +106,9 @@ GitHub'ga yangi commit push qilinganda Vercel saytni avtomatik yangilaydi.
 
 ## Cheklovlar (pilot versiyasi)
 
-- **Mijozning o'z telefonidan QR-menyu** orqali buyurtma hali ishlamaydi: mijoz telefoni kafe hisobiga
-  ulanmagan. Kafe qurilmasidagi QR-menyu rejimi ishlaydi. Alohida xavfsiz kirish nuqtasi kelgusi qadamda.
+- **QR-buyurtma ofitsiant tasdig'idan o'tadi.** Mijoz telefonidan kelgan buyurtma ofitsiant/kassir/admin
+  ekranida "📱 QR-buyurtma" bo'lib chiqadi va "Qabul qilish" bosilgandan keyingina oshxonaga tushadi.
+  Bitta stoldan daqiqasiga 3 tadan ortiq so'rov qabul qilinmaydi. Narx telefondan emas, serverdagi menyudan olinadi.
 - **PIN tekshiruvi qurilmada** bajariladi. Bulutdagi ma'lumot kafe hisobi bilan himoyalangan, lekin
   ulangan qurilmani qo'lga kiritgan odam ma'lumotlarni ko'ra oladi. Planshetlarni qulflab qo'ying.
 - **Shaxsiy ma'lumotlar:** O'zbekiston qonunchiligiga ko'ra fuqarolarning shaxsiy ma'lumotlari

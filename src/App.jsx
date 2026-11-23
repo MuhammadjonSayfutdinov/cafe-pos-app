@@ -18,6 +18,9 @@ import PrintReceiptModal from './components/PrintReceiptModal';
 import CustomerMode from './components/CustomerMode';
 import AutoLockControl from './components/AutoLockControl';
 import SyncStatusBadge from './components/SyncStatusBadge';
+import QrRequestsPanel from './components/QrRequestsPanel';
+import { callRpc } from './sync/engine';
+import { notify } from './utils/notify';
 import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from './constants/orderStatus';
 import { newId } from './utils/ids';
 
@@ -76,6 +79,7 @@ export default function App() {
   const [inventoryLogs, setInventoryLogs] = useSticky('pos_inv_logs', []);
   const [expenses, setExpenses] = useSticky('pos_expenses', []);
   const [customers, setCustomers] = useSticky('pos_customers', []);
+  const [qrRequests, setQrRequests] = useSticky('pos_qr_requests', []);
   
   // Xavfsizlik va Nazorat Statelari
   const [auditLogs, setAuditLogs] = useSticky('pos_audit_logs', []);
@@ -303,6 +307,37 @@ export default function App() {
   };
 
   // ==========================================
+  // 6. MIJOZ TELEFONIDAN QR-BUYURTMA SO'ROVLARI (supabase/qr.sql)
+  // ==========================================
+  // So'rov serverda atomik tarzda "olinadi": ikki xodim bir vaqtda bossa, buyurtma ikki marta tushmaydi
+  const handleQrRequest = async (req, status) => {
+    if (!req || req.status !== 'pending') return;
+    let res;
+    try {
+      res = await callRpc('qr_claim_request', { p_id: req.id, p_status: status, p_by: currentUser?.name || '' });
+    } catch (e) {
+      notify(`❌ So'rovni qayta ishlab bo'lmadi: ${e.message}`);
+      return;
+    }
+    if (!res?.ok) {
+      notify("⚠️ Bu so'rovni boshqa xodim allaqachon ko'rib chiqqan");
+      return;
+    }
+    const handledAt = Date.now();
+    // Bajarilgan eski so'rovlarni ro'yxatdan tozalaymiz (1 kundan eski)
+    setQrRequests(prev => (Array.isArray(prev) ? prev : [])
+      .map(r => (r && r.id === req.id ? { ...r, status, handledBy: currentUser?.name || '', handledAt } : r))
+      .filter(r => r && (r.status === 'pending' || handledAt - Number(r.createdAt || handledAt) < 86400000)));
+
+    if (status === 'accepted') {
+      handleOrderSubmit(req.table, Array.isArray(req.items) ? req.items : []);
+      notify(`✅ ${req.table}: QR-buyurtma oshxonaga yuborildi`);
+    } else {
+      addAuditLog("QR-buyurtma rad etildi", `${req.table}: ${(req.items || []).length} xil taom`);
+    }
+  };
+
+  // ==========================================
   // 7. OFITSIANT CHAQIRUVI (BELL / QO'NG'IROQCHA)
   // ==========================================
   const handleCallWaiter = (tableNameFromChild) => {
@@ -457,6 +492,15 @@ export default function App() {
 
       {/* --- ASOSIY ISHCHI MODULLAR --- */}
       <main className="p-3 md:p-5 max-w-[1600px] mx-auto">
+
+        {/* Mijoz telefonidan kelgan QR-buyurtmalar (ofitsiant, kassir, admin) */}
+        {['admin', 'waiter', 'cashier'].includes(currentUser.role) && (
+          <QrRequestsPanel
+            requests={qrRequests}
+            onAccept={(req) => handleQrRequest(req, 'accepted')}
+            onReject={(req) => handleQrRequest(req, 'rejected')}
+          />
+        )}
 
         {/* Standart admin PIN hali almashtirilmagan bo'lsa ogohlantirish (B6) */}
         {currentUser.role === 'admin' && String(

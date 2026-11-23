@@ -65,6 +65,11 @@ export function createSupabaseTransport({ url, anonKey }) {
       const [records, kv] = await Promise.all([fetchTable('pos_records', since), fetchTable('pos_kv', since)]);
       return { records, kv };
     },
+    async rpc(fn, args) {
+      const { data, error } = await client.rpc(fn, args);
+      if (error) throw new Error(error.message);
+      return data;
+    },
     pushRecords: (rows) => upsertChunks('pos_records', rows, 'collection,id'),
     pushKv: (rows) => upsertChunks('pos_kv', rows, 'key'),
     subscribe(onEvent, onStatus) {

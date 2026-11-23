@@ -37,6 +37,7 @@ export function createFakeTransport({ url }) {
       if (!res.ok) throw new Error(`Soxta server xatosi: ${res.status}`);
       return res.json();
     },
+    rpc: (fn, args) => post(`/rpc/${fn}`, args),
     pushRecords: (rows) => post('/records', rows),
     pushKv: (rows) => post('/kv', rows),
     subscribe(onEvent, onStatus) {

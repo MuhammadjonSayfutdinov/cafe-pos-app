@@ -508,3 +508,11 @@ export function syncNow() {
 }
 
 export const getDeviceId = () => deviceId;
+
+/** Server funksiyasini chaqirish (masalan, qr_claim_request). Sinxron o'chiq bo'lsa - xato. */
+export async function callRpc(fn, args) {
+  if (!transport || typeof transport.rpc !== 'function') {
+    throw new Error("Bulut sinxronlash ulanmagan");
+  }
+  return transport.rpc(fn, args);
+}

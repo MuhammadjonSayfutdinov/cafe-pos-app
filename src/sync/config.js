@@ -17,7 +17,8 @@ export const RECORD_COLLECTIONS = Object.freeze({
   pos_customers: 'prepend',
   pos_expenses: 'prepend',
   pos_audit_logs: 'prepend',
-  pos_calls: 'append'
+  pos_calls: 'append',
+  pos_qr_requests: 'prepend' // mijoz telefonidan QR-buyurtma so'rovlari (supabase/qr.sql)
 });
 
 export const KV_KEYS = Object.freeze([
