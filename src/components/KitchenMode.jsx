@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ORDER_STATUS } from '../constants/orderStatus';
+import { localWrite } from '../sync/engine';
 
 // =========================================================
 // STANDART SLA SOZLAMALARI (DAQIQALARDA)
@@ -26,6 +27,7 @@ const writeLocalJSON = (key, value) => {
   } catch {
     // ignore storage errors
   }
+  localWrite(key, value); // sinxronlanadigan kalit bo'lsa bulutga ham (pos_kds_* faqat qurilmada)
 };
 
 // =========================================================

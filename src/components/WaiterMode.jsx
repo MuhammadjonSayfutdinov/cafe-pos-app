@@ -9,6 +9,7 @@ import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../uti
 import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
+import { newId } from '../utils/ids';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -671,7 +672,7 @@ export default function WaiterMode({
       );
     } else {
       const baseOrder = {
-        id: String(nowMs),
+        id: newId(),
         createdAt: nowMs,
         table: selectedTable,
         waiter: currentUser?.name || 'Ofitsiant',
@@ -837,7 +838,7 @@ export default function WaiterMode({
       );
     } else {
       const baseOrder = {
-        id: Date.now().toString(),
+        id: newId(),
         createdAt: Date.now(),
         table: tableName,
         waiter: currentUser?.name || 'Ofitsiant',
@@ -921,7 +922,7 @@ export default function WaiterMode({
     const feePct = splitOrder.serviceFee ?? serviceFee;
     const splitBase = {
       ...splitOrder,
-      id: `${Date.now()}`,
+      id: newId(),
       table: splitTargetTable,
       items: movedItems,
       // Pre-chek eski chekka tegishli, yangi chekka o'tmaydi

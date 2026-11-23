@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { notify, confirmAsync } from '../utils/notify';
+import { newId } from '../utils/ids';
 
 export default function AdminEmployeesTab({ 
   users = [], 
@@ -157,7 +158,7 @@ export default function AdminEmployeesTab({
       }
     } else {
       const createdUser = { 
-        id: Date.now(), 
+        id: newId('emp_'), 
         ...newEmployeeData, 
         name: safeName, 
         pin: safePin,

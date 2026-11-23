@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getRecordTimeMs } from '../utils/dates';
 import { ORDER_STATUS } from '../constants/orderStatus';
+import { localWrite } from '../sync/engine';
 
 // =========================================================
 // BUYURTMA VA XARAJAT SANASINI UNIVERSAL O'QISH YORDAMCHISI
@@ -56,6 +57,7 @@ export default function StatsWaiterPayroll({
   useEffect(() => {
     try {
       window.localStorage.setItem('pos_waiter_payroll_rules', JSON.stringify(payrollRules));
+      localWrite('pos_waiter_payroll_rules', payrollRules);
     } catch {
       // ignore storage errors
     }

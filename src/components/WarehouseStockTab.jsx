@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { notify, confirmAsync } from '../utils/notify';
+import { newId } from '../utils/ids';
 
 // Ombor uchun tayyor toifalar ro'yxati
 const inventoryCategories = [
@@ -254,7 +255,7 @@ export default function WarehouseStockTab({
       }
     } else {
       const newItemObj = { 
-        id: Date.now().toString(), 
+        id: newId('inv_'), 
         name, 
         category, 
         unit: normUnit, 

@@ -7,6 +7,7 @@ import { calcOrderTotals } from '../utils/orderTotals';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
+import { newId } from '../utils/ids';
 
 // ==========================================
 // 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
@@ -502,7 +503,7 @@ export default function CashierMode({
     }
 
     const created = {
-      id: `cust_${Date.now()}`,
+      id: newId('cust_'),
       name: cleanName,
       phone: newCrmCustomer.phone.trim(),
       bonusBalance: initBonus,
@@ -800,7 +801,7 @@ export default function CashierMode({
         updatedCustomerBalance = totals.earnedCashback;
 
         const newCustomerRecord = {
-          id: `cust_${Date.now()}`,
+          id: newId('cust_'),
           name: finalCustomerName,
           phone: finalCustomerPhone,
           bonusBalance: updatedCustomerBalance,

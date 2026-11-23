@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { notify, confirmAsync } from '../utils/notify';
+import { newId } from '../utils/ids';
 
 export default function AdminAuditLogsTab({ 
   auditLogs = [],
@@ -151,7 +152,7 @@ export default function AdminAuditLogsTab({
     if (await confirmAsync("DIQQAT! Barcha harakatlar tarixini (Audit Logs) o'chirib tozalamoqchimisiz?")) {
       setAuditLogs([
         {
-          id: `${Date.now()}`,
+          id: newId('log_'),
           date: new Date().toLocaleString(),
           action: "Tarix tozalandi",
           details: "Admin tomonidan eski audit yozuvlari tozalandi",

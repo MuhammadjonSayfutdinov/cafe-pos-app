@@ -6,8 +6,9 @@
 
 import { getCreatedTimeMs } from './dates';
 import { notify } from './notify';
+import { RECORD_COLLECTIONS } from '../sync/config';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 const VERSION_KEY = 'pos_schema_version';
 
 // Ro'yxat bo'lishi shart bo'lgan kalitlar
@@ -102,6 +103,38 @@ function migrateToV2() {
   }
 }
 
+// v3: bulutga sinxronlash uchun har bir yozuvda yagona id bo'lishi shart
+function ensureRecordIds() {
+  Object.keys(RECORD_COLLECTIONS).forEach(key => {
+    const r = read(key);
+    if (!r.exists || !Array.isArray(r.value)) return;
+    const seen = new Set();
+    let changed = false;
+    const list = r.value
+      .map((item, idx) => {
+        // eski formatdagi chaqiruvlar oddiy matn bo'lishi mumkin: '3-Stol'
+        if (key === 'pos_calls' && typeof item === 'string') {
+          changed = true;
+          return { id: `call_${Date.now()}_${idx}`, table: item, time: '' };
+        }
+        return item;
+      })
+      .filter(isObj)
+      .map((item, idx) => {
+        let id = item.id === undefined || item.id === null || item.id === '' ? null : String(item.id);
+        if (!id || seen.has(id)) {
+          id = `${key.replace('pos_', '')}_${Date.now().toString(36)}_${idx}_${Math.random().toString(36).slice(2, 6)}`;
+          changed = true;
+          seen.add(id);
+          return { ...item, id };
+        }
+        seen.add(id);
+        return item;
+      });
+    if (changed || list.length !== r.value.length) write(key, list);
+  });
+}
+
 export function runMigrations() {
   try {
     const broken = quarantineBrokenKeys();
@@ -114,6 +147,7 @@ export function runMigrations() {
 
     const current = Number(window.localStorage.getItem(VERSION_KEY)) || 1;
     if (current < 2) migrateToV2();
+    if (current < 3) ensureRecordIds();
     if (current < SCHEMA_VERSION) window.localStorage.setItem(VERSION_KEY, String(SCHEMA_VERSION));
   } catch (error) {
     console.error("Migratsiyada xato (ilova davom etadi):", error);

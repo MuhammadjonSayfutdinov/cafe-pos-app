@@ -17,7 +17,9 @@ import StatsMode from './components/StatsMode';
 import PrintReceiptModal from './components/PrintReceiptModal';
 import CustomerMode from './components/CustomerMode';
 import AutoLockControl from './components/AutoLockControl';
+import SyncStatusBadge from './components/SyncStatusBadge';
 import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from './constants/orderStatus';
+import { newId } from './utils/ids';
 
 const initialMenuItems = [
   { 
@@ -284,7 +286,7 @@ export default function App() {
       }
 
       const newOrder = {
-        id: String(nowMs),
+        id: newId(),
         createdAt: nowMs,
         table: targetTable,
         waiter: currentUser?.name || 'QR-Menyu (Mijoz)',
@@ -318,7 +320,7 @@ export default function App() {
       return [
         ...safePrev,
         {
-          id: Date.now(),
+          id: newId('call_'),
           table: targetTable,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
@@ -426,6 +428,8 @@ export default function App() {
 
         {/* O'ng taraf: Avto-Qulf sozlamasi (Telefon/Kompyuter uslubida), Tungi rejim va Chiqish */}
         <div className="flex items-center gap-2">
+          <SyncStatusBadge />
+
           <AutoLockControl
             currentUser={currentUser}
             users={users}

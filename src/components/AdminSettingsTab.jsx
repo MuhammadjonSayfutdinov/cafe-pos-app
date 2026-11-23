@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 import { detectTelegramChatId, sendTelegramMessage, escapeHtml, getTelegramConfig, DEFAULT_TELEGRAM_CONFIG } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
+import { localWrite } from '../sync/engine';
+import AdminSyncSection from './AdminSyncSection';
 
 // Telegram sozlamalari: yagona joy - src/utils/telegramNotifier.js (B12)
 const readTelegramConfig = getTelegramConfig;
@@ -97,6 +99,7 @@ export default function AdminSettingsTab({
   useEffect(() => {
     try {
       window.localStorage.setItem('pos_telegram_config', JSON.stringify(telegramConfig));
+      localWrite('pos_telegram_config', telegramConfig);
     } catch {
       // ignore storage error
     }
@@ -674,6 +677,9 @@ export default function AdminSettingsTab({
           </div>
         </div>
       )}
+
+      {/* BULUT SINXRONLASH */}
+      <AdminSyncSection />
 
       {/* 4-BLOK: BACKUP & RESTORE */}
       <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 shadow-xs border border-gray-100 dark:border-gray-700 space-y-5">
