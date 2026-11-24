@@ -3,6 +3,72 @@
 /* Tungi rejim: <html class="dark"> (App.jsx da yoqiladi) */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ==========================================================================
+   DIZAYN TOKENLARI (zamonaviy restoran uslubi: to'q zinc fon + amber urg'u)
+   Ranglarni faqat shu yerda o'zgartiring - butun dastur (xodimlar ekranlari va
+   mijoz QR-menyusi) birdaniga yangilanadi.
+   ========================================================================== */
+
+/* Geist shrifti (SIL OFL 1.1, public/fonts/Geist-LICENSE.txt). Qurilmada saqlanadi:
+   internetsiz ham ishlaydi (service worker public/ fayllarini keshlaydi). */
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* font-black (900) Geist'da juda qalin: 800 bilan zamonaviyroq ko'rinadi */
+  --font-weight-black: 800;
+
+  /* BRAND - asosiy urg'u rang (tugmalar, faol tab, logotip). Hozir: amber.
+     Kodda: bg-brand-600, text-brand-500, border-brand-500 ... */
+  --color-brand-50: oklch(98.7% 0.022 95.277);
+  --color-brand-100: oklch(96.2% 0.059 95.617);
+  --color-brand-200: oklch(92.4% 0.12 95.746);
+  --color-brand-300: oklch(87.9% 0.169 91.605);
+  --color-brand-400: oklch(82.8% 0.189 84.429);
+  --color-brand-500: oklch(76.9% 0.188 70.08);
+  --color-brand-600: oklch(66.6% 0.179 58.318);
+  --color-brand-700: oklch(55.5% 0.163 48.998);
+  --color-brand-800: oklch(47.3% 0.137 46.201);
+  --color-brand-900: oklch(41.4% 0.112 45.904);
+  --color-brand-950: oklch(27.9% 0.077 45.635);
+
+  /* NEYTRAL ranglar: gray-* klasslari ko'kimtir emas, neytral "zinc" tusida chiqadi.
+     Tungi rejimda fon chuqurroq: gray-900 = sahifa (#09090b), gray-800 = karta (#18181b),
+     gray-700 = chegara/maydon (#27272a). */
+  --color-gray-50: oklch(98.5% 0 0);
+  --color-gray-100: oklch(96.7% 0.001 286.375);
+  --color-gray-200: oklch(92% 0.004 286.32);
+  --color-gray-300: oklch(87.1% 0.006 286.286);
+  --color-gray-400: oklch(70.5% 0.015 286.067);
+  --color-gray-500: oklch(55.2% 0.016 285.938);
+  --color-gray-600: oklch(44.2% 0.017 285.786);
+  --color-gray-700: oklch(27.4% 0.006 286.033);
+  --color-gray-800: oklch(21% 0.006 285.885);
+  --color-gray-900: oklch(14.1% 0.005 285.823);
+  --color-gray-950: oklch(10.5% 0.004 285.8);
+
+  /* Modal va bo'limlar uchun yumshoq paydo bo'lish (kodda: animate-fade-in, animate-fade-in-up) */
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-fade-in-up: fade-in-up 0.5s ease-out both;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
 /* Tailwind 3 (CDN) bilan bir xil ko'rinish uchun moslik qoidalari */
 @layer base {
   *,
@@ -22,11 +88,30 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+
+  /* Tungi rejimda brauzerning o'z elementlari (select, sana, scrollbar) ham to'q bo'ladi */
+  .dark {
+    color-scheme: dark;
+    scrollbar-color: var(--color-gray-700) transparent;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-brand-500) 35%, transparent);
+  }
 }
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-gray-100);
+}
+
+/* Tungi rejimda sahifa cheti (telefonda "tortib" qaralganda) oq bo'lib qolmasin */
+html.dark body,
+body:has(.dark) {
+  background-color: var(--color-gray-900);
 }
 
 /* Scrollbarni yashirish */

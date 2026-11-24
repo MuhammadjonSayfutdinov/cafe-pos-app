@@ -1065,7 +1065,7 @@ export default function StatsMode({
           <button
             type="button"
             onClick={() => handleOpenReceiptsExplorer('paid')}
-            className="px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-md shadow-indigo-600/25 transition active:scale-95 whitespace-nowrap flex items-center gap-1.5"
+            className="px-4 py-2.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-black text-xs shadow-md shadow-brand-600/25 transition active:scale-95 whitespace-nowrap flex items-center gap-1.5"
           >
             <span>🧾</span> Cheklarni ko'rish ({completedOrders.length})
           </button>
@@ -1096,7 +1096,7 @@ export default function StatsMode({
               }}
               className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl font-black text-xs transition ${
                 viewScope === 'current' && periodPreset === 'shift_all'
-                  ? 'bg-indigo-600 text-white shadow-xs'
+                  ? 'bg-brand-600 text-white shadow-xs'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800'
               }`}
             >
@@ -1111,7 +1111,7 @@ export default function StatsMode({
               }}
               className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl font-black text-xs transition ${
                 viewScope === 'archived' && periodPreset === 'shift_all'
-                  ? 'bg-indigo-600 text-white shadow-xs'
+                  ? 'bg-brand-600 text-white shadow-xs'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800'
               }`}
             >
@@ -1126,7 +1126,7 @@ export default function StatsMode({
               }}
               className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl font-black text-xs transition ${
                 viewScope === 'all' && periodPreset === 'shift_all'
-                  ? 'bg-indigo-600 text-white shadow-xs'
+                  ? 'bg-brand-600 text-white shadow-xs'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800'
               }`}
             >
@@ -1137,18 +1137,18 @@ export default function StatsMode({
       </div>
 
       {/* TELEFON "MB SARFI / TRAFIK LIMITI" USLUBIDAGI SANALAR ORALIG'I FILTRI VA DAROMAD GRAFIGI */}
-      <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-xs border-2 border-indigo-100 dark:border-indigo-900/40 space-y-5">
+      <div className="bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-xs border-2 border-brand-100 dark:border-brand-900/40 space-y-5">
         
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl font-black">
+            <span className="w-10 h-10 rounded-2xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xl font-black">
               📅
             </span>
             <div>
               <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-white leading-tight">
                 Davr va Sanalar Oralig'i Bo'yicha Daromad Filtr-Limiti
               </h3>
-              <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+              <p className="text-xs font-bold text-brand-600 dark:text-brand-400">
                 Faol davr: {activeDateRange.label} • {totalOrdersCount} ta chek • Tushum: {totalRevenue.toLocaleString()} so'm
               </p>
             </div>
@@ -1170,7 +1170,7 @@ export default function StatsMode({
                 onClick={() => setPeriodPreset(tab.id)}
                 className={`px-3.5 py-2 rounded-xl text-xs font-black transition active:scale-95 ${
                   periodPreset === tab.id
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+                    ? 'bg-brand-600 text-white shadow-md shadow-brand-600/25'
                     : 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
                 }`}
               >
@@ -1192,7 +1192,7 @@ export default function StatsMode({
                 setStartDate(e.target.value);
                 setPeriodPreset('custom');
               }}
-              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
             />
           </div>
 
@@ -1207,7 +1207,7 @@ export default function StatsMode({
                 setEndDate(e.target.value);
                 setPeriodPreset('custom');
               }}
-              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
             />
           </div>
 
@@ -1219,7 +1219,7 @@ export default function StatsMode({
               type="month"
               value={selectedMonthPicker}
               onChange={e => handleMonthPickerChange(e.target.value)}
-              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+              className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
             />
           </div>
 
@@ -1235,9 +1235,9 @@ export default function StatsMode({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/30 border border-indigo-200/70 dark:border-indigo-800/50 space-y-2.5">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-brand-50 to-orange-50 dark:from-brand-950/40 dark:to-orange-950/30 border border-brand-200/70 dark:border-brand-800/50 space-y-2.5">
             <div className="flex justify-between items-center">
-              <span className="text-[11px] font-black uppercase text-indigo-700 dark:text-indigo-300">
+              <span className="text-[11px] font-black uppercase text-brand-700 dark:text-brand-300">
                 🎯 Maqsadli Daromad Plani (Limit)
               </span>
               <button
@@ -1246,7 +1246,7 @@ export default function StatsMode({
                   setTempTargetInput(String(revenueTargetLimit));
                   setIsEditingTarget(prev => !prev);
                 }}
-                className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 hover:underline"
+                className="text-[11px] font-black text-brand-600 dark:text-brand-400 hover:underline"
               >
                 ✏️ Planni o'zgartirish
               </button>
@@ -1260,7 +1260,7 @@ export default function StatsMode({
                   step="100000"
                   value={tempTargetInput}
                   onChange={e => setTempTargetInput(e.target.value)}
-                  className="flex-1 p-2 rounded-lg bg-white dark:bg-gray-800 border border-indigo-300 text-xs font-black"
+                  className="flex-1 p-2 rounded-lg bg-white dark:bg-gray-800 border border-brand-300 text-xs font-black"
                 />
                 <button
                   type="button"
@@ -1269,7 +1269,7 @@ export default function StatsMode({
                     if (v > 0) setRevenueTargetLimit(v);
                     setIsEditingTarget(false);
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-black text-xs"
+                  className="px-3 py-1.5 rounded-lg bg-brand-600 text-white font-black text-xs"
                 >
                   Saqlash
                 </button>
@@ -1287,14 +1287,14 @@ export default function StatsMode({
 
             <div className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden p-0.5">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 transition-all duration-500"
+                className="h-full rounded-full bg-gradient-to-r from-brand-500 via-orange-500 to-emerald-500 transition-all duration-500"
                 style={{ width: `${Math.max(3, targetProgressPct)}%` }}
               />
             </div>
 
             <div className="flex justify-between text-[11px] font-bold text-gray-500">
               <span>Sof foyda: <strong className="text-emerald-600">+{totalNetProfit.toLocaleString()} s</strong></span>
-              <span>Cheklar: <strong className="text-indigo-600">{totalOrdersCount} ta</strong></span>
+              <span>Cheklar: <strong className="text-brand-600">{totalOrdersCount} ta</strong></span>
             </div>
           </div>
 
@@ -1327,14 +1327,14 @@ export default function StatsMode({
                       className="flex-1 min-w-[54px] flex flex-col items-center justify-end h-full cursor-pointer group"
                       title={`${dayItem.dateKey}: ${dayItem.revenue.toLocaleString()} so'm (${dayItem.count} ta chek)`}
                     >
-                      <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 mb-1 opacity-85 group-hover:scale-110 transition">
+                      <span className="text-[9px] font-black text-brand-600 dark:text-brand-400 mb-1 opacity-85 group-hover:scale-110 transition">
                         {dayItem.revenue >= 1000000
                           ? `${(dayItem.revenue / 1000000).toFixed(1)}M`
                           : `${Math.round(dayItem.revenue / 1000)}k`}
                       </span>
                       <div className="w-full max-w-[34px] bg-gray-200 dark:bg-gray-700 rounded-t-xl h-16 flex items-end overflow-hidden">
                         <div
-                          className="w-full bg-indigo-600 group-hover:bg-amber-500 rounded-t-xl transition-all duration-300"
+                          className="w-full bg-brand-600 group-hover:bg-brand-400 rounded-t-xl transition-all duration-300"
                           style={{ height: `${heightPct}%` }}
                         />
                       </div>
@@ -1352,11 +1352,11 @@ export default function StatsMode({
 
       {/* ZALDAGI OCHIQ STOLLAR, NASIYALAR VA SEYF NAQD PUL BALANSI SATRI */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-indigo-50/80 dark:bg-indigo-900/20 px-5 py-4 rounded-2xl border border-indigo-200 dark:border-indigo-800/50 flex justify-between items-center">
+        <div className="bg-brand-50/80 dark:bg-brand-900/20 px-5 py-4 rounded-2xl border border-brand-200 dark:border-brand-800/50 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <span className="text-2xl">🔒</span>
             <div>
-              <p className="text-xs font-black uppercase text-indigo-600 dark:text-indigo-400">
+              <p className="text-xs font-black uppercase text-brand-600 dark:text-brand-400">
                 Seyfda Qolishi Shart Naqd Pul
               </p>
               <p className="text-[11px] font-bold text-gray-500">
@@ -1364,7 +1364,7 @@ export default function StatsMode({
               </p>
             </div>
           </div>
-          <span className="text-lg font-black text-indigo-700 dark:text-indigo-300">
+          <span className="text-lg font-black text-brand-700 dark:text-brand-300">
             {expectedCashInDrawer.toLocaleString()} s
           </span>
         </div>
@@ -1444,7 +1444,7 @@ export default function StatsMode({
                 Ofitsiantlar Ulushi va Oylik Maosh Hisoblagichi (HR Payroll)
               </h3>
               <p className="text-xs font-bold text-gray-500 mt-0.5">
-                Hisob davri: <strong className="text-indigo-600 dark:text-indigo-400">{payrollPeriodLabel}</strong> • Xizmat haqidan ulush, oklad, bonus va kassa avanslari
+                Hisob davri: <strong className="text-brand-600 dark:text-brand-400">{payrollPeriodLabel}</strong> • Xizmat haqidan ulush, oklad, bonus va kassa avanslari
               </p>
             </div>
           </div>
@@ -1515,7 +1515,7 @@ export default function StatsMode({
                   onClick={() => setPayrollDateMode(tab.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${
                     payrollDateMode === tab.id
-                      ? 'bg-indigo-600 text-white shadow-xs'
+                      ? 'bg-brand-600 text-white shadow-xs'
                       : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
                   }`}
                 >
@@ -1568,7 +1568,7 @@ export default function StatsMode({
             <span className="text-[10px] font-black uppercase text-gray-400 block">
               👨‍🍳 Ofitsiantlar Xizmat Ulushi
             </span>
-            <span className="text-base sm:text-lg font-black text-indigo-600 dark:text-indigo-400">
+            <span className="text-base sm:text-lg font-black text-brand-600 dark:text-brand-400">
               +{payrollTotalsSummary.totalWaiterServiceShare.toLocaleString()} s
             </span>
           </div>
@@ -1631,7 +1631,7 @@ export default function StatsMode({
                             #{index + 1}
                           </span>
                           <div>
-                            <p className="font-black text-gray-900 dark:text-white text-sm sm:text-base group-hover:text-indigo-600 transition">
+                            <p className="font-black text-gray-900 dark:text-white text-sm sm:text-base group-hover:text-brand-600 transition">
                               {row.waiterName}
                             </p>
                             <span className="text-[10px] font-bold text-gray-400">
@@ -1666,7 +1666,7 @@ export default function StatsMode({
                       </td>
 
                       <td className="p-4">
-                        <span className="font-black text-indigo-600 dark:text-indigo-400 block">
+                        <span className="font-black text-brand-600 dark:text-brand-400 block">
                           +{row.serviceShareEarned.toLocaleString()} s
                         </span>
                         <span className="text-[10px] text-gray-400">
@@ -1723,7 +1723,7 @@ export default function StatsMode({
                           <button
                             type="button"
                             onClick={() => handleOpenEditWaiterRule(row)}
-                            className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 font-black text-xs transition"
+                            className="px-3 py-1.5 rounded-xl bg-brand-50 dark:bg-brand-900/40 hover:bg-brand-100 text-brand-600 dark:text-brand-300 font-black text-xs transition"
                           >
                             ⚙️ Stavka
                           </button>
@@ -1767,7 +1767,7 @@ export default function StatsMode({
             <span className="px-3 py-1.5 rounded-xl bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300">
               📉 Xarajatlar: -{expenseMetrics.operationalExpenses.toLocaleString()} s
             </span>
-            <span className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300">
+            <span className="px-3 py-1.5 rounded-xl bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-300">
               🏦 Inkassatsiya: {expenseMetrics.inkassatsiyaAmount.toLocaleString()} s
             </span>
           </div>
@@ -1994,7 +1994,7 @@ export default function StatsMode({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-lg shadow-indigo-600/30 transition active:scale-95"
+                  className="flex-1 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-black text-xs shadow-lg shadow-brand-600/30 transition active:scale-95"
                 >
                   💾 Stavkani Saqlash
                 </button>
@@ -2021,7 +2021,7 @@ export default function StatsMode({
                 <h3 className="font-black text-xl text-gray-900 dark:text-white">
                   👨‍🍳 {inspectingWaiterRow.waiterName} — Yopilgan Cheklar Tarixi ({inspectingWaiterRow.ordersCount} ta)
                 </h3>
-                <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                <p className="text-xs font-bold text-brand-600 dark:text-brand-400 mt-0.5">
                   Davr: {payrollPeriodLabel} • Jami savdo: {inspectingWaiterRow.totalRevenue.toLocaleString()} s • Sof maosh: {inspectingWaiterRow.netPayableSalary.toLocaleString()} s
                 </p>
               </div>
@@ -2096,7 +2096,7 @@ export default function StatsMode({
                   <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
                     <span>🧾</span> Cheklar Arxivi va Ichki Ma'lumotlari
                   </h3>
-                  <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                  <p className="text-xs font-bold text-brand-600 dark:text-brand-400 mt-0.5">
                     Tanlangan davr: {activeDateRange.label} • Har bir chek ustiga bosib ichidagi taomlarni ko'ring
                   </p>
                 </div>
@@ -2125,7 +2125,7 @@ export default function StatsMode({
                       }}
                       className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${
                         receiptsModalCategory === cat.id
-                          ? 'bg-indigo-600 text-white shadow-xs'
+                          ? 'bg-brand-600 text-white shadow-xs'
                           : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
                       }`}
                     >
@@ -2140,7 +2140,7 @@ export default function StatsMode({
                     value={receiptSearchQuery}
                     onChange={e => setReceiptSearchQuery(e.target.value)}
                     placeholder="🔍 #Chek ID, Stol, Ofitsiant, Taom..."
-                    className="px-3.5 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500 w-full sm:w-56"
+                    className="px-3.5 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-brand-500 w-full sm:w-56"
                   />
 
                   <select
@@ -2182,8 +2182,8 @@ export default function StatsMode({
                         onClick={() => setSelectedDetailOrder(ord)}
                         className={`p-4 rounded-2xl border-2 cursor-pointer transition flex justify-between items-center gap-3 ${
                           isSelected
-                            ? 'bg-indigo-50/90 dark:bg-indigo-900/30 border-indigo-500 shadow-xs'
-                            : 'bg-gray-50 dark:bg-gray-900/50 border-gray-200/80 dark:border-gray-700 hover:border-indigo-300'
+                            ? 'bg-brand-50/90 dark:bg-brand-900/30 border-brand-500 shadow-xs'
+                            : 'bg-gray-50 dark:bg-gray-900/50 border-gray-200/80 dark:border-gray-700 hover:border-brand-300'
                         }`}
                       >
                         <div className="space-y-1 min-w-0">
@@ -2207,7 +2207,7 @@ export default function StatsMode({
                         </div>
 
                         <div className="text-right shrink-0">
-                          <span className="text-base sm:text-lg font-black text-indigo-600 dark:text-indigo-400 block">
+                          <span className="text-base sm:text-lg font-black text-brand-600 dark:text-brand-400 block">
                             {finalAmt.toLocaleString()} s
                           </span>
                           <span className="text-[10px] font-black text-gray-400">
@@ -2247,7 +2247,7 @@ export default function StatsMode({
                       <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-xs space-y-4">
                         <div className="flex justify-between items-start border-b border-dashed border-gray-200 dark:border-gray-700 pb-4">
                           <div>
-                            <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
+                            <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300">
                               Chek #{String(ord.id).slice(-4)} • {ord.status}
                             </span>
                             <h4 className="text-2xl font-black text-gray-900 dark:text-white mt-1.5">
@@ -2261,7 +2261,7 @@ export default function StatsMode({
                           <button
                             type="button"
                             onClick={() => setReprintOrderData(ord)}
-                            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-md transition active:scale-95 flex items-center gap-1.5"
+                            className="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-black text-xs shadow-md transition active:scale-95 flex items-center gap-1.5"
                           >
                             <span>🖨</span> Chop etish
                           </button>
@@ -2283,7 +2283,7 @@ export default function StatsMode({
                           {(ord.customerName || ord.debtorName) && (
                             <div className="col-span-2 pt-1 border-t border-gray-200 dark:border-gray-700">
                               <span className="text-gray-400 block text-[10px] uppercase">Mijoz:</span>
-                              <span className="font-black text-indigo-600 dark:text-indigo-400">
+                              <span className="font-black text-brand-600 dark:text-brand-400">
                                 {ord.customerName || ord.debtorName} {ord.customerPhone ? `(${ord.customerPhone})` : ''}
                               </span>
                             </div>
@@ -2341,7 +2341,7 @@ export default function StatsMode({
                             </div>
                           )}
                           {bonusUsed > 0 && (
-                            <div className="flex justify-between text-indigo-600">
+                            <div className="flex justify-between text-brand-600">
                               <span>Bonusdan qoplandi:</span>
                               <span className="font-black">-{bonusUsed.toLocaleString()} so'm</span>
                             </div>

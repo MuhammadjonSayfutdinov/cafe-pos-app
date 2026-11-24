@@ -75,7 +75,7 @@ export default function App() {
   // ==========================================
   const [cafeName, setCafeName] = useSticky('pos_cafe_name', 'Premium Cafe');
   const [serviceFee, setServiceFee] = useSticky('pos_service_fee', 10);
-  const [isDarkMode, setIsDarkMode] = useSticky('pos_theme', false);
+  const [isDarkMode, setIsDarkMode] = useSticky('pos_theme', true); // yangi qurilmada to'q (restoran uslubi)
   const [tables, setTables] = useSticky('pos_tables', initialTables);
   const [orders, setOrders] = useSticky('pos_orders', []);
   const [waiterCalls, setWaiterCalls] = useSticky('pos_calls', []);
@@ -500,24 +500,24 @@ export default function App() {
     }`}>
       
       {/* --- GLOBAL TOP NAVBAR --- */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 md:px-6 py-3 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-40 shadow-xs">
+      <header className="bg-white/85 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700/70 px-4 md:px-6 py-3 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-xl font-black shadow-md shadow-indigo-600/30">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center text-xl font-black shadow-lg shadow-brand-900/40">
             🍽️
           </div>
           <div>
-            <h1 className="font-black text-lg text-gray-900 dark:text-white leading-tight">
+            <h1 className="font-bold tracking-tight text-lg sm:text-xl text-gray-900 dark:text-white leading-tight">
               {cafeName}
             </h1>
-            <p className="text-xs font-bold text-gray-400">
-              {currentUser.name} • <span className="uppercase text-indigo-500">{getRoleMeta(currentUser.role).icon} {getUserTitle(currentUser)}</span>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+              {currentUser.name} • <span className="uppercase font-bold tracking-wide text-brand-600 dark:text-brand-500">{getRoleMeta(currentUser.role).icon} {getUserTitle(currentUser)}</span>
             </p>
           </div>
         </div>
 
         {/* Admin uchun barcha ekranlarni ko'rish va boshqarish tablari */}
         {currentUser.role === 'admin' && (
-          <nav className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-900/60 p-1.5 rounded-2xl overflow-x-auto hide-scrollbar">
+          <nav className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700/70 p-1 rounded-full overflow-x-auto hide-scrollbar">
             {[
               { id: 'admin', label: '⚙️ Boshqaruv' },
               { id: 'stats', label: '📊 Statistika' },
@@ -530,10 +530,10 @@ export default function App() {
               <button
                 key={tab.id}
                 onClick={() => setAdminActiveView(tab.id)}
-                className={`px-3.5 py-2 rounded-xl font-black text-xs whitespace-nowrap transition active:scale-95 ${
+                className={`px-4 py-2 rounded-full font-semibold text-xs whitespace-nowrap transition-all duration-300 active:scale-95 ${
                   adminActiveView === tab.id
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800'
+                    ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/40'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-white dark:hover:bg-gray-700'
                 }`}
               >
                 {tab.label}
@@ -556,7 +556,7 @@ export default function App() {
 
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
-            className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-lg transition active:scale-90"
+            className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-brand-500 flex items-center justify-center text-lg transition active:scale-90"
             title="Tungi / Kunduzgi rejim"
           >
             {isDarkMode ? '☀️' : '🌙'}
@@ -564,7 +564,7 @@ export default function App() {
 
           <button
             onClick={handleLogout}
-            className="bg-red-50 dark:bg-red-900/30 hover:bg-red-100 text-red-600 dark:text-red-400 font-black px-4 py-2 rounded-xl text-xs sm:text-sm transition active:scale-95"
+            className="bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 font-semibold px-4 py-2 rounded-full text-xs sm:text-sm transition active:scale-95"
           >
             Chiqish 🔒
           </button>
@@ -593,7 +593,7 @@ export default function App() {
 
         {/* Namuna PIN (777777, 1111, ...) hali almashtirilmagan bo'lsa ogohlantirish (B6) */}
         {staffWithSamplePin.length > 0 && (
-          <div className="mb-4 p-3 rounded-2xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs sm:text-sm font-black break-words">
+          <div className="mb-4 px-4 py-3 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 text-xs sm:text-sm font-semibold break-words">
             ⚠️ Namuna PIN kod bilan qolgan xodimlar: {staffWithSamplePin.map(u => String(u.name || '—')).join(', ')}.
             {' '}Boshqaruv → "Xodimlar va Parollar" bo'limida PIN kodlarni almashtiring yoki keraksiz xodimni o'chiring.
           </div>

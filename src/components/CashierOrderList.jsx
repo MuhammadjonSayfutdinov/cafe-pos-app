@@ -50,7 +50,7 @@ export default function CashierOrderList({
               onClick={() => typeof setActiveTab === 'function' && setActiveTab(tab.id)}
               className={`flex-1 px-3 py-2 rounded-xl font-black text-xs transition ${
                 activeTab === tab.id
-                  ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-300 shadow-xs'
+                  ? 'bg-white dark:bg-gray-800 text-brand-600 dark:text-brand-300 shadow-xs'
                   : 'text-gray-500 dark:text-gray-400'
               }`}
             >
@@ -152,14 +152,14 @@ export default function CashierOrderList({
                 onClick={() => typeof onSelectOrder === 'function' && onSelectOrder(order)}
                 className={`p-4 rounded-2xl border-2 cursor-pointer transition-all active:scale-95 flex justify-between items-center ${
                   isSelected 
-                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30' 
-                    : 'border-gray-100 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 bg-white dark:bg-gray-800'
+                    ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/30' 
+                    : 'border-gray-100 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600 bg-white dark:bg-gray-800'
                 }`}
               >
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className={`font-black text-lg ${
-                      isSelected ? 'text-indigo-700 dark:text-indigo-400' : 'text-gray-900 dark:text-white'
+                      isSelected ? 'text-brand-700 dark:text-brand-400' : 'text-gray-900 dark:text-white'
                     }`}>
                       {order.table || 'Stol'}
                     </h3>
@@ -222,7 +222,7 @@ export default function CashierOrderList({
                   )}
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xl transition-colors ${
                     isSelected 
-                      ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30' 
+                      ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30' 
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-400'
                   }`}>
                     →

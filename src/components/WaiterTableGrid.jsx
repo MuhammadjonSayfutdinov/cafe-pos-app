@@ -593,7 +593,7 @@ export default function WaiterTableGrid({
                           e.stopPropagation();
                           onOpenTransferModal(activeOrder);
                         }}
-                        className="flex-1 py-2 px-2 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-gray-700 dark:text-gray-200 font-black text-[11px] transition"
+                        className="flex-1 py-2 px-2 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-brand-100 dark:hover:bg-brand-900/40 text-gray-700 dark:text-gray-200 font-black text-[11px] transition"
                       >
                         🔄 Ko'chirish
                       </button>

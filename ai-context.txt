@@ -49,6 +49,13 @@ haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
     va dark: klasslari bilan kunduzgi/tungi rejimda ishlashi shart.
 12. alert/confirm/prompt o'rniga modal yoki bildirishnoma (toast) ishlating
     (yangi kodda).
+12a. Dizayn (zamonaviy restoran uslubi): ranglar src/index.css @theme da.
+    Asosiy urg'u rang - brand-* (hozir amber): tugma, faol tab, logotip uchun
+    bg-brand-600 / text-brand-500 yozing (indigo emas). gray-* klasslari neytral
+    zinc tusida chiqadi (tungi rejim: gray-900 sahifa, gray-800 karta, gray-700
+    chegara). indigo faqat holat/toifa rangi sifatida qolgan (oshxonada "Yangi",
+    "Plastik" to'lov, ofitsiant roli...) - amber bilan adashmasin.
+    Shrift: Geist (public/fonts, oflayn ishlaydi). Mijoz QR-menyusi doim to'q.
 13. Vazifa oxirida qisqa hisobot bering: o'zgargan fayllar, nima qilindi,
     qanday sinab ko'rish kerak.
 
@@ -60,7 +67,7 @@ tegayotganda kerakli funksiyani toping, butun faylni o'qimang.
 
 src/App.jsx (791)       Global state, routing, biznes-logika markazi
 src/main.jsx            React root
-src/index.css           Tailwind va scrollbar klasslari
+src/index.css           Tailwind, dizayn tokenlari (brand rangi, neytral gray, Geist shrift)
 src/hooks/useSticky.js  localStorage + oynalararo (tablararo) sinxron
 src/pwa/                register.js (service worker, oflayn kesh), update.js (yangi versiyaga
                         avtomatik o'tish; markUnsavedWork - yo'qolishi mumkin bo'lgan ish bor ekan kutadi)

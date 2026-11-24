@@ -271,7 +271,7 @@ export default function AdminCategoriesTab({
                     <button 
                       type="button"
                       onClick={() => handleOpenModal(originalIndex)} 
-                      className="px-3.5 py-2 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold text-xs transition"
+                      className="px-3.5 py-2 bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 text-brand-600 dark:text-brand-400 rounded-xl font-bold text-xs transition"
                     >
                       Tahrirlash
                     </button>

@@ -521,7 +521,7 @@ export default function AdminMenuTab({
                         <p className="font-black text-gray-900 dark:text-gray-100 text-base">
                           {item.name}
                         </p>
-                        <span className="inline-block mt-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2.5 py-0.5 rounded-md text-[11px] font-bold">
+                        <span className="inline-block mt-1 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 px-2.5 py-0.5 rounded-md text-[11px] font-bold">
                           {item.category}
                         </span>
                       </td>
@@ -599,7 +599,7 @@ export default function AdminMenuTab({
                         <button 
                           type="button"
                           onClick={() => handleOpenMenuModal(item)} 
-                          className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 rounded-lg font-bold text-xs transition"
+                          className="px-4 py-2 bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 text-brand-600 dark:text-brand-400 rounded-lg font-bold text-xs transition"
                         >
                           Tahrirlash
                         </button>
@@ -680,7 +680,7 @@ export default function AdminMenuTab({
                   <button
                     type="button"
                     onClick={handleAddVariantInput}
-                    className="text-[10px] font-black text-indigo-600 bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-300 px-2.5 py-1 rounded-lg uppercase hover:bg-indigo-200 transition"
+                    className="text-[10px] font-black text-brand-600 bg-brand-100 dark:bg-brand-900/40 dark:text-brand-300 px-2.5 py-1 rounded-lg uppercase hover:bg-brand-200 transition"
                   >
                     + Porsiya qo'shish
                   </button>
@@ -809,7 +809,7 @@ export default function AdminMenuTab({
                               <span className="text-gray-400">
                                 Ombordan yechiladi: {qtyInInvUnit} {selectedInv.unit}
                               </span>
-                              <span className="font-black text-indigo-600 dark:text-indigo-400">
+                              <span className="font-black text-brand-600 dark:text-brand-400">
                                 Tannarxi: {lineCost.toLocaleString()} so'm
                               </span>
                             </div>
@@ -847,7 +847,7 @@ export default function AdminMenuTab({
 
                   <div className="bg-white dark:bg-gray-800 p-2.5 rounded-xl border border-gray-100 dark:border-gray-700">
                     <span className="text-[10px] font-bold text-gray-400 uppercase block">Food Cost / Foyda</span>
-                    <span className="font-black text-xs text-indigo-600 dark:text-indigo-400">
+                    <span className="font-black text-xs text-brand-600 dark:text-brand-400">
                       {modalProfitAnalysis.foodCostPercent}% / {modalProfitAnalysis.marginPercent}%
                     </span>
                   </div>

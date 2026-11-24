@@ -165,7 +165,7 @@ export default function WaiterCart({
                     className={`px-2.5 py-1.5 rounded-xl font-black text-[11px] transition active:scale-95 flex items-center gap-1 border ${
                       isPreCheckLocked
                         ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 border-red-200 dark:border-red-800'
-                        : 'bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                        : 'bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 text-brand-600 dark:text-brand-300 border-brand-200 dark:border-brand-800'
                     }`}
                     title="Mijozga hisob (Pre-chek) chiqarish va chekni qulflash"
                   >
@@ -260,7 +260,7 @@ export default function WaiterCart({
                         {item.name}
                       </h4>
                       {sentQty > 0 ? (
-                        <span className="px-1.5 py-0.5 rounded-sm bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-black text-[9px] uppercase">
+                        <span className="px-1.5 py-0.5 rounded-sm bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 font-black text-[9px] uppercase">
                           🔒 Oshxonada: {sentQty}
                         </span>
                       ) : (
@@ -323,7 +323,7 @@ export default function WaiterCart({
                     <button
                       type="button"
                       onClick={() => setExpandedNoteId(isNoteOpen ? null : itemKey)}
-                      className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                      className="text-[11px] font-black text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
                     >
                       <span>📝</span>
                       <span>{item.note ? `Izoh: "${item.note}"` : "+ Oshpazga izoh qo'shish"}</span>
@@ -337,7 +337,7 @@ export default function WaiterCart({
                         value={item.note || ''}
                         onChange={e => updateNoteText(itemKey, e.target.value)}
                         placeholder="Masalan: Piyozsiz, kam tuzli..."
-                        className="w-full p-2 rounded-xl bg-white dark:bg-gray-800 border border-indigo-200 dark:border-gray-600 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+                        className="w-full p-2 rounded-xl bg-white dark:bg-gray-800 border border-brand-200 dark:border-gray-600 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
                       />
                       <div className="flex flex-wrap gap-1">
                         {QUICK_CHEF_NOTES.map(chip => (

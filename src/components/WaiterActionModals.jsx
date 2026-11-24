@@ -152,7 +152,7 @@ export default function WaiterActionModals({
                 required
                 value={targetTransferTable}
                 onChange={e => setTargetTransferTable(e.target.value)}
-                className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+                className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
               >
                 <option value="">-- Bo'sh stolni tanlang --</option>
                 {freeTablesForAction.map(t => (
@@ -169,7 +169,7 @@ export default function WaiterActionModals({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs"
+                  className="flex-1 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-black text-xs"
                 >
                   Ko'chirish ✓
                 </button>
@@ -249,7 +249,7 @@ export default function WaiterActionModals({
                               [idx]: Math.min(maxQ, chosenQ + 1)
                             }))
                           }
-                          className="w-7 h-7 rounded-lg bg-indigo-600 text-white font-black"
+                          className="w-7 h-7 rounded-lg bg-brand-600 text-white font-black"
                         >
                           +
                         </button>

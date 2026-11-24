@@ -177,7 +177,7 @@ export default function WaiterMenu({
                   )}
 
                   <div className="pr-12">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-0.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-brand-600 dark:text-brand-400 block mb-0.5">
                       {dish.category}
                     </span>
                     <h4 className="font-black text-sm sm:text-base text-gray-900 dark:text-white leading-snug">

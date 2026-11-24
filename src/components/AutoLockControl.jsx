@@ -353,7 +353,7 @@ export default function AutoLockControl({
           onClick={() => setIsMenuOpen(prev => !prev)}
           className={`px-3 py-2 rounded-xl font-black text-xs transition flex items-center gap-1.5 border ${
             activeTimeoutSeconds > 0
-              ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/60 hover:bg-indigo-100'
+              ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-800/60 hover:bg-brand-100'
               : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-200'
           }`}
           title="Avtomatik ekran qulflanish vaqtini sozlash"
@@ -422,7 +422,7 @@ export default function AutoLockControl({
                     onClick={() => handleSelectTimeout(opt.seconds)}
                     className={`py-2 px-2.5 rounded-xl font-black text-xs text-left transition flex items-center justify-between ${
                       isSelected
-                        ? 'bg-indigo-600 text-white shadow-xs'
+                        ? 'bg-brand-600 text-white shadow-xs'
                         : 'bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700'
                     } ${opt.seconds === 0 ? 'col-span-2 justify-center text-center' : ''}`}
                   >

@@ -207,7 +207,7 @@ export default function AdminDashboard({
             onClick={() => setPeriodFilter('today')}
             className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-black transition ${
               periodFilter === 'today'
-                ? 'bg-indigo-600 text-white shadow-xs'
+                ? 'bg-brand-600 text-white shadow-xs'
                 : 'text-gray-600 dark:text-gray-400'
             }`}
           >
@@ -218,7 +218,7 @@ export default function AdminDashboard({
             onClick={() => setPeriodFilter('all')}
             className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-black transition ${
               periodFilter === 'all'
-                ? 'bg-indigo-600 text-white shadow-xs'
+                ? 'bg-brand-600 text-white shadow-xs'
                 : 'text-gray-600 dark:text-gray-400'
             }`}
           >
@@ -241,14 +241,14 @@ export default function AdminDashboard({
           </p>
         </div>
         
-        <div className="bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-3xl border border-indigo-100 dark:border-indigo-800/50 shadow-xs">
-          <p className="text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase tracking-wider mb-1">
+        <div className="bg-brand-50 dark:bg-brand-900/20 p-6 rounded-3xl border border-brand-100 dark:border-brand-800/50 shadow-xs">
+          <p className="text-brand-600 dark:text-brand-400 text-xs font-black uppercase tracking-wider mb-1">
             🧾 Yopilgan Cheklar
           </p>
           <h2 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">
             {totalOrdersCount} <span className="text-base">ta</span>
           </h2>
-          <p className="text-[11px] font-bold text-indigo-700/70 dark:text-indigo-300/70 mt-2">
+          <p className="text-[11px] font-bold text-brand-700/70 dark:text-brand-300/70 mt-2">
             Hozir zalda faol: {activeOpenOrders.length} ta stol
           </p>
         </div>
@@ -283,7 +283,7 @@ export default function AdminDashboard({
         <div className="bg-gray-50 dark:bg-gray-900/40 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div>
             <p className="text-[11px] font-black uppercase text-gray-400">🍽️ Hozir stollardagi ochiq cheklar</p>
-            <p className="text-lg font-black text-indigo-600 dark:text-indigo-400 mt-0.5">
+            <p className="text-lg font-black text-brand-600 dark:text-brand-400 mt-0.5">
               {activeTablesRevenue.toLocaleString()} so'm ({activeOpenOrders.length} ta stol)
             </p>
           </div>
@@ -348,14 +348,14 @@ export default function AdminDashboard({
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-3xl shadow-md text-white flex flex-col justify-center items-center text-center">
-          <p className="text-indigo-100 text-xs font-black uppercase tracking-wider mb-2">
+        <div className="bg-gradient-to-br from-brand-500 to-brand-700 p-6 rounded-3xl shadow-md text-white flex flex-col justify-center items-center text-center">
+          <p className="text-brand-100 text-xs font-black uppercase tracking-wider mb-2">
             📈 O'rtacha Chek Summasi
           </p>
           <h2 className="text-3xl sm:text-4xl font-black">
             {averageReceipt.toLocaleString()} s
           </h2>
-          <p className="text-xs font-bold text-indigo-100/80 mt-2">
+          <p className="text-xs font-bold text-brand-100/80 mt-2">
             Har bir stolning o'rtacha xarajati
           </p>
         </div>
@@ -393,7 +393,7 @@ export default function AdminDashboard({
                     </span>
                   </div>
                   <div className="text-right">
-                    <p className="font-black text-sm text-indigo-600 dark:text-indigo-400">
+                    <p className="font-black text-sm text-brand-600 dark:text-brand-400">
                       {stats.count} porsiya
                     </p>
                     <p className="text-[11px] font-bold text-gray-500">

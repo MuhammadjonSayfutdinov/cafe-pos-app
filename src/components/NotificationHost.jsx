@@ -86,7 +86,7 @@ export default function NotificationHost() {
                 autoFocus
                 onClick={() => resolveConfirm(activeConfirm.id, true)}
                 className={`px-5 py-2.5 rounded-xl text-white font-black text-sm transition active:scale-95 ${
-                  activeConfirm.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                  activeConfirm.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-brand-600 hover:bg-brand-700'
                 }`}
               >
                 {activeConfirm.confirmText}

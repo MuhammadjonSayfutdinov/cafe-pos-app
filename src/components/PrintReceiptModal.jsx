@@ -290,7 +290,7 @@ export default function PrintReceiptModal({
               type="button"
               onClick={() => setPaperSize('80mm')}
               className={`px-2.5 py-1 rounded-lg text-xs font-black transition ${
-                paperSize === '80mm' ? 'bg-indigo-600 text-white shadow-xs' : 'text-gray-600'
+                paperSize === '80mm' ? 'bg-brand-600 text-white shadow-xs' : 'text-gray-600'
               }`}
             >
               🖨 80mm
@@ -299,7 +299,7 @@ export default function PrintReceiptModal({
               type="button"
               onClick={() => setPaperSize('58mm')}
               className={`px-2.5 py-1 rounded-lg text-xs font-black transition ${
-                paperSize === '58mm' ? 'bg-indigo-600 text-white shadow-xs' : 'text-gray-600'
+                paperSize === '58mm' ? 'bg-brand-600 text-white shadow-xs' : 'text-gray-600'
               }`}
             >
               🧾 58mm
@@ -571,7 +571,7 @@ export default function PrintReceiptModal({
             <button 
               type="button"
               onClick={() => window.print()}
-              className="flex-[1.5] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-2xl text-sm shadow-lg shadow-indigo-600/30 transition active:scale-95 flex items-center justify-center gap-1.5"
+              className="flex-[1.5] bg-brand-600 hover:bg-brand-700 text-white font-black py-3.5 rounded-2xl text-sm shadow-lg shadow-brand-600/30 transition active:scale-95 flex items-center justify-center gap-1.5"
             >
               <span>🖨</span> Qayta chop etish
             </button>

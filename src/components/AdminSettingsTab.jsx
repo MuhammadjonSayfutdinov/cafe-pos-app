@@ -426,7 +426,7 @@ export default function AdminSettingsTab({
                 required
                 value={tempCafeName}
                 onChange={(e) => setTempCafeName(e.target.value)}
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500 transition"
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-brand-500 transition"
                 placeholder="Masalan: Rayhon Milliy Taomlar"
               />
             </div>
@@ -444,7 +444,7 @@ export default function AdminSettingsTab({
                   required
                   value={tempServiceFee}
                   onChange={(e) => setTempServiceFee(e.target.value)}
-                  className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500 transition text-lg"
+                  className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-gray-900 dark:text-white outline-hidden focus:border-brand-500 transition text-lg"
                 />
                 <div className="flex gap-2">
                   {[0, 5, 10, 12, 15, 20].map(pct => (
@@ -454,7 +454,7 @@ export default function AdminSettingsTab({
                       onClick={() => setTempServiceFee(String(pct))}
                       className={`flex-1 py-1.5 rounded-lg font-black text-xs border transition ${
                         Number(tempServiceFee) === pct
-                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          ? 'bg-brand-600 text-white border-brand-600'
                           : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
                       }`}
                     >
@@ -468,7 +468,7 @@ export default function AdminSettingsTab({
 
           <button 
             type="submit" 
-            className="w-full sm:w-auto px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-lg shadow-indigo-600/30 transition active:scale-95 uppercase tracking-wider text-sm"
+            className="w-full sm:w-auto px-8 bg-brand-600 hover:bg-brand-700 text-white font-black py-4 rounded-xl shadow-lg shadow-brand-600/30 transition active:scale-95 uppercase tracking-wider text-sm"
           >
             💾 O'zgarishlarni Saqlash
           </button>
@@ -719,7 +719,7 @@ export default function AdminSettingsTab({
             <span>Zaxira Nusxa Yuklab Olish (.json)</span>
           </button>
 
-          <label className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 border-2 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-black text-sm flex items-center justify-center gap-3 cursor-pointer transition active:scale-95">
+          <label className="p-4 rounded-2xl bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 border-2 border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 font-black text-sm flex items-center justify-center gap-3 cursor-pointer transition active:scale-95">
             <span className="text-2xl">📤</span>
             <span>Zaxiradan Tiklash (.json)</span>
             <input type="file" accept=".json" onChange={handleImportBackup} className="hidden" />

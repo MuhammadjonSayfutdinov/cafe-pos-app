@@ -1046,14 +1046,14 @@ export default function CashierMode({
             <span className="text-xl">💸</span>
           </div>
 
-          <div className="bg-indigo-50/80 dark:bg-indigo-900/30 px-4 py-2.5 rounded-2xl border-2 border-indigo-300 dark:border-indigo-700 flex justify-between items-center">
+          <div className="bg-brand-50/80 dark:bg-brand-900/30 px-4 py-2.5 rounded-2xl border-2 border-brand-300 dark:border-brand-700 flex justify-between items-center">
             <div>
-              <span className="text-[10px] font-black uppercase text-indigo-700 dark:text-indigo-300 block">
+              <span className="text-[10px] font-black uppercase text-brand-700 dark:text-brand-300 block">
                 🗄️ Seyfdagi Sof Naqd Pul
               </span>
               <span className={`text-base sm:text-lg font-black ${
                 cashDrawerSummary.expectedCashInDrawer >= 0
-                  ? 'text-indigo-700 dark:text-indigo-300'
+                  ? 'text-brand-700 dark:text-brand-300'
                   : 'text-red-600'
               }`}>
                 {cashDrawerSummary.expectedCashInDrawer.toLocaleString()} s
@@ -1153,7 +1153,7 @@ export default function CashierMode({
           </div>
         ) : (
           <div className="flex-1 bg-white dark:bg-gray-800 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center p-8 text-center">
-            <div className="w-24 h-24 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-5xl mb-4 shadow-inner">
+            <div className="w-24 h-24 rounded-full bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center text-5xl mb-4 shadow-inner">
               🧾
             </div>
             <h3 className="text-xl font-black text-gray-800 dark:text-white mb-2">
@@ -1235,7 +1235,7 @@ export default function CashierMode({
               value={crmSearch}
               onChange={e => setCrmSearch(e.target.value)}
               placeholder="🔍 Mijoz ismi yoki telefon raqami bo'yicha qidirish..."
-              className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+              className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs sm:text-sm font-bold text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
             />
 
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
@@ -1280,7 +1280,7 @@ export default function CashierMode({
                               setCustomerPhone(cust.phone);
                               setIsCrmModalOpen(false);
                             }}
-                            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs transition active:scale-95"
+                            className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-black text-xs transition active:scale-95"
                           >
                             Chekka Tanlash ✓
                           </button>

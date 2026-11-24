@@ -57,7 +57,7 @@ export default class ErrorBoundary extends React.Component {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm"
+              className="px-5 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-black text-sm"
             >
               🔄 Qayta yuklash
             </button>

@@ -27,7 +27,7 @@ export default function SyncGate({ children }) {
   if (status.state === 'booting' && !skipWait) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4 bg-gray-100 dark:bg-gray-900 text-center">
-        <div className="w-14 h-14 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
+        <div className="w-14 h-14 rounded-full border-4 border-gray-200 dark:border-gray-700 border-t-brand-500 animate-spin" />
         <p className="font-black text-gray-800 dark:text-gray-100">Ma'lumotlar bulutdan yuklanmoqda...</p>
         <button
           type="button"
@@ -57,7 +57,7 @@ function FirstSyncScreen({ status }) {
       {failed ? (
         <div className="text-5xl">📴</div>
       ) : (
-        <div className="w-14 h-14 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
+        <div className="w-14 h-14 rounded-full border-4 border-gray-200 dark:border-gray-700 border-t-brand-500 animate-spin" />
       )}
       <p className="font-black text-gray-800 dark:text-gray-100">
         {failed ? "Bulutdan ma'lumot olib bo'lmadi" : "Ma'lumotlar bulutdan yuklanmoqda..."}
@@ -76,7 +76,7 @@ function FirstSyncScreen({ status }) {
               setBusy(true);
               syncNow();
             }}
-            className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 active:scale-95 text-white font-black"
+            className="px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-60 active:scale-95 text-white font-black"
           >
             {busy ? 'Urinilmoqda...' : '🔄 Qayta urinish'}
           </button>
@@ -140,7 +140,7 @@ function DeviceLogin() {
             autoComplete="username"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            className="mt-1 w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+            className="mt-1 w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
           />
         </label>
 
@@ -151,7 +151,7 @@ function DeviceLogin() {
             autoComplete="current-password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className="mt-1 w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+            className="mt-1 w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
           />
         </label>
 
@@ -160,7 +160,7 @@ function DeviceLogin() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-black"
+          className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-black"
         >
           {busy ? 'Ulanmoqda...' : 'Ulash'}
         </button>

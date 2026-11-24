@@ -336,7 +336,7 @@ export default function CourierMode({
               href={mapsUrl(d.address)}
               target="_blank"
               rel="noopener noreferrer"
-              className="block text-sm font-bold text-indigo-700 dark:text-indigo-300 underline decoration-dotted break-words"
+              className="block text-sm font-bold text-brand-700 dark:text-brand-300 underline decoration-dotted break-words"
             >
               📍 {d.address}
             </a>

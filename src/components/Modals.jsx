@@ -135,7 +135,7 @@ export function TableQrModal({
           <button
             type="button"
             onClick={handleCopyUrl}
-            className="text-xs font-black text-indigo-600 dark:text-indigo-400 hover:underline"
+            className="text-xs font-black text-brand-600 dark:text-brand-400 hover:underline"
           >
             {copiedLink ? '✅ Havola nusxalandi!' : '🔗 QR-Menyu havolasini nusxalash'}
           </button>
@@ -337,7 +337,7 @@ export function ReceiptModal({
           <p className="font-black text-lg mt-2 text-gray-900">Joy: {tableLabel}</p>
           <p className="text-xs text-gray-500 mt-1">Xodim: {waiterLabel}</p>
           {(resolvedOrder.customerPhone || resolvedOrder.customerName || resolvedOrder.debtorName) && (
-            <p className="text-xs font-bold text-indigo-600 mt-1">
+            <p className="text-xs font-bold text-brand-600 mt-1">
               Mijoz: {resolvedOrder.customerName || resolvedOrder.debtorName || resolvedOrder.customerPhone}
             </p>
           )}
@@ -398,7 +398,7 @@ export function ReceiptModal({
           )}
 
           {usedBonus > 0 && (
-            <div className="flex justify-between text-indigo-600 font-black pt-1">
+            <div className="flex justify-between text-brand-600 font-black pt-1">
               <span>Ishlatilgan Bonus:</span>
               <span>- {usedBonus.toLocaleString()} so'm</span>
             </div>
@@ -425,9 +425,9 @@ export function ReceiptModal({
         </div>
         
         {earnedBonus > 0 && (
-          <div className="bg-indigo-50 border border-indigo-200 p-2.5 rounded-xl text-center mb-5">
-            <span className="text-xs text-indigo-800 font-bold">Raqamingizga bonus yozildi:</span>
-            <p className="text-lg font-black text-indigo-600">
+          <div className="bg-brand-50 border border-brand-200 p-2.5 rounded-xl text-center mb-5">
+            <span className="text-xs text-brand-800 font-bold">Raqamingizga bonus yozildi:</span>
+            <p className="text-lg font-black text-brand-600">
               +{Math.floor(earnedBonus).toLocaleString()} so'm 🎁
             </p>
           </div>
@@ -450,7 +450,7 @@ export function ReceiptModal({
           <button
             type="button"
             onClick={handleCopyReceipt}
-            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-black text-xs transition active:scale-95"
+            className="bg-brand-50 hover:bg-brand-100 text-brand-700 py-3 rounded-xl font-black text-xs transition active:scale-95"
           >
             {copiedText ? '✅ Olindi' : '📋 Nusxa'}
           </button>

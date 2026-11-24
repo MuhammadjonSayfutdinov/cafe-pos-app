@@ -432,7 +432,7 @@ export default function StatsWaiterPayroll({
               Ofitsiantlar Ulushi va Oylik Maosh Hisoblagichi (HR Payroll)
             </h3>
             <p className="text-xs font-bold text-gray-500 mt-0.5">
-              Faol davr: <strong className="text-indigo-600 dark:text-indigo-400">{currentPeriodText}</strong> • Har bir xodimning xizmat haqi ulushi, okladi va avanslari
+              Faol davr: <strong className="text-brand-600 dark:text-brand-400">{currentPeriodText}</strong> • Har bir xodimning xizmat haqi ulushi, okladi va avanslari
             </p>
           </div>
         </div>
@@ -506,7 +506,7 @@ export default function StatsWaiterPayroll({
                 onClick={() => setDateMode(tab.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${
                   dateMode === tab.id
-                    ? 'bg-indigo-600 text-white shadow-xs'
+                    ? 'bg-brand-600 text-white shadow-xs'
                     : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
                 }`}
               >
@@ -559,7 +559,7 @@ export default function StatsWaiterPayroll({
           <span className="text-[10px] font-black uppercase text-gray-400 block">
             👨‍🍳 Ofitsiantlar Xizmat Ulushi
           </span>
-          <span className="text-base sm:text-lg font-black text-indigo-600 dark:text-indigo-400">
+          <span className="text-base sm:text-lg font-black text-brand-600 dark:text-brand-400">
             +{totalsSummary.totalWaiterServiceShare.toLocaleString()} s
           </span>
         </div>
@@ -623,7 +623,7 @@ export default function StatsWaiterPayroll({
                           #{index + 1}
                         </span>
                         <div>
-                          <p className="font-black text-gray-900 dark:text-white text-sm sm:text-base group-hover:text-indigo-600 transition">
+                          <p className="font-black text-gray-900 dark:text-white text-sm sm:text-base group-hover:text-brand-600 transition">
                             {row.waiterName}
                           </p>
                           <span className="text-[10px] font-bold text-gray-400">
@@ -662,7 +662,7 @@ export default function StatsWaiterPayroll({
 
                     {/* 5. Ofitsiantning Xizmat Haqidan Sof Ulushi */}
                     <td className="p-4">
-                      <span className="font-black text-indigo-600 dark:text-indigo-400 block">
+                      <span className="font-black text-brand-600 dark:text-brand-400 block">
                         +{row.serviceShareEarned.toLocaleString()} s
                       </span>
                       <span className="text-[10px] text-gray-400">
@@ -723,7 +723,7 @@ export default function StatsWaiterPayroll({
                         <button
                           type="button"
                           onClick={() => handleOpenEditRule(row)}
-                          className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 font-black text-xs transition"
+                          className="px-3 py-1.5 rounded-xl bg-brand-50 dark:bg-brand-900/40 hover:bg-brand-100 text-brand-600 dark:text-brand-300 font-black text-xs transition"
                           title="Foiz ulushi, oklad va avansni sozlash"
                         >
                           ⚙️ Stavka
@@ -919,7 +919,7 @@ export default function StatsWaiterPayroll({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-lg shadow-indigo-600/30 transition active:scale-95"
+                  className="flex-1 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-black text-xs shadow-lg shadow-brand-600/30 transition active:scale-95"
                 >
                   💾 Stavkani Saqlash
                 </button>
@@ -946,7 +946,7 @@ export default function StatsWaiterPayroll({
                 <h3 className="font-black text-xl text-gray-900 dark:text-white">
                   👨‍🍳 {inspectingWaiter.waiterName} — Yopilgan Cheklar Tarixi ({inspectingWaiter.ordersCount} ta)
                 </h3>
-                <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                <p className="text-xs font-bold text-brand-600 dark:text-brand-400 mt-0.5">
                   Davr: {currentPeriodText} • Jami savdo: {inspectingWaiter.totalRevenue.toLocaleString()} s • Sof maosh: {inspectingWaiter.netPayableSalary.toLocaleString()} s
                 </p>
               </div>

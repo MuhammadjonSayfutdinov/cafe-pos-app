@@ -51,7 +51,8 @@ export default function PublicQrApp({ table, tableKey = '' }) {
   const [error, setError] = useState('');
   const [mine, setMine] = useState(() => readMine(table));
   const [geoRequired, setGeoRequired] = useState(false);
-  const isDark = typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+  // Mijoz menyusi har doim to'q (zamonaviy restoran uslubida), telefon sozlamasidan qat'i nazar
+  const isDark = true;
 
   const mineRef = useRef(mine);
   mineRef.current = mine;
@@ -242,7 +243,7 @@ export default function PublicQrApp({ table, tableKey = '' }) {
         <button
           type="button"
           onClick={() => api && loadMenu(api)}
-          className="mt-4 px-5 py-3 rounded-xl bg-indigo-600 text-white font-black"
+          className="mt-4 px-7 py-3 rounded-full bg-brand-600 hover:bg-brand-700 text-white font-semibold shadow-lg shadow-brand-900/40 transition active:scale-95"
         >
           🔄 Qayta urinish
         </button>
@@ -271,11 +272,25 @@ export default function PublicQrApp({ table, tableKey = '' }) {
 
 function Message({ title, text, spinner, children }) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6 text-center bg-gray-50 dark:bg-gray-900">
-      {spinner && <div className="w-12 h-12 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />}
-      <h1 className="text-lg font-black text-gray-900 dark:text-white">{title}</h1>
-      {text && <p className="text-sm font-bold text-gray-500 dark:text-gray-400 max-w-sm">{text}</p>}
+    <div className="min-h-screen bg-zinc-950 text-zinc-300 font-sans antialiased overflow-x-hidden flex flex-col items-center justify-center gap-3 p-6 text-center">
+      {spinner && <div className="w-12 h-12 rounded-full border-4 border-zinc-800 border-t-brand-500 animate-spin mb-3" />}
+      <h1 className="text-xl sm:text-2xl font-bold text-zinc-100">{title}</h1>
+      {text && <p className="text-sm text-zinc-400 max-w-sm">{text}</p>}
       {children}
+      {spinner && (
+        <div className="w-full max-w-5xl mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 text-left">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="bg-zinc-900 rounded-3xl border border-zinc-800/60 p-5 flex items-center gap-4 animate-pulse">
+              <div className="w-14 h-14 rounded-2xl bg-zinc-800/70 shrink-0" />
+              <div className="flex-1 space-y-2.5">
+                <div className="h-4 bg-zinc-800/80 rounded w-2/3" />
+                <div className="h-3 bg-zinc-800/50 rounded w-1/3" />
+                <div className="h-4 bg-zinc-800/80 rounded w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

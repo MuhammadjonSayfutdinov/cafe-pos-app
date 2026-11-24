@@ -164,7 +164,7 @@ export default function StatsOverviewCards({
       {/* 5. YOPILGAN CHEKLAR VA INTERAKTIV OCHISH KARTASI */}
       <div 
         onClick={handleOpenReceipts}
-        className="bg-gradient-to-br from-indigo-50 to-indigo-100/80 dark:from-indigo-900/30 dark:to-indigo-800/20 p-6 rounded-3xl border-2 border-indigo-300 dark:border-indigo-700 shadow-xs hover:shadow-lg hover:border-indigo-500 transition-all relative overflow-hidden group flex flex-col justify-between cursor-pointer"
+        className="bg-gradient-to-br from-brand-50 to-brand-100/80 dark:from-brand-900/30 dark:to-brand-800/20 p-6 rounded-3xl border-2 border-brand-300 dark:border-brand-700 shadow-xs hover:shadow-lg hover:border-brand-500 transition-all relative overflow-hidden group flex flex-col justify-between cursor-pointer"
         title="Barcha yopilgan cheklarning ichini va sanalar bo'yicha ro'yxatini ko'rish uchun bosing"
       >
         <div className="absolute right-[-16px] top-[-16px] opacity-10 text-8xl group-hover:scale-110 transition-transform select-none pointer-events-none">
@@ -172,21 +172,21 @@ export default function StatsOverviewCards({
         </div>
         <div className="relative z-10">
           <div className="flex justify-between items-center gap-2 mb-2">
-            <p className="text-indigo-700 dark:text-indigo-400 text-xs font-black uppercase tracking-wider">
+            <p className="text-brand-700 dark:text-brand-400 text-xs font-black uppercase tracking-wider">
               5. Yopilgan Cheklar ({safeOrdersCount} ta)
             </p>
-            <span className="px-2.5 py-1 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase shadow-xs group-hover:scale-105 transition">
+            <span className="px-2.5 py-1 rounded-xl bg-brand-600 text-white text-[10px] font-black uppercase shadow-xs group-hover:scale-105 transition">
               👁 Cheklarni ochish →
             </span>
           </div>
           <h2 className="text-2xl sm:text-3xl xl:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
             {averageCheck.toLocaleString()}{' '}
-            <span className="text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 font-extrabold">
+            <span className="text-xs sm:text-sm text-brand-600 dark:text-brand-400 font-extrabold">
               s (o'rtacha)
             </span>
           </h2>
         </div>
-        <div className="relative z-10 mt-4 pt-3 border-t border-indigo-200/60 dark:border-indigo-800/40 flex justify-between items-center text-xs font-bold text-indigo-800/80 dark:text-indigo-300/80">
+        <div className="relative z-10 mt-4 pt-3 border-t border-brand-200/60 dark:border-brand-800/40 flex justify-between items-center text-xs font-bold text-brand-800/80 dark:text-brand-300/80">
           <span>🛎️ Xizmat haqi ({serviceSharePercent}%):</span>
           <span className="font-black">+{safeServiceFee.toLocaleString()} s</span>
         </div>

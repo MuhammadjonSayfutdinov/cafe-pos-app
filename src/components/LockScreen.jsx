@@ -180,66 +180,81 @@ export default function LockScreen({
   // 5. RENDER (UI DIZAYN)
   // ==========================================
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center p-4 select-none transition-colors duration-300 ${
+    <div className={`relative isolate min-h-screen flex flex-col items-center justify-center p-4 select-none overflow-hidden transition-colors duration-300 ${
       isDarkMode ? 'dark bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'
     }`}>
-      
+
+      {/* FON: kafe rasmi + to'q qatlam */}
+      <img
+        src="/images/cafe-hero.webp"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 -z-20 w-full h-full object-cover"
+      />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/80 via-black/65 to-black/90" />
+
       {/* SARLAVHA */}
-      <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-indigo-600 text-white rounded-3xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-xl shadow-indigo-600/30">
+      <div className="text-center mb-8 animate-fade-in-up">
+        <div className="w-16 h-16 bg-gradient-to-br from-brand-500 to-brand-700 text-white rounded-3xl flex items-center justify-center text-3xl mx-auto mb-5 shadow-xl shadow-brand-900/50 ring-4 ring-white/10">
           🍽️
         </div>
-        <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">
           {cafeName}
         </h1>
-        <p className="text-xs sm:text-sm font-black uppercase tracking-widest text-gray-400 mt-1">
+        <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.3em] text-brand-400 mt-3">
           Premium Boshqaruv Tizimi
         </p>
       </div>
 
       {/* ASOSIY KARTA */}
-      <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[32px] p-6 sm:p-8 shadow-xl border border-gray-100 dark:border-gray-700 space-y-5">
-        
+      <div className="bg-white/95 dark:bg-gray-900/75 backdrop-blur-xl w-full max-w-md rounded-[32px] p-5 sm:p-7 shadow-2xl shadow-black/50 border border-white/20 dark:border-gray-700/70 space-y-3.5 animate-fade-in-up">
+
         {/* 1. BOSHQARUV (6 XONALI PIN) */}
         <button
           type="button"
           onClick={() => handleSelectGroup('management')}
-          className="w-full p-6 rounded-3xl border-2 border-gray-100 dark:border-gray-700 hover:border-indigo-500 dark:hover:border-indigo-500 bg-gray-50/50 dark:bg-gray-900/40 hover:bg-indigo-50/30 transition-all active:scale-[0.98] flex flex-col items-center text-center group"
+          className="w-full p-4 sm:p-5 rounded-3xl border border-gray-200 dark:border-gray-700/70 hover:border-brand-500 dark:hover:border-brand-500 bg-gray-50 dark:bg-gray-800/70 hover:bg-brand-50/60 dark:hover:bg-brand-500/10 transition-all active:scale-[0.98] flex items-center gap-4 text-left group"
         >
-          <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-xs flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition">
+          <div className="w-14 h-14 shrink-0 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-2xl group-hover:scale-110 transition">
             👔
           </div>
-          <h2 className="text-lg font-black tracking-wider uppercase text-gray-900 dark:text-white">
-            BOSHQARUV
-          </h2>
-          <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">
-            Faqat rahbar va omborchi uchun
-          </p>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base sm:text-lg font-bold tracking-wider uppercase text-gray-900 dark:text-white">
+              BOSHQARUV
+            </h2>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+              Faqat rahbar va omborchi uchun
+            </p>
+          </div>
+          <span className="text-xl text-gray-400 group-hover:text-brand-500 group-hover:translate-x-1 transition">›</span>
         </button>
 
         {/* 2. XODIMLAR (4 XONALI PIN) */}
         <button
           type="button"
           onClick={() => handleSelectGroup('staff')}
-          className="w-full p-6 rounded-3xl border-2 border-gray-100 dark:border-gray-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-gray-50/50 dark:bg-gray-900/40 hover:bg-emerald-50/30 transition-all active:scale-[0.98] flex flex-col items-center text-center group"
+          className="w-full p-4 sm:p-5 rounded-3xl border border-gray-200 dark:border-gray-700/70 hover:border-emerald-500 dark:hover:border-emerald-500 bg-gray-50 dark:bg-gray-800/70 hover:bg-emerald-50/60 dark:hover:bg-emerald-500/10 transition-all active:scale-[0.98] flex items-center gap-4 text-left group"
         >
-          <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-xs flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition">
+          <div className="w-14 h-14 shrink-0 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-2xl group-hover:scale-110 transition">
             👥
           </div>
-          <h2 className="text-lg font-black tracking-wider uppercase text-gray-900 dark:text-white">
-            XODIMLAR
-          </h2>
-          <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-1">
-            Kassir, ofitsiant va oshpazlar uchun
-          </p>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base sm:text-lg font-bold tracking-wider uppercase text-gray-900 dark:text-white">
+              XODIMLAR
+            </h2>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+              Kassir, ofitsiant va oshpazlar uchun
+            </p>
+          </div>
+          <span className="text-xl text-gray-400 group-hover:text-emerald-500 group-hover:translate-x-1 transition">›</span>
         </button>
 
         {/* 3. MIJOZ UCHUN QR-MENYU TUGMASI */}
-        <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+        <div className="pt-3.5 border-t border-gray-200 dark:border-gray-700/70">
           <button
             type="button"
             onClick={() => setIsTableModalOpen(true)}
-            className="w-full py-4 px-6 rounded-2xl bg-emerald-100/80 dark:bg-emerald-900/30 hover:bg-emerald-200/80 text-emerald-800 dark:text-emerald-300 font-black text-sm flex items-center justify-center gap-2 transition active:scale-95"
+            className="w-full py-3.5 px-6 rounded-full border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-semibold text-sm flex items-center justify-center gap-2 transition active:scale-95"
           >
             <span>📱</span>
             <span>Mijoz uchun QR-Menyu</span>
@@ -248,7 +263,7 @@ export default function LockScreen({
 
       </div>
 
-      <p className="mt-6 text-[11px] font-bold text-gray-400 dark:text-gray-500 tracking-wide">
+      <p className="mt-6 text-[11px] font-medium text-white/50 tracking-wide">
         Versiya: {APP_BUILD}{APP_BUILD_TIME ? ` · ${formatBuildTime(APP_BUILD_TIME)}` : ''}
       </p>
 
@@ -256,29 +271,29 @@ export default function LockScreen({
           MODAL 1: PIN TERISH OYNASI (BOSHQARUV VA XODIMLAR)
           ======================================================= */}
       {selectedGroup && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-[32px] p-6 sm:p-8 shadow-2xl border border-gray-100 dark:border-gray-700">
-            
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[32px] p-6 sm:p-8 shadow-2xl shadow-black/50 border border-gray-200 dark:border-gray-700/70">
+
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase">
+                <h3 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white uppercase">
                   {selectedGroup === 'management' ? '👔 Boshqaruv' : '👥 Xodimlar'}
                 </h3>
-                <p className="text-xs font-bold text-gray-400 mt-0.5">
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">
                   {requiredPinLength} xonali maxfiy PIN-kodni kiriting
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleClosePinModal}
-                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center font-black text-gray-500 hover:bg-red-100 hover:text-red-500 transition"
+                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center font-bold text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-500/15 hover:text-red-500 transition"
               >
                 ✕
               </button>
             </div>
 
             {/* PIN Nuqtachalari */}
-            <div className="flex justify-center gap-3 my-6">
+            <div className="flex justify-center gap-3.5 my-7">
               {Array.from({ length: requiredPinLength }).map((_, idx) => {
                 const isFilled = idx < pin.length;
                 return (
@@ -286,8 +301,8 @@ export default function LockScreen({
                     key={idx}
                     className={`w-4 h-4 rounded-full transition-all duration-150 ${
                       isFilled
-                        ? 'bg-indigo-600 scale-125 shadow-md shadow-indigo-600/40'
-                        : 'bg-gray-200 dark:bg-gray-700'
+                        ? 'bg-brand-500 scale-125 shadow-md shadow-brand-500/50'
+                        : 'bg-gray-200 dark:bg-gray-700 ring-1 ring-gray-300 dark:ring-gray-600'
                     }`}
                   />
                 );
@@ -295,11 +310,11 @@ export default function LockScreen({
             </div>
 
             {isLocked ? (
-              <p className="text-center text-xs font-black text-red-500 mb-4">
+              <p className="text-center text-xs font-bold text-red-500 mb-4">
                 ⛔️ Kirish vaqtincha bloklandi: {Math.ceil(lockRemainingMs / 1000)} soniya kuting
               </p>
             ) : error && (
-              <p className="text-center text-xs font-black text-red-500 mb-4 animate-bounce">
+              <p className="text-center text-xs font-bold text-red-500 mb-4 animate-bounce">
                 {error}
               </p>
             )}
@@ -311,7 +326,7 @@ export default function LockScreen({
                   key={num}
                   type="button"
                   onClick={() => handleNumberClick(String(num))}
-                  className="h-14 rounded-2xl bg-gray-50 dark:bg-gray-700/60 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 text-xl font-black text-gray-900 dark:text-white transition active:scale-90 border border-gray-100 dark:border-gray-600"
+                  className="h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 hover:bg-brand-50 dark:hover:bg-brand-500/10 hover:border-brand-500/60 text-2xl font-semibold text-gray-900 dark:text-white transition active:scale-90 border border-gray-200 dark:border-gray-700/70"
                 >
                   {num}
                 </button>
@@ -320,7 +335,7 @@ export default function LockScreen({
               <button
                 type="button"
                 onClick={() => setPin('')}
-                className="h-14 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-500 font-black text-xs uppercase transition active:scale-90"
+                className="h-16 rounded-2xl bg-red-50 dark:bg-red-500/10 text-red-500 font-bold text-xs uppercase transition active:scale-90"
               >
                 Tozalash
               </button>
@@ -328,7 +343,7 @@ export default function LockScreen({
               <button
                 type="button"
                 onClick={() => handleNumberClick('0')}
-                className="h-14 rounded-2xl bg-gray-50 dark:bg-gray-700/60 hover:bg-indigo-50 text-xl font-black text-gray-900 dark:text-white transition active:scale-90 border border-gray-100 dark:border-gray-600"
+                className="h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 hover:bg-brand-50 dark:hover:bg-brand-500/10 hover:border-brand-500/60 text-2xl font-semibold text-gray-900 dark:text-white transition active:scale-90 border border-gray-200 dark:border-gray-700/70"
               >
                 0
               </button>
@@ -336,7 +351,7 @@ export default function LockScreen({
               <button
                 type="button"
                 onClick={handleBackspace}
-                className="h-14 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-black text-lg transition active:scale-90"
+                className="h-16 rounded-2xl bg-gray-100 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 font-bold text-xl transition active:scale-90"
               >
                 ⌫
               </button>
@@ -350,16 +365,16 @@ export default function LockScreen({
           MODAL 2: MIJOZ STOLINI TANLASH (BO'SH STOLLAR RO'YXATI)
           ======================================================= */}
       {isTableModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
-          <div className="bg-white dark:bg-gray-800 w-full sm:max-w-lg rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl border border-gray-100 dark:border-gray-700 flex flex-col max-h-[85vh]">
-            
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
+          <div className="bg-white dark:bg-gray-900 w-full sm:max-w-lg rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl shadow-black/50 border border-gray-200 dark:border-gray-700/70 flex flex-col max-h-[85vh]">
+
             {/* Modal Header */}
-            <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-700 pb-4 shrink-0">
+            <div className="flex justify-between items-start gap-3 border-b border-gray-200 dark:border-gray-700/70 pb-4 shrink-0">
               <div>
-                <h3 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
                   <span>🪑</span> Stolingizni tanlang
                 </h3>
-                <p className="text-xs font-bold text-gray-400 mt-1">
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">
                   QR-Menyuni ochish uchun bo'sh stollardan birini bosing.
                   Band stolda o'tirgan bo'lsangiz, stoldagi QR kodni telefoningiz bilan skaner qiling.
                 </p>
@@ -367,21 +382,21 @@ export default function LockScreen({
               <button
                 type="button"
                 onClick={() => setIsTableModalOpen(false)}
-                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center font-black text-gray-500 hover:bg-red-100 hover:text-red-500 transition"
+                className="w-10 h-10 shrink-0 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center font-bold text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-500/15 hover:text-red-500 transition"
               >
                 ✕
               </button>
             </div>
 
             {/* Filtr Tablari: Faqat Bo'sh stollar vs Barcha stollar */}
-            <div className="flex bg-gray-100 dark:bg-gray-900/60 p-1 rounded-2xl my-4 shrink-0">
+            <div className="flex bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700/70 p-1 rounded-full my-4 shrink-0">
               <button
                 type="button"
                 onClick={() => setTableFilter('free')}
-                className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition ${
+                className={`flex-1 py-2.5 rounded-full font-semibold text-xs uppercase tracking-wider transition ${
                   tableFilter === 'free'
-                    ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                    : 'text-gray-500 dark:text-gray-400'
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
                 }`}
               >
                 🟢 Bo'sh stollar ({freeTables.length})
@@ -389,10 +404,10 @@ export default function LockScreen({
               <button
                 type="button"
                 onClick={() => setTableFilter('all')}
-                className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition ${
+                className={`flex-1 py-2.5 rounded-full font-semibold text-xs uppercase tracking-wider transition ${
                   tableFilter === 'all'
-                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-gray-500 dark:text-gray-400'
+                    ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/30'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
                 }`}
               >
                 🗺️ Barcha stollar ({tablesWithStatus.length})
@@ -404,13 +419,13 @@ export default function LockScreen({
               {tableFilter === 'free' && freeTables.length === 0 ? (
                 <div className="text-center py-10 text-gray-400">
                   <span className="text-5xl block mb-3">🎉</span>
-                  <p className="font-black text-gray-700 dark:text-gray-300">
+                  <p className="font-bold text-gray-700 dark:text-gray-300">
                     Hozircha barcha stollarimiz band!
                   </p>
                   <button
                     type="button"
                     onClick={() => setTableFilter('all')}
-                    className="mt-4 text-xs font-black text-indigo-600 underline"
+                    className="mt-4 text-xs font-bold text-brand-600 dark:text-brand-500 underline"
                   >
                     Band stollarni ko'rish
                   </button>
@@ -424,22 +439,22 @@ export default function LockScreen({
                       onClick={() => handleSelectCustomerTable(item.name)}
                       disabled={item.isOccupied}
                       title={item.isOccupied ? "Band stol: stoldagi QR kodni telefon bilan skaner qiling" : undefined}
-                      className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-1.5 transition ${
+                      className={`p-4 rounded-3xl border flex flex-col items-center justify-center gap-1.5 transition ${
                         item.isOccupied
-                          ? 'bg-gray-100 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700 opacity-70 cursor-not-allowed'
-                          : 'bg-emerald-50/70 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/60 hover:border-emerald-500 active:scale-95'
+                          ? 'bg-gray-100 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700/70 opacity-70 cursor-not-allowed'
+                          : 'bg-emerald-50/70 dark:bg-emerald-500/5 border-emerald-200 dark:border-emerald-500/25 hover:border-emerald-500 dark:hover:border-emerald-500 active:scale-95'
                       }`}
                     >
                       <span className="text-2xl">
                         {item.isOccupied ? '🍽️' : '🪑'}
                       </span>
-                      <span className="font-black text-base text-gray-900 dark:text-white">
+                      <span className="font-bold text-base text-gray-900 dark:text-white">
                         {item.name}
                       </span>
-                      <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                      <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
                         item.isOccupied
-                          ? 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
-                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+                          ? 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
                       }`}>
                         {item.isOccupied ? '🔒 Band · QR orqali' : "Bo'sh"}
                       </span>

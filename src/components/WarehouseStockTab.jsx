@@ -480,7 +480,7 @@ export default function WarehouseStockTab({
     if (breakdown.family === 'weight') {
       if (displayUnitMode === 'gr') {
         return (
-          <div className="font-black text-lg text-indigo-600 dark:text-indigo-400">
+          <div className="font-black text-lg text-brand-600 dark:text-brand-400">
             {breakdown.gr.toLocaleString()} <span className="text-xs">gr</span>
           </div>
         );
@@ -512,7 +512,7 @@ export default function WarehouseStockTab({
             <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
               {breakdown.kg.toLocaleString()} kg
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/50">
+            <span className="px-2 py-0.5 rounded-md bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 border border-brand-200/60 dark:border-brand-800/50">
               {breakdown.gr.toLocaleString()} gr
             </span>
           </div>
@@ -530,7 +530,7 @@ export default function WarehouseStockTab({
             <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
               {breakdown.litr.toLocaleString()} litr
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+            <span className="px-2 py-0.5 rounded-md bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300">
               {breakdown.ml.toLocaleString()} ml
             </span>
           </div>
@@ -556,11 +556,11 @@ export default function WarehouseStockTab({
     <div className="animate-fade-in space-y-4">
       
       {/* OMBOR MOLIYAVIY QIYMATI BANNERI */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-2xl shadow-xs flex flex-wrap justify-between items-center gap-3">
+      <div className="bg-gradient-to-r from-brand-500 to-brand-700 text-white p-4 rounded-2xl shadow-xs flex flex-wrap justify-between items-center gap-3">
         <div className="flex items-center gap-3">
           <span className="text-3xl">💰</span>
           <div>
-            <p className="text-[11px] font-black uppercase tracking-wider text-indigo-100">
+            <p className="text-[11px] font-black uppercase tracking-wider text-brand-100">
               Ombordagi Jami Xomashyolar Qiymati (Aktivlar)
             </p>
             <p className="text-xl sm:text-2xl font-black">
@@ -665,7 +665,7 @@ export default function WarehouseStockTab({
                       <span className="block text-[11px] text-gray-400 font-bold mb-1 uppercase tracking-wider">
                         {item.category || 'Boshqa'}
                       </span>
-                      <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 block">
+                      <span className="text-xs font-black text-brand-600 dark:text-brand-400 block">
                         1 {item.unit} narxi: {cost.toLocaleString()} s (Jami: {totalVal.toLocaleString()} s)
                       </span>
                       {isLow && (
@@ -704,7 +704,7 @@ export default function WarehouseStockTab({
                   </div>
 
                   <div className="flex justify-end gap-3 pt-3 border-t dark:border-gray-700">
-                    <button type="button" onClick={() => handleOpenItemModal(item)} className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+                    <button type="button" onClick={() => handleOpenItemModal(item)} className="text-brand-600 dark:text-brand-400 font-bold text-sm">
                       ✏️ Tahrirlash
                     </button>
                     <button type="button" onClick={() => handleDeleteInventory(item.id, item.name)} className="text-red-500 font-bold text-sm">
@@ -763,7 +763,7 @@ export default function WarehouseStockTab({
                             <span className="font-black text-sm text-gray-900 dark:text-white block">
                               {cost.toLocaleString()} s <span className="text-xs font-bold text-gray-400">/ 1 {item.unit}</span>
                             </span>
-                            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                            <span className="text-xs font-bold text-brand-600 dark:text-brand-400">
                               Jami: {totalValue.toLocaleString()} so'm
                             </span>
                           </div>
@@ -801,7 +801,7 @@ export default function WarehouseStockTab({
                       </td>
 
                       <td className="p-4 text-right space-x-3 whitespace-nowrap">
-                        <button type="button" onClick={() => handleOpenItemModal(item)} className="text-indigo-500 hover:text-indigo-700 font-bold text-sm">
+                        <button type="button" onClick={() => handleOpenItemModal(item)} className="text-brand-600 hover:text-brand-700 font-bold text-sm">
                           ✏️ Tahrir
                         </button>
                         <button type="button" onClick={() => handleDeleteInventory(item.id, item.name)} className="text-red-500 hover:text-red-700 font-bold text-sm">
@@ -949,7 +949,7 @@ export default function WarehouseStockTab({
                     <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-black pt-1">
                       <div className="bg-white dark:bg-gray-800 p-2 rounded-xl">
                         <span className="block text-[9px] text-gray-400">1 GRAMM NARXI</span>
-                        <span className="text-indigo-600">
+                        <span className="text-brand-600">
                           {convertUnitPriceBetweenUnits(itemData.costPrice, itemData.unit, 'gr').toLocaleString()} s
                         </span>
                       </div>
@@ -1015,7 +1015,7 @@ export default function WarehouseStockTab({
                 {selectedStockItem.name}
               </span>
               <span className="text-xs font-bold text-gray-500">
-                Joriy: <strong className="text-indigo-600 dark:text-indigo-400 text-base">{selectedStockItem.quantity} {selectedStockItem.unit}</strong>
+                Joriy: <strong className="text-brand-600 dark:text-brand-400 text-base">{selectedStockItem.quantity} {selectedStockItem.unit}</strong>
               </span>
             </div>
 
@@ -1034,7 +1034,7 @@ export default function WarehouseStockTab({
                         onClick={() => handleUpdateUnitSwitch(u.value)}
                         className={`py-2 rounded-lg text-xs font-black transition ${
                           updateInputUnit === u.value
-                            ? 'bg-indigo-600 text-white shadow-xs'
+                            ? 'bg-brand-600 text-white shadow-xs'
                             : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800'
                         }`}
                       >

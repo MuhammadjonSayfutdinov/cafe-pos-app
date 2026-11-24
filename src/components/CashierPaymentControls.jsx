@@ -59,7 +59,7 @@ export default function CashierPaymentControls({
               <button
                 type="button"
                 onClick={onOpenCrmModal}
-                className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-gray-700 hover:bg-indigo-50 transition"
+                className="text-[11px] font-black text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-brand-200 dark:border-gray-700 hover:bg-brand-50 transition"
               >
                 👥 Baza ({Array.isArray(customers) ? customers.length : 0})
               </button>
@@ -120,7 +120,7 @@ export default function CashierPaymentControls({
                 <div className="pt-2 border-t border-gray-100 dark:border-gray-700 space-y-1.5">
                   <div className="flex justify-between items-center text-[11px] font-bold">
                     <span className="text-gray-500">Bonusdan chegirish:</span>
-                    <span className="text-indigo-600 dark:text-indigo-400">
+                    <span className="text-brand-600 dark:text-brand-400">
                       Maks: {Number(maxUsableBonus || 0).toLocaleString()} s
                     </span>
                   </div>
@@ -132,7 +132,7 @@ export default function CashierPaymentControls({
                       value={useBonusAmount}
                       onChange={(e) => typeof setUseBonusAmount === 'function' && setUseBonusAmount(e.target.value)}
                       placeholder="Bonus summasi..."
-                      className="flex-1 p-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-black text-indigo-600 dark:text-indigo-400 outline-hidden focus:border-indigo-500"
+                      className="flex-1 p-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-black text-brand-600 dark:text-brand-400 outline-hidden focus:border-brand-500"
                     />
                     <button
                       type="button"
@@ -140,7 +140,7 @@ export default function CashierPaymentControls({
                         typeof setUseBonusAmount === 'function' &&
                         setUseBonusAmount(String(maxUsableBonus))
                       }
-                      className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs transition active:scale-95"
+                      className="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-black text-xs transition active:scale-95"
                     >
                       MAX
                     </button>
@@ -197,7 +197,7 @@ export default function CashierPaymentControls({
                 }}
                 className={`py-2.5 rounded-xl font-black text-xs transition ${
                   discountType === tab.id
-                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-xs'
+                    ? 'bg-white dark:bg-gray-700 text-brand-600 dark:text-white shadow-xs'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >
@@ -215,7 +215,7 @@ export default function CashierPaymentControls({
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
                 placeholder={discountType === 'percent' ? 'Necha foiz? (Masalan: 10)' : 'Necha so\'m? (Masalan: 15000)'}
-                className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-indigo-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+                className="w-full p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-brand-200 dark:border-gray-700 font-black text-sm text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
               />
 
               {/* Tezkor chegirma tugmalari */}
@@ -226,7 +226,7 @@ export default function CashierPaymentControls({
                       key={pct}
                       type="button"
                       onClick={() => setDiscountValue(String(pct))}
-                      className="flex-1 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 font-black text-xs transition"
+                      className="flex-1 py-1.5 rounded-lg bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 text-brand-600 dark:text-brand-300 font-black text-xs transition"
                     >
                       {pct}%
                     </button>
@@ -255,7 +255,7 @@ export default function CashierPaymentControls({
                   className={`py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm border-2 transition active:scale-95 flex items-center justify-center gap-2 ${
                     isSelected
                       ? `${m.activeClass} shadow-md`
-                      : 'bg-gray-50 dark:bg-gray-900/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-indigo-300'
+                      : 'bg-gray-50 dark:bg-gray-900/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-brand-300'
                   }`}
                 >
                   <span>{m.label}</span>

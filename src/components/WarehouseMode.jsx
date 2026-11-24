@@ -211,7 +211,7 @@ export default function WarehouseMode({
               onClick={() => setActiveTab('stock')}
               className={`px-5 py-3 rounded-xl font-black text-xs sm:text-sm transition-all whitespace-nowrap active:scale-95 flex items-center gap-2 ${
                 activeTab === 'stock' 
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' 
+                  ? 'bg-brand-600 text-white shadow-md shadow-brand-600/30' 
                   : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
@@ -270,7 +270,7 @@ export default function WarehouseMode({
                   onClick={() => setDisplayUnitMode(mode.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition ${
                     displayUnitMode === mode.id
-                      ? 'bg-indigo-600 text-white shadow-xs'
+                      ? 'bg-brand-600 text-white shadow-xs'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}
                 >
@@ -296,7 +296,7 @@ export default function WarehouseMode({
             <span className="text-[10px] font-black uppercase text-gray-400 block">
               ⚖️ Jami og'irlik zaxirasi
             </span>
-            <p className="text-sm sm:text-base font-black text-indigo-600 dark:text-indigo-400 mt-1">
+            <p className="text-sm sm:text-base font-black text-brand-600 dark:text-brand-400 mt-1">
               {warehouseStats.totalTons} t • {warehouseStats.totalKg.toLocaleString()} kg
             </p>
             <p className="text-[11px] font-bold text-gray-400">
@@ -424,7 +424,7 @@ export default function WarehouseMode({
                   step="any"
                   value={convValue}
                   onChange={e => setConvValue(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 font-black text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
                 />
               </div>
 
@@ -452,7 +452,7 @@ export default function WarehouseMode({
                 <>
                   <div className="flex justify-between items-center text-sm">
                     <span className="font-bold text-gray-500">🥄 Grammda:</span>
-                    <span className="font-black text-indigo-600 dark:text-indigo-400">
+                    <span className="font-black text-brand-600 dark:text-brand-400">
                       {convertMeasurement(convValue, convFromUnit, 'gr').toLocaleString()} gr
                     </span>
                   </div>
@@ -473,7 +473,7 @@ export default function WarehouseMode({
                 <>
                   <div className="flex justify-between items-center text-sm">
                     <span className="font-bold text-gray-500">💧 Millilitrda:</span>
-                    <span className="font-black text-indigo-600 dark:text-indigo-400">
+                    <span className="font-black text-brand-600 dark:text-brand-400">
                       {convertMeasurement(convValue, convFromUnit, 'ml').toLocaleString()} ml
                     </span>
                   </div>
@@ -490,7 +490,7 @@ export default function WarehouseMode({
             <button
               type="button"
               onClick={() => setIsConverterOpen(false)}
-              className="w-full py-3 rounded-xl bg-indigo-600 text-white font-black text-sm"
+              className="w-full py-3 rounded-xl bg-brand-600 text-white font-black text-sm"
             >
               Yopish
             </button>

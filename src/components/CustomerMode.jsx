@@ -339,7 +339,7 @@ export default function CustomerMode({
               {cafeName}
             </h1>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-black bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-black bg-brand-50 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400">
                 🪑 {activeTable}
               </span>
               {serviceFeePercent > 0 && (
@@ -597,7 +597,7 @@ export default function CustomerMode({
                               x{it.quantity || it.qty || 1}
                             </span>
                             {it.note && (
-                              <p className="text-[11px] font-bold text-indigo-500">
+                              <p className="text-[11px] font-bold text-brand-600">
                                 💬 {it.note}
                               </p>
                             )}
@@ -628,7 +628,7 @@ export default function CustomerMode({
               <button
                 type="button"
                 onClick={() => setActiveTab('menu')}
-                className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-indigo-600/30 transition active:scale-95"
+                className="w-full py-4 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-brand-600/30 transition active:scale-95"
               >
                 + Yana qo'shimcha buyurtma berish
               </button>
@@ -646,7 +646,7 @@ export default function CustomerMode({
         className={`fixed bottom-[95px] right-4 w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition z-30 flex-col ${
           isWaiterCalled
             ? 'bg-gray-400 text-white cursor-not-allowed'
-            : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/40 active:scale-90'
+            : 'bg-brand-600 hover:bg-brand-700 text-white shadow-brand-600/40 active:scale-90'
         }`}
       >
         <span className="text-xl">🔔</span>
@@ -769,7 +769,7 @@ export default function CustomerMode({
                       onClick={() => handleToggleQuickNote(tag)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${
                         isSelected
-                          ? 'bg-indigo-600 text-white'
+                          ? 'bg-brand-600 text-white'
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                       }`}
                     >
@@ -848,7 +848,7 @@ export default function CustomerMode({
                         {(Number(item.price || 0) * Number(item.quantity || 1)).toLocaleString()} so'm
                       </p>
                       {item.note && (
-                        <p className="text-xs font-bold text-indigo-500 mt-1.5 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-lg inline-block">
+                        <p className="text-xs font-bold text-brand-600 mt-1.5 bg-brand-50 dark:bg-brand-900/30 px-2 py-1 rounded-lg inline-block">
                           💬 {item.note}
                         </p>
                       )}

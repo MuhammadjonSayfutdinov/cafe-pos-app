@@ -199,7 +199,7 @@ export default function QrSecuritySection({ addAuditLog, tables = [] }) {
               type="button"
               onClick={handleLocate}
               disabled={locating}
-              className="px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-black text-xs sm:text-sm whitespace-nowrap transition active:scale-95"
+              className="px-4 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-black text-xs sm:text-sm whitespace-nowrap transition active:scale-95"
             >
               {locating ? '⏳ Aniqlanmoqda...' : '📍 Shu qurilma turgan joy'}
             </button>

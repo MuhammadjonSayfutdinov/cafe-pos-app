@@ -186,7 +186,7 @@ export default function AdminAuditLogsTab({
             type="button"
             onClick={handleExportLogs}
             disabled={filteredLogs.length === 0}
-            className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 font-black text-xs transition active:scale-95 disabled:opacity-40"
+            className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 text-brand-600 dark:text-brand-400 font-black text-xs transition active:scale-95 disabled:opacity-40"
           >
             📥 Yuklab olish (.txt)
           </button>
@@ -210,7 +210,7 @@ export default function AdminAuditLogsTab({
           onClick={() => setFilterType('all')}
           className={`p-4 rounded-2xl border-2 text-left transition ${
             filterType === 'all'
-              ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20'
+              ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-900/20'
               : 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40'
           }`}
         >
@@ -266,7 +266,7 @@ export default function AdminAuditLogsTab({
             placeholder="🔍 Xodim, sana, harakat yoki tafsilotni qidiring..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-bold outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white transition"
+            className="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-bold outline-hidden focus:border-brand-500 text-gray-900 dark:text-white transition"
           />
           {searchTerm && (
             <button
@@ -338,7 +338,7 @@ export default function AdminAuditLogsTab({
                       {/* 2. Xodim va Roli */}
                       <td className="p-4 whitespace-nowrap">
                         <div className="flex items-center gap-2.5">
-                          <span className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-black shrink-0">
+                          <span className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xs font-black shrink-0">
                             {firstChar}
                           </span>
                           <span className="font-black text-gray-900 dark:text-white text-sm">

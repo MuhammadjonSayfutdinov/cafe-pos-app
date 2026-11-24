@@ -211,7 +211,7 @@ export default function StatsPopularItems({
           bg: 'bg-gray-300 dark:bg-gray-600',
           text: 'text-gray-900 dark:text-white',
           shadow: 'shadow-gray-400/30',
-          bar: 'bg-indigo-500',
+          bar: 'bg-brand-500',
           icon: '🥈'
         };
       case 2:
@@ -263,7 +263,7 @@ export default function StatsPopularItems({
                 onClick={() => setSortBy('count')}
                 className={`flex-1 sm:flex-initial px-3 py-2 rounded-xl text-xs font-black transition whitespace-nowrap ${
                   sortBy === 'count'
-                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    ? 'bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-xs'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-800'
                 }`}
               >
@@ -332,7 +332,7 @@ export default function StatsPopularItems({
                     onClick={() => setItemDateMode(p.id)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${
                       itemDateMode === p.id
-                        ? 'bg-indigo-600 text-white shadow-xs'
+                        ? 'bg-brand-600 text-white shadow-xs'
                         : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
                     }`}
                   >
@@ -352,7 +352,7 @@ export default function StatsPopularItems({
                       type="date"
                       value={customStartDate}
                       onChange={e => setCustomStartDate(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-300 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+                      className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-300 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
                     />
                   </div>
                   <div>
@@ -363,7 +363,7 @@ export default function StatsPopularItems({
                       type="date"
                       value={customEndDate}
                       onChange={e => setCustomEndDate(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-300 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+                      className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-300 dark:border-gray-700 text-xs font-black text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
                     />
                   </div>
                 </div>
@@ -420,7 +420,7 @@ export default function StatsPopularItems({
                       </div>
                       
                       <div className="text-right bg-white dark:bg-gray-800 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xs shrink-0">
-                        <p className="font-black text-indigo-600 dark:text-indigo-400 text-base md:text-xl leading-none">
+                        <p className="font-black text-brand-600 dark:text-brand-400 text-base md:text-xl leading-none">
                           {item.count.toLocaleString()}{' '}
                           <span className="text-xs font-bold text-gray-500">pors</span>
                         </p>
@@ -453,7 +453,7 @@ export default function StatsPopularItems({
             <button
               type="button"
               onClick={() => setShowAllRanks(prev => !prev)}
-              className="text-indigo-600 dark:text-indigo-400 font-black hover:underline"
+              className="text-brand-600 dark:text-brand-400 font-black hover:underline"
             >
               {showAllRanks ? '▲ Top-5 talikni qoldirish' : '▼ Top-15 talikni ko\'rish'}
             </button>
@@ -498,7 +498,7 @@ export default function StatsPopularItems({
             </div>
             <div className="flex justify-between text-gray-500">
               <span>🍲 Top taomlar sotuvi:</span>
-              <span className="font-black text-indigo-600 dark:text-indigo-400">
+              <span className="font-black text-brand-600 dark:text-brand-400">
                 {summaryStats.totalPortions} porsiya
               </span>
             </div>

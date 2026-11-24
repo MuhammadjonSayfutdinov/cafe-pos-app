@@ -154,7 +154,7 @@ export function CloseShiftModal({ orders, expenses, setOrders, setExpenses, curr
           value={counted}
           onChange={e => setCounted(e.target.value)}
           placeholder={String(report.expectedCash)}
-          className="mt-1 w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-lg text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+          className="mt-1 w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-lg text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
         />
       </label>
       {diff !== null && (
@@ -297,7 +297,7 @@ export default function ShiftPanel({ orders, expenses, setOrders, setExpenses, c
       {modal?.report && (
         <Modal title="📊 Z-hisobot" onClose={() => setModal(null)} wide>
           <ReportTable shift={modal.report} />
-          <button type="button" onClick={() => printShiftReport(modal.report, cafeName)} className="mt-4 w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black">
+          <button type="button" onClick={() => printShiftReport(modal.report, cafeName)} className="mt-4 w-full py-3.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-black">
             🖨 Chop etish
           </button>
         </Modal>
@@ -314,7 +314,7 @@ export default function ShiftPanel({ orders, expenses, setOrders, setExpenses, c
                   key={s.id}
                   type="button"
                   onClick={() => setModal({ report: s })}
-                  className="w-full text-left p-3 rounded-2xl bg-gray-50 dark:bg-gray-900/60 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 flex justify-between gap-3"
+                  className="w-full text-left p-3 rounded-2xl bg-gray-50 dark:bg-gray-900/60 hover:bg-brand-50 dark:hover:bg-brand-900/30 flex justify-between gap-3"
                 >
                   <span className="min-w-0">
                     <span className="block font-black text-sm text-gray-900 dark:text-white">{timeOf(s.openedAt)} — {timeOf(s.closedAt)}</span>

@@ -320,7 +320,7 @@ export default function AdminUsersTab({
                 placeholder="Masalan: Alisher" 
                 autoComplete="off"
                 required
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white font-bold transition"
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-brand-500 text-gray-900 dark:text-white font-bold transition"
               />
             </div>
 
@@ -338,7 +338,7 @@ export default function AdminUsersTab({
                 placeholder="Masalan: Barmen, Bosh oshpaz"
                 autoComplete="off"
                 maxLength={40}
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white font-bold transition"
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-brand-500 text-gray-900 dark:text-white font-bold transition"
               />
               <datalist id="staff-title-suggestions">
                 {TITLE_SUGGESTIONS.map(t => <option key={t} value={t} />)}
@@ -357,7 +357,7 @@ export default function AdminUsersTab({
                 name="role"
                 value={formData.role} 
                 onChange={handleInputChange}
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white font-bold transition cursor-pointer"
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-brand-500 text-gray-900 dark:text-white font-bold transition cursor-pointer"
               >
                 {roleOptions.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -374,7 +374,7 @@ export default function AdminUsersTab({
                 <button
                   type="button"
                   onClick={handleGenerateRandomPin}
-                  className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                  className="text-[11px] font-black text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
                   title="Takrorlanmas PIN-kodni avtomatik tanlash"
                 >
                   🎲 Avto-PIN
@@ -388,7 +388,7 @@ export default function AdminUsersTab({
                 onChange={handleInputChange} 
                 placeholder={`${requiredLenForForm} ta raqam...`}
                 required
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-indigo-500 text-gray-900 dark:text-white font-black tracking-[0.25em] transition"
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-brand-500 text-gray-900 dark:text-white font-black tracking-[0.25em] transition"
               />
             </div>
 
@@ -404,7 +404,7 @@ export default function AdminUsersTab({
                     name="canSeeSales"
                     checked={Boolean(formData.canSeeSales)}
                     onChange={handleInputChange}
-                    className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                    className="w-4 h-4 accent-brand-600 cursor-pointer"
                   />
                   <span className="text-xs font-black text-gray-700 dark:text-gray-300">
                     📊 Ofitsiant o'zining shaxsiy savdo summasini ko'ra olsin
@@ -425,7 +425,7 @@ export default function AdminUsersTab({
               )}
               <button 
                 type="submit" 
-                className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl font-black shadow-lg shadow-indigo-600/30 transition active:scale-95 whitespace-nowrap"
+                className="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-700 text-white px-8 py-3.5 rounded-xl font-black shadow-lg shadow-brand-600/30 transition active:scale-95 whitespace-nowrap"
               >
                 {editingId ? 'Saqlash 💾' : "Xodimni Qo'shish ➕"}
               </button>
@@ -455,7 +455,7 @@ export default function AdminUsersTab({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="🔍 Ism bo'yicha qidirish..."
-              className="flex-1 sm:w-48 px-3.5 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-indigo-500"
+              className="flex-1 sm:w-48 px-3.5 py-2 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
             />
 
             <div className="flex bg-gray-100 dark:bg-gray-900 p-1 rounded-xl">
@@ -470,7 +470,7 @@ export default function AdminUsersTab({
                   onClick={() => setFilterGroup(tab.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
                     filterGroup === tab.id
-                      ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                      ? 'bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-xs'
                       : 'text-gray-500 dark:text-gray-400'
                   }`}
                 >
@@ -499,13 +499,13 @@ export default function AdminUsersTab({
                   key={user.id} 
                   className={`bg-gray-50 dark:bg-gray-900/50 p-5 rounded-2xl border-2 flex flex-col justify-between hover:shadow-md transition-all group ${
                     editingId === user.id
-                      ? 'border-indigo-500 ring-2 ring-indigo-500/20'
+                      ? 'border-brand-500 ring-2 ring-brand-500/20'
                       : 'border-gray-200 dark:border-gray-700'
                   }`}
                 >
                   <div>
                     <div className="flex justify-between items-start mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-black flex items-center justify-center text-xl shadow-xs">
+                      <div className="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 font-black flex items-center justify-center text-xl shadow-xs">
                         {safeName.charAt(0).toUpperCase()}
                       </div>
 
@@ -546,7 +546,7 @@ export default function AdminUsersTab({
                       <button 
                         type="button"
                         onClick={() => togglePinVisibility(user.id)}
-                        className="ml-1 text-gray-400 hover:text-indigo-500 transition focus:outline-hidden"
+                        className="ml-1 text-gray-400 hover:text-brand-600 transition focus:outline-hidden"
                         title="Parolni ko'rsatish/yashirish"
                       >
                         {showPins[user.id] ? '🙈' : '👁️'}

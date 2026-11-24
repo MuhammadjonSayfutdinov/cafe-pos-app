@@ -120,8 +120,8 @@ export default function WarehouseHistoryTab({
     } else if (typeLower.includes('reviziya')) {
       category = 'reviziya';
       badgeLabel = '⚖️ Reviziya';
-      badgeStyle = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300';
-      barColor = 'bg-indigo-500';
+      badgeStyle = 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300';
+      barColor = 'bg-brand-500';
     } else if (typeLower.includes('sotuv') || typeLower.includes('avto')) {
       category = 'chiqim';
       badgeLabel = '🧾 Sotuv (Avto)';
@@ -291,7 +291,7 @@ export default function WarehouseHistoryTab({
             type="button"
             onClick={handleExportHistory}
             disabled={filteredLogs.length === 0}
-            className="flex-1 lg:flex-none px-4 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 font-black text-xs transition active:scale-95 disabled:opacity-40 whitespace-nowrap"
+            className="flex-1 lg:flex-none px-4 py-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 text-brand-600 dark:text-brand-400 font-black text-xs transition active:scale-95 disabled:opacity-40 whitespace-nowrap"
           >
             📥 Yuklab olish (.txt)
           </button>
@@ -352,7 +352,7 @@ export default function WarehouseHistoryTab({
                   <p className="text-xs font-bold text-gray-600 dark:text-gray-300 break-words">
                     {log.note}
                   </p>
-                  <p className="text-xs font-black text-indigo-500 mt-1.5">
+                  <p className="text-xs font-black text-brand-600 mt-1.5">
                     👤 {log.user}
                   </p>
                 </div>
@@ -405,7 +405,7 @@ export default function WarehouseHistoryTab({
                       {log.note}
                     </td>
 
-                    <td className="p-4 text-xs font-black text-indigo-500 text-right whitespace-nowrap">
+                    <td className="p-4 text-xs font-black text-brand-600 text-right whitespace-nowrap">
                       👤 {log.user}
                     </td>
                   </tr>

@@ -586,7 +586,7 @@ export default function KitchenMode({
             <button
               type="button"
               onClick={() => setIsSlaModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 font-black text-xs border border-indigo-200 dark:border-indigo-800 transition flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 text-brand-700 dark:text-brand-300 font-black text-xs border border-brand-200 dark:border-brand-800 transition flex items-center gap-1.5"
             >
               <span>⏱️ SLA Normativ:</span>
               <span className="text-amber-600 dark:text-amber-400">{slaConfig.warningMinutes}d</span>
@@ -604,7 +604,7 @@ export default function KitchenMode({
               <span className="text-[10px] font-black uppercase text-gray-400 block">
                 ⏱️ O'rtacha Pishirish Vaqti
               </span>
-              <p className="text-base sm:text-lg font-black text-indigo-600 dark:text-indigo-400 mt-0.5">
+              <p className="text-base sm:text-lg font-black text-brand-600 dark:text-brand-400 mt-0.5">
                 {kitchenKpi.avgCookFormatted}
               </p>
               <span className="text-[10px] font-bold text-gray-400">
@@ -721,7 +721,7 @@ export default function KitchenMode({
                   onClick={() => setStatusFilter(f.id)}
                   className={`px-3.5 py-2 rounded-xl text-xs font-black whitespace-nowrap transition ${
                     statusFilter === f.id
-                      ? 'bg-indigo-600 text-white shadow-xs'
+                      ? 'bg-brand-600 text-white shadow-xs'
                       : 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400'
                   }`}
                 >
@@ -1090,7 +1090,7 @@ export default function KitchenMode({
                   type="checkbox"
                   checked={slaConfig.autoSortByWait}
                   onChange={e => setSlaConfig(prev => ({ ...prev, autoSortByWait: e.target.checked }))}
-                  className="w-5 h-5 accent-indigo-600"
+                  className="w-5 h-5 accent-brand-600"
                 />
               </label>
             </div>
@@ -1106,7 +1106,7 @@ export default function KitchenMode({
               <button
                 type="button"
                 onClick={() => setIsSlaModalOpen(false)}
-                className="flex-1 py-3.5 rounded-xl bg-indigo-600 text-white font-black text-xs"
+                className="flex-1 py-3.5 rounded-xl bg-brand-600 text-white font-black text-xs"
               >
                 Saqlash ✓
               </button>

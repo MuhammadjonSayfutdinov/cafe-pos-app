@@ -51,7 +51,7 @@ export default function StatsPaymentBreakdown({
             <span className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
               💵 Naqd: {cashTotal.toLocaleString()} s
             </span>
-            <span className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/50">
+            <span className="px-3 py-1.5 rounded-xl bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 border border-brand-200/60 dark:border-brand-800/50">
               🏦 Elektron: {digitalTotal.toLocaleString()} s
             </span>
           </div>
@@ -71,7 +71,7 @@ export default function StatsPaymentBreakdown({
                 className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
                   isDebt && amount > 0
                     ? 'bg-orange-50/60 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800/60'
-                    : 'bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600'
+                    : 'bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600'
                 }`}
               >
                 <div>
@@ -115,7 +115,7 @@ export default function StatsPaymentBreakdown({
       </div>
 
       {/* O'NG TOMON: O'rtacha chek */}
-      <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-8 rounded-3xl shadow-lg text-white flex flex-col justify-center items-center text-center relative overflow-hidden group">
+      <div className="bg-gradient-to-br from-brand-500 to-brand-700 p-8 rounded-3xl shadow-lg text-white flex flex-col justify-center items-center text-center relative overflow-hidden group">
         <div className="absolute right-[-30px] bottom-[-30px] opacity-10 text-9xl group-hover:scale-110 transition-transform select-none pointer-events-none">
           📈
         </div>
@@ -124,14 +124,14 @@ export default function StatsPaymentBreakdown({
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 backdrop-blur-xs shadow-inner">
             📊
           </div>
-          <p className="text-indigo-100 font-black uppercase tracking-widest mb-2 text-xs sm:text-sm">
+          <p className="text-brand-100 font-black uppercase tracking-widest mb-2 text-xs sm:text-sm">
             O'rtacha Chek Summasi
           </p>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white drop-shadow-md break-words">
             {safeAverage.toLocaleString()}{' '}
             <span className="text-xl sm:text-2xl font-bold opacity-80">s</span>
           </h2>
-          <p className="text-xs font-bold text-indigo-100/90 mt-4 max-w-[260px] mx-auto leading-relaxed">
+          <p className="text-xs font-bold text-brand-100/90 mt-4 max-w-[260px] mx-auto leading-relaxed">
             Har bir yopilgan buyurtmadan restoranga tushayotgan o'rtacha daromad ko'rsatkichi.
           </p>
         </div>

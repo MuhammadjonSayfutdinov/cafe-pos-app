@@ -76,7 +76,7 @@ export default function AdminSyncSection() {
         <button
           type="button"
           onClick={syncNow}
-          className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm"
+          className="flex-1 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-black text-sm"
         >
           🔄 Hozir sinxronlash
         </button>
