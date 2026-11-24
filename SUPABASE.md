@@ -87,12 +87,26 @@ GitHub'ga yangi commit push qilinganda Vercel saytni avtomatik yangilaydi.
 
 ## Mijoz telefonidan QR-buyurtma
 
-1. Ofitsiant ekranida stol kartochkasidagi 📱 tugmasi → QR kodni chop eting va stolga yopishtiring.
-   QR kod `https://sizning-sayt/?table=3-Stol` manzilini ochadi.
+1. Admin → Tizim Sozlamalari → "🖨️ QR stikerlar" (yoki ofitsiant ekranidagi 📱) → chop eting va stolga yopishtiring.
+   QR kod `https://sizning-sayt/?table=3-Stol&k=<stol kaliti>` manzilini ochadi.
 2. Mijoz skanerlaydi → menyu ochiladi (kirish talab qilinmaydi) → savatga qo'shib "Buyurtmani tasdiqlash".
 3. Xodim ekranida "📱 QR-buyurtma: 3-Stol" chiqadi (ovozli signal bilan) → **Qabul qilish** yoki **Rad etish**.
 4. Mijoz "Buyurtmalarim" bo'limida holatni ko'radi: kutilmoqda → qabul qilindi / rad etildi.
-5. Mijoz "🔔 Ofitsiant" tugmasini bossa, xodim qurilmalarida chaqiruv chiqadi.
+5. Mijoz "🔔 Ofitsiant" tugmasini bossa, ofitsiant, kassa va admin ekranining tepasida qizil
+   "🔔 3-Stol: mijoz ofitsiantni chaqiryapti" chiqadi (ovoz bilan) → **✓ Bordim**.
+6. Chek kassada to'langach, mijoz telefonidagi "Buyurtmalarim" bo'shaydi.
+
+**Uzoqdan "o'yin" buyurtmasidan himoya** (Admin → Tizim Sozlamalari → "🛡️ QR-buyurtma himoyasi"):
+
+- Band stolga (to'lanmagan cheki bor) faqat o'sha stoldagi QR kodni skaner qilgan mijoz buyurtma beradi:
+  stikerda stolning maxfiy kaliti bor. Havolani qo'lda yozgan odam faqat bo'sh stolga so'rov yubora oladi,
+  ofitsiant ekranida "⚠️ kalitsiz havola" deb ko'rinadi.
+- **Faqat kafe ichidan** (ixtiyoriy): kafe joylashuvini kiriting (Google Maps'dan nusxa yoki "📍 Shu qurilma
+  turgan joy") va radiusni tanlang (200 m tavsiya). Shunda buyurtma va chaqiruv faqat telefon joylashuvi
+  shu radiusda bo'lsa qabul qilinadi.
+- Stiker surati tarqalib ketsa: "🔄 QR kalitlarini yangilash" → stikerlarni qayta chop eting.
+- Dastur yangilanganda `supabase/qr.sql` ni **yana bir marta to'liq** ishga tushiring, keyin
+  **QR stikerlarni qayta chop eting** (eski stikerda kalit yo'q: band stolga buyurtma o'tmaydi).
 
 Mijozga faqat sotuvdagi taomlar nomi va narxi ko'rinadi. Xodimlar, PIN kodlar, mijozlar ro'yxati va boshqa
 stollarning buyurtmalari ko'rinmaydi.
@@ -103,6 +117,8 @@ stollarning buyurtmalari ko'rinmaydi.
 - [ ] Menyu, narxlar, stollar va kategoriyalar kiritilgan
 - [ ] Supabase'da ochiq ro'yxatdan o'tish o'chirilgan (3-qadam)
 - [ ] `supabase/qr.sql` ishga tushirilgan, QR stikerlar chop etilgan, telefondan sinov buyurtmasi berilgan
+- [ ] Telefondan "🔔 Ofitsiant" bosildi → kassa/ofitsiant ekranida qizil chaqiruv chiqdi
+- [ ] "🛡️ QR-buyurtma himoyasi": kafe joylashuvi kiritilgan, "Faqat kafe ichidan" yoqilgan (ixtiyoriy)
 - [ ] Har bir qurilma ulangan, sarlavhada `☁️ Bulut` belgisi ko'rinadi
 - [ ] Sinov: ofitsiant planshetidan buyurtma → oshxona ekranida chiqdi → kassada to'landi
 - [ ] Sinov: Wi-Fi o'chirildi → buyurtma berildi (`📴 Oflayn`) → Wi-Fi yoqildi → boshqa qurilmaga yetib keldi

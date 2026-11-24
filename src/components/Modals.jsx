@@ -3,6 +3,7 @@ import { PAYMENT_METHOD } from '../constants/orderStatus';
 import useSticky from '../hooks/useSticky';
 import QrCodeSvg from '../qr/QrCodeSvg';
 import { QR_BASE_URL_KEY, buildTableQrUrl, isLocalOnlyUrl } from '../qr/tableQrUrl';
+import { useQrTableKey } from '../qr/useQrTableKey';
 
 // =========================================================================
 // 1. STOL UCHUN QR-KOD GENERATSIYA VA CHOP ETISH OYNASI (TableQrModal)
@@ -15,11 +16,15 @@ export function TableQrModal({
   const [copiedLink, setCopiedLink] = useState(false);
   // Sayt manzili: Admin -> Tizim Sozlamalari -> QR stikerlar (bo'sh bo'lsa joriy manzil)
   const [qrBaseUrl] = useSticky(QR_BASE_URL_KEY, '');
+  const getTableKey = useQrTableKey();
 
   const safeTable = String(table || '1-Stol');
 
-  // Mijoz skaner qiladigan to'liq URL manzil
-  const targetMenuUrl = useMemo(() => buildTableQrUrl(qrBaseUrl, safeTable), [qrBaseUrl, safeTable]);
+  // Mijoz skaner qiladigan to'liq URL manzil (stol kaliti bilan: src/qr/tableKey.js)
+  const targetMenuUrl = useMemo(
+    () => buildTableQrUrl(qrBaseUrl, safeTable, getTableKey(safeTable)),
+    [qrBaseUrl, safeTable, getTableKey]
+  );
   const isLocalOnly = isLocalOnlyUrl(qrBaseUrl);
 
   // Escape bosilganda yopish

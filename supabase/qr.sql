@@ -1,5 +1,7 @@
 -- Cafe POS: mijoz telefonidan QR-buyurtma (kirishsiz).
--- schema.sql dan KEYIN, SQL Editor'da bir marta ishga tushiring. Qayta ishga tushirish xavfsiz.
+-- schema.sql dan KEYIN, SQL Editor'da ishga tushiring. Qayta ishga tushirish xavfsiz.
+-- Dastur yangilanganda shu faylni yana bir marta TO'LIQ ishga tushiring (funksiyalar yangilanadi,
+-- ma'lumot o'chmaydi).
 --
 -- Xavfsizlik:
 --  * Mijoz jadvallarni to'g'ridan-to'g'ri o'qiy olmaydi (RLS). Faqat shu funksiyalar ochiq.
@@ -7,7 +9,18 @@
 --    (xodimlar, PIN, mijozlar, buyurtmalar ko'rinmaydi).
 --  * Narx SERVERDA menyudan olinadi: telefondan kelgan narxga ishonilmaydi.
 --  * Buyurtma darhol oshxonaga tushmaydi: ofitsiant/kassir "Qabul qilish" ni bosadi.
---  * Cheklov: bitta stoldan daqiqasiga 3 ta so'rov, umumiy daqiqasiga 60 ta.
+--  * Cheklov: bitta stoldan daqiqasiga 3 ta so'rov, umumiy daqiqasiga 60 ta,
+--    bitta stolda tasdiqlanmagan so'rovlar ko'pi bilan 3 ta.
+--  * Band stolga (to'lanmagan cheki bor) faqat stoldagi QR stikerni skaner qilgan mijoz
+--    buyurtma beradi: havolada stol kaliti bor (?table=3-Stol&k=..., src/qr/tableKey.js).
+--    Kalitsiz (havolani qo'lda yozgan) faqat bo'sh stolga buyurtma bera oladi.
+--  * "Faqat kafe ichidan" yoqilgan bo'lsa (Admin -> Tizim Sozlamalari, pos_qr_geofence),
+--    buyurtma va ofitsiant chaqiruvi telefon joylashuvi kafe radiusida bo'lsagina qabul qilinadi.
+
+-- Eski versiyadagi funksiyalar: parametrlari o'zgardi (bir xil nomli ikki funksiya qolmasin)
+drop function if exists public.qr_menu(text);
+drop function if exists public.qr_submit_order(text, jsonb, text);
+drop function if exists public.qr_call_waiter(text);
 
 -- Stol mavjudmi (pos_tables: ['1-Stol', ...] yoki [{name: '1-Stol'}, ...])
 create or replace function public.qr_table_exists(p_table text)
@@ -23,13 +36,124 @@ as $$
   );
 $$;
 
--- 1) Menyu: faqat sotuvdagi taomlar va kerakli maydonlar
-create or replace function public.qr_menu(p_table text)
+-- Stol band: to'lanmagan cheki bor. "Olib ketish" band bo'lmaydi (har buyurtma alohida chek)
+create or replace function public.qr_table_busy(p_table text)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select p_table <> 'Olib ketish' and exists (
+    select 1 from pos_records o
+     where o.collection = 'pos_orders' and not o.deleted
+       and o.data ->> 'table' = p_table
+       and coalesce(o.data ->> 'status', '') not in ('To''langan', 'Qarz', 'Arxiv')
+  );
+$$;
+
+-- Mijoz shu stolga buyurtma bera oladimi / ofitsiant chaqira oladimi.
+--  p_ctx: { k: stol kaliti (QR havoladan), r: [shu telefonning oldingi so'rov id lari],
+--           lat, lng, acc: telefon joylashuvi (metr) }
+--  Natija: { busy, key_ok, owner, geo_required } va rad etilsa { error, hint: busy|geo|far }
+create or replace function public.qr_access(p_table text, p_ctx jsonb)
 returns jsonb
 language plpgsql stable security definer set search_path = public
 as $$
 declare
-  v_menu jsonb;
+  v_ctx    jsonb := case when jsonb_typeof(p_ctx) = 'object' then p_ctx else '{}'::jsonb end;
+  v_secret text;
+  v_key_ok boolean := false;
+  v_busy   boolean;
+  v_owner  boolean := false;
+  v_ids    text[];
+  v_geo    jsonb;
+  v_geo_on boolean := false;
+  v_clat   double precision;
+  v_clng   double precision;
+  v_radius double precision := 200;
+  v_lat    double precision;
+  v_lng    double precision;
+  v_acc    double precision := 0;
+  v_dist   double precision;
+  v_res    jsonb;
+begin
+  -- 1) Stol kaliti: sha256(sir || '|' || stol) ning boshidagi 12 belgi
+  select value #>> '{}' into v_secret
+    from pos_kv where key = 'pos_qr_secret' and jsonb_typeof(value) = 'string';
+  if coalesce(length(v_secret), 0) >= 16 and coalesce(v_ctx ->> 'k', '') <> '' then
+    v_key_ok := (v_ctx ->> 'k') = left(encode(sha256(convert_to(v_secret || '|' || p_table, 'UTF8')), 'hex'), 12);
+  end if;
+
+  -- 2) Band stol: ochiq chekni aynan shu telefon ochgan bo'lsa ham ruxsat (uning QR-buyurtmasi qabul qilingan)
+  v_busy := qr_table_busy(p_table);
+  if v_busy and not v_key_ok and coalesce(jsonb_typeof(v_ctx -> 'r'), '') = 'array' then
+    select array_agg(x) into v_ids
+      from (select jsonb_array_elements_text(v_ctx -> 'r') as x limit 20) s;
+    v_owner := coalesce(array_length(v_ids, 1), 0) > 0 and exists (
+      select 1
+        from pos_records q
+        join pos_records o
+          on o.collection = 'pos_orders' and o.id = q.data ->> 'orderId' and not o.deleted
+       where q.collection = 'pos_qr_requests' and q.id = any (v_ids)
+         and q.data ->> 'table' = p_table and q.data ->> 'status' = 'accepted'
+         and o.data ->> 'table' = p_table
+         and coalesce(o.data ->> 'status', '') not in ('To''langan', 'Qarz', 'Arxiv')
+    );
+  end if;
+
+  -- 3) "Faqat kafe ichidan" sozlamasi
+  select value into v_geo from pos_kv where key = 'pos_qr_geofence';
+  if coalesce(jsonb_typeof(v_geo), '') = 'object' and coalesce(v_geo ->> 'enabled', '') = 'true'
+     and coalesce(jsonb_typeof(v_geo -> 'lat'), '') = 'number'
+     and coalesce(jsonb_typeof(v_geo -> 'lng'), '') = 'number' then
+    v_geo_on := true;
+    v_clat := (v_geo ->> 'lat')::double precision;
+    v_clng := (v_geo ->> 'lng')::double precision;
+    if coalesce(jsonb_typeof(v_geo -> 'radius'), '') = 'number' then
+      v_radius := least(greatest((v_geo ->> 'radius')::double precision, 50), 2000);
+    end if;
+  end if;
+
+  v_res := jsonb_build_object('busy', v_busy, 'key_ok', v_key_ok, 'owner', v_owner, 'geo_required', v_geo_on);
+
+  if v_busy and not v_key_ok and not v_owner then
+    return v_res || jsonb_build_object('hint', 'busy', 'error',
+      'Bu stol band. Shu stolda o''tirgan bo''lsangiz, stoldagi QR kodni telefon kamerasi bilan qayta skaner qiling yoki ofitsiantni chaqiring.');
+  end if;
+
+  if v_geo_on then
+    if coalesce(jsonb_typeof(v_ctx -> 'lat'), '') <> 'number' or coalesce(jsonb_typeof(v_ctx -> 'lng'), '') <> 'number' then
+      return v_res || jsonb_build_object('hint', 'geo', 'error',
+        'Buyurtma va chaqiruv faqat kafe ichidan qabul qilinadi. Telefon joylashuviga (GPS) ruxsat bering.');
+    end if;
+    v_lat := (v_ctx ->> 'lat')::double precision;
+    v_lng := (v_ctx ->> 'lng')::double precision;
+    if coalesce(jsonb_typeof(v_ctx -> 'acc'), '') = 'number' then
+      v_acc := least(greatest((v_ctx ->> 'acc')::double precision, 0), 150);
+    end if;
+    -- Ikki nuqta orasidagi masofa (metr, haversine)
+    v_dist := 2 * 6371000 * asin(least(1, sqrt(
+      power(sin(radians(v_lat - v_clat) / 2), 2) +
+      cos(radians(v_clat)) * cos(radians(v_lat)) * power(sin(radians(v_lng - v_clng) / 2), 2)
+    )));
+    if coalesce(v_dist - v_acc > v_radius, true) then
+      return v_res || jsonb_build_object('hint', 'far', 'error', format(
+        'Siz kafedan taxminan %s uzoqdasiz. Buyurtma va chaqiruv faqat kafe ichidan qabul qilinadi.',
+        case when v_dist >= 1000 then round((v_dist / 1000)::numeric, 1)::text || ' km'
+             else round(v_dist::numeric)::text || ' m' end));
+    end if;
+  end if;
+
+  return v_res;
+end;
+$$;
+
+-- 1) Menyu: faqat sotuvdagi taomlar va kerakli maydonlar
+create or replace function public.qr_menu(p_table text, p_ctx jsonb default '{}'::jsonb)
+returns jsonb
+language plpgsql stable security definer set search_path = public
+as $$
+declare
+  v_menu   jsonb;
+  v_access jsonb;
 begin
   if not qr_table_exists(p_table) then
     raise exception 'Stol topilmadi: %', p_table;
@@ -50,8 +174,18 @@ begin
      and not r.deleted
      and coalesce(r.data ->> 'is_available', 'true') <> 'false';
 
+  -- Telefon oldindan bilsin: band stolmi (kalitsiz buyurtma yo'q), joylashuv so'raladimi
+  v_access := qr_access(p_table, p_ctx);
+
   return jsonb_build_object(
     'table', p_table,
+    'access', jsonb_build_object(
+      'busy', v_access -> 'busy',
+      'key_ok', v_access -> 'key_ok',
+      'geo_required', v_access -> 'geo_required',
+      'blocked', coalesce(v_access ->> 'hint', '') = 'busy',
+      'message', case when coalesce(v_access ->> 'hint', '') = 'busy' then v_access -> 'error' end
+    ),
     'cafe_name', (select value from pos_kv where key = 'pos_cafe_name'),
     'service_fee', (select value from pos_kv where key = 'pos_service_fee'),
     'categories', (select value from pos_kv where key = 'pos_categories'),
@@ -61,7 +195,8 @@ end;
 $$;
 
 -- 2) Buyurtma so'rovi: ofitsiant tasdiqlashini kutadi
-create or replace function public.qr_submit_order(p_table text, p_items jsonb, p_note text default '')
+create or replace function public.qr_submit_order(p_table text, p_items jsonb, p_note text default '',
+                                                  p_ctx jsonb default '{}'::jsonb)
 returns jsonb
 language plpgsql volatile security definer set search_path = public
 as $$
@@ -79,9 +214,14 @@ declare
   v_recent   int;
   v_now_ms   bigint := floor(extract(epoch from clock_timestamp()) * 1000);
   v_id       text;
+  v_access   jsonb;
 begin
   if not qr_table_exists(p_table) then
     raise exception 'Stol topilmadi: %', p_table;
+  end if;
+  v_access := qr_access(p_table, p_ctx);
+  if v_access ? 'error' then
+    raise exception using message = v_access ->> 'error', hint = v_access ->> 'hint';
   end if;
   if p_items is null or jsonb_typeof(p_items) <> 'array'
      or jsonb_array_length(p_items) = 0 or jsonb_array_length(p_items) > 30 then
@@ -98,6 +238,12 @@ begin
    where collection = 'pos_qr_requests' and created_at > now() - interval '1 minute';
   if v_recent >= 60 then
     raise exception 'Hozir so''rovlar juda ko''p. Ofitsiantni chaqiring';
+  end if;
+  select count(*) into v_recent from pos_records
+   where collection = 'pos_qr_requests' and not deleted and data ->> 'table' = p_table
+     and data ->> 'status' = 'pending' and created_at > now() - interval '3 hours';
+  if v_recent >= 3 then
+    raise exception 'Oldingi buyurtmalaringiz hali tasdiqlanmadi. Ofitsiant ko''rib chiqishini kuting';
   end if;
 
   for v_item in select * from jsonb_array_elements(p_items) loop
@@ -158,7 +304,10 @@ begin
     'note', left(coalesce(p_note, ''), 300),
     'status', 'pending',
     'createdAt', v_now_ms,
-    'time', to_char(now() at time zone 'Asia/Tashkent', 'HH24:MI')
+    'time', to_char(now() at time zone 'Asia/Tashkent', 'HH24:MI'),
+    -- Xodim ekranida: QR stiker skaner qilinganmi (kalit to'g'ri), joylashuv tekshirilganmi
+    'keyOk', coalesce((v_access ->> 'key_ok')::boolean, false),
+    'geoChecked', coalesce((v_access ->> 'geo_required')::boolean, false)
   ), 'qr');
 
   return jsonb_build_object('ok', true, 'id', v_id, 'items', v_items, 'subTotal', v_sub);
@@ -166,17 +315,28 @@ end;
 $$;
 
 -- 3) Ofitsiantni chaqirish (bitta stoldan 30 soniyada bir marta)
-create or replace function public.qr_call_waiter(p_table text)
+create or replace function public.qr_call_waiter(p_table text, p_ctx jsonb default '{}'::jsonb)
 returns jsonb
 language plpgsql volatile security definer set search_path = public
 as $$
 declare
   v_now_ms bigint := floor(extract(epoch from clock_timestamp()) * 1000);
   v_id     text;
+  v_access jsonb;
 begin
   if not qr_table_exists(p_table) then
     raise exception 'Stol topilmadi: %', p_table;
   end if;
+  v_access := qr_access(p_table, p_ctx);
+  if v_access ? 'error' then
+    raise exception using message = v_access ->> 'error', hint = v_access ->> 'hint';
+  end if;
+  -- 15 daqiqadan eski, javobsiz qolgan chaqiruv yangisiga almashadi (eski versiyada xodim
+  -- ekrani chaqiruvni ko'rsatmasdi: o'chirilmay qolgan chaqiruv yangisini to'sib qo'yardi)
+  update pos_records
+     set deleted = true, data = '{}'::jsonb, updated_by = 'qr'
+   where collection = 'pos_calls' and not deleted and data ->> 'table' = p_table
+     and created_at < now() - interval '15 minutes';
   if exists (select 1 from pos_records
               where collection = 'pos_calls' and not deleted and data ->> 'table' = p_table) then
     return jsonb_build_object('ok', true, 'already', true);
@@ -194,19 +354,50 @@ begin
     'table', p_table,
     'time', to_char(now() at time zone 'Asia/Tashkent', 'HH24:MI'),
     'createdAt', v_now_ms,
-    'source', 'qr'
+    'source', 'qr',
+    'keyOk', coalesce((v_access ->> 'key_ok')::boolean, false)
   ), 'qr');
   return jsonb_build_object('ok', true, 'id', v_id);
 end;
 $$;
 
--- 4) Mijoz o'z so'rovlarining holatini ko'radi (faqat id bo'yicha, ko'pi bilan 20 ta)
+-- 4) Mijoz o'z so'rovlarining holatini ko'radi (faqat id bo'yicha, ko'pi bilan 20 ta).
+--    Qabul qilingan so'rov uchun chek holati ham: orderStatus (Yangi, Tayyor, ...) va
+--    closed = chek to'langan/qarzga yozilgan/bekor qilingan. Telefon yopilgan chekni ro'yxatdan
+--    olib tashlaydi (oldin to'langan taom "tayyorlanmoqda" bo'lib qolib ketardi).
 create or replace function public.qr_request_status(p_ids text[])
 returns jsonb
 language sql stable security definer set search_path = public
 as $$
-  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'status', r.data ->> 'status')), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', r.id,
+           'status', r.data ->> 'status',
+           'orderStatus', o.status,
+           'closed', case
+             when coalesce(r.data ->> 'status', '') <> 'accepted' then false
+             when o.closed is not null then o.closed
+             -- chek topilmadi: qabul qilinganiga 1 daqiqadan oshgan bo'lsa yopilgan deb olamiz
+             -- (xodim qurilmasi chekni bulutga 1-2 soniyada yozadi)
+             else case when jsonb_typeof(r.data -> 'handledAt') = 'number'
+                       then (r.data ->> 'handledAt')::numeric else 0 end
+                  < floor(extract(epoch from now()) * 1000) - 60000
+           end
+         )), '[]'::jsonb)
     from pos_records r
+    left join lateral (
+      select x.data ->> 'status' as status,
+             (x.deleted or coalesce(x.data ->> 'status', '') in ('To''langan', 'Qarz', 'Arxiv')) as closed
+        from pos_records x
+       where coalesce(r.data ->> 'status', '') = 'accepted'
+         and x.collection = 'pos_orders'
+         and case when coalesce(r.data ->> 'orderId', '') <> ''
+                  then x.id = r.data ->> 'orderId'
+                  else x.data ->> 'table' = r.data ->> 'table' and not x.deleted
+                       and coalesce(x.data ->> 'status', '') not in ('To''langan', 'Qarz', 'Arxiv')
+             end
+       order by x.updated_at desc
+       limit 1
+    ) o on true
    where r.collection = 'pos_qr_requests'
      and r.id = any (p_ids[1:20]);
 $$;
@@ -238,16 +429,23 @@ begin
 end;
 $$;
 
--- Ruxsatlar: faqat shu funksiyalar mijozga (anon) ochiq
-revoke all on function public.qr_table_exists(text) from public;
-revoke all on function public.qr_menu(text) from public;
-revoke all on function public.qr_submit_order(text, jsonb, text) from public;
-revoke all on function public.qr_call_waiter(text) from public;
+-- Ruxsatlar: faqat shu funksiyalar mijozga (anon) ochiq.
+-- Yordamchi funksiyalar (stol kaliti, bandlik) to'g'ridan-to'g'ri chaqirilmaydi: Supabase yangi
+-- funksiyaga anon ruxsatini o'zi beradi, shuning uchun anon va authenticated dan ham olinadi.
+revoke all on function public.qr_table_exists(text) from public, anon, authenticated;
+revoke all on function public.qr_table_busy(text) from public, anon, authenticated;
+revoke all on function public.qr_access(text, jsonb) from public, anon, authenticated;
+revoke all on function public.qr_menu(text, jsonb) from public;
+revoke all on function public.qr_submit_order(text, jsonb, text, jsonb) from public;
+revoke all on function public.qr_call_waiter(text, jsonb) from public;
 revoke all on function public.qr_request_status(text[]) from public;
 revoke all on function public.qr_claim_request(text, text, text) from public;
 
-grant execute on function public.qr_menu(text) to anon, authenticated;
-grant execute on function public.qr_submit_order(text, jsonb, text) to anon, authenticated;
-grant execute on function public.qr_call_waiter(text) to anon, authenticated;
+grant execute on function public.qr_menu(text, jsonb) to anon, authenticated;
+grant execute on function public.qr_submit_order(text, jsonb, text, jsonb) to anon, authenticated;
+grant execute on function public.qr_call_waiter(text, jsonb) to anon, authenticated;
 grant execute on function public.qr_request_status(text[]) to anon, authenticated;
 grant execute on function public.qr_claim_request(text, text, text) to authenticated;
+
+-- Supabase API (PostgREST) yangi funksiyalarni darhol ko'rsin
+notify pgrst, 'reload schema';

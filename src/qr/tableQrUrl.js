@@ -1,4 +1,5 @@
-// Stol QR kodidagi havola: <sayt manzili>?table=<stol nomi> (o'qiydigan tomoni: src/main.jsx)
+// Stol QR kodidagi havola: <sayt manzili>?table=<stol nomi>&k=<stol kaliti> (o'qiydigan tomoni: src/main.jsx)
+// Stol kaliti: src/qr/tableKey.js (band stolga faqat QR skaner qilgan mijoz buyurtma beradi)
 //
 // Sayt manzili admin sozlamasida (pos_qr_base_url, bulut orqali barcha qurilmalarga boradi).
 // Bo'sh bo'lsa, hozirgi ochilgan manzil olinadi. Stikerni kompyuterda "localhost" yoki
@@ -29,8 +30,8 @@ export const normalizeQrBaseUrl = (input) => {
 
 export const resolveQrBaseUrl = (saved) => normalizeQrBaseUrl(saved) || currentAppUrl();
 
-export const buildTableQrUrl = (baseUrl, table) =>
-  `${resolveQrBaseUrl(baseUrl)}?table=${encodeURIComponent(String(table || ''))}`;
+export const buildTableQrUrl = (baseUrl, table, key = '') =>
+  `${resolveQrBaseUrl(baseUrl)}?table=${encodeURIComponent(String(table || ''))}${key ? `&k=${encodeURIComponent(key)}` : ''}`;
 
 // Faqat shu kompyuter yoki shu Wi-Fi ichida ochiladigan manzil
 export const isLocalOnlyUrl = (baseUrl) => {

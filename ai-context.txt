@@ -75,7 +75,10 @@ Avtorizatsiya va umumiy:
 
 Mijoz (QR):
   CustomerQRView (915), CustomerMode (926)
-  src/qr/PublicQrApp.jsx, qrApi.js   ?table=... sahifasi (kirishsiz, supabase/qr.sql)
+  src/qr/PublicQrApp.jsx, qrApi.js   ?table=...&k=... sahifasi (kirishsiz, supabase/qr.sql)
+  src/qr/tableKey.js, useQrTableKey.js  stol kaliti (k) va "faqat kafe ichidan" sozlamasi
+  QrSecuritySection                  Admin -> Sozlamalar: QR himoyasi (joylashuv, kalitni yangilash)
+  WaiterCallsPanel                   mijoz chaqiruvlari (pos_calls) xodim ekranining tepasida
   src/qr/qrEncode.js, QrCodeSvg.jsx  QR kod yaratish (kutubxonasiz, tashqi xizmatsiz)
   src/qr/tableQrUrl.js               stol havolasi; sayt manzili pos_qr_base_url
   QrStickerSheet                     barcha stollar uchun A4 stiker varag'i (Admin -> Sozlamalar)
@@ -123,6 +126,10 @@ pos_audit_logs    audit jurnali   pos_service_fee  xizmat foizi (10)
 pos_cafe_name     kafe nomi       pos_theme        dark/light (boolean)
 pos_override_enabled  admin PIN himoyasi yoqilganmi (boolean)
 pos_qr_base_url   stol QR kodi ochadigan sayt manzili ('' = joriy manzil)
+pos_qr_secret     stol QR kalitlari siri (src/qr/tableKey.js); mijozga ko'rinmaydi
+pos_qr_geofence   { enabled, lat, lng, radius }: QR buyurtma faqat kafe ichidan
+pos_qr_requests   mijoz telefonidan so'rovlar: { id, table, items, subTotal, status
+                  ('pending'|'accepted'|'rejected'), keyOk, geoChecked, orderId (qabul qilingach) }
 
 pos_menu (taom):
   { id, name, category, is_available, variants: [{id, name, price}],
@@ -161,7 +168,9 @@ pos_inventory: { id, name, unit, quantity, minLimit, costPrice, updatedAt }
 pos_inv_logs: ombor amallari, turlari: 'kirim', 'chiqim_avto', 'spisanie'
 pos_customers: { name, phone, bonusBalance, ... } (CRM, bonus/keshbek)
 pos_audit_logs: { id, date, action, details, userName, role }
-pos_calls: [{ id, table, time }]
+pos_calls: [{ id, table, time, createdAt, source?: 'qr', keyOk? }]
+  Ko'rsatiladi: WaiterCallsPanel (ofitsiant/kassir/admin) va WaiterTableGrid.
+  O'chirish: App.handleClearCall(stol) - pos_calls va buyurtmadagi eski hasCall belgisi.
 
 ---------------------------------------------------------------------------
 5. BIZNES QOIDALARI (kutilgan xatti-harakat)
@@ -178,6 +187,11 @@ pos_calls: [{ id, table, time }]
 - Statistika: faqat "To'langan" (va alohida blokda 'Qarz') hisoblanadi.
 - Xavfsiz amallar (o'chirish, zaxira tiklash, bazani tozalash) admin PIN
   tasdig'ini talab qiladi.
+- QR-buyurtma: band stolga (to'lanmagan cheki bor) faqat stoldagi QR (to'g'ri k=)
+  bilan yoki shu telefon o'zi ochgan chekka; kalitsiz faqat bo'sh stolga. Mijoz
+  ekrani (kirish oynasi -> QR-Menyu) faqat bo'sh stolni ochadi. "Faqat kafe
+  ichidan" yoqilsa, buyurtma va chaqiruv telefon joylashuvi bilan. Tekshiruv
+  serverda: supabase/qr.sql -> qr_access. "Olib ketish" hech qachon band emas.
 
 ---------------------------------------------------------------------------
 6. MA'LUM MUAMMOLAR

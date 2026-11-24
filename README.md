@@ -9,7 +9,9 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
 - **Oshxona (KDS):** buyurtmalar navbati, kechikish ogohlantirishi (SLA), stop-list; dozakazda faqat yangi porsiyalar chiqadi
 - **Kassa:** naqd, plastik, Click/Payme, aralash va qarzga to'lov; chegirma, bonus/keshbek, pre-chek, qarzlar ro'yxati;
   smena ochish/yopish, sanalgan naqd va farq, Z-hisobot (chop etish, Telegram), smenalar tarixi
-- **Mijoz QR-menyusi:** stoldagi QR kod orqali o'z telefonidan buyurtma (ofitsiant tasdiqlaydi), ofitsiantni chaqirish.
+- **Mijoz QR-menyusi:** stoldagi QR kod orqali o'z telefonidan buyurtma (ofitsiant tasdiqlaydi), ofitsiantni chaqirish
+  (chaqiruv ofitsiant, kassa va admin ekranida qizil bo'lib chiqadi). Band stolga faqat stoldagi QR bilan buyurtma
+  beriladi; ixtiyoriy "Faqat kafe ichidan" (telefon joylashuvi) — uzoqdan "o'yin" buyurtmasi o'tmaydi.
   Barcha stollar uchun QR stikerlarni bitta A4 varaqda chop etish: Boshqaruv → Tizim Sozlamalari → "🖨️ QR stikerlar"
   (QR kod qurilmaning o'zida yaratiladi, internet shart emas)
 - **Kuryer (yetkazib berish):** ofitsiant ekranida "🛵 Yangi yetkazish" (telefon, manzil, mo'ljal, yetkazish narxi;

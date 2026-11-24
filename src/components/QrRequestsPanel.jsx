@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
+import { CLOSED_ORDER_STATUSES, TAKEAWAY_TABLE } from '../constants/orderStatus';
 
 // Mijoz telefonidan kelgan QR-buyurtma so'rovlari (supabase/qr.sql -> pos_qr_requests).
 // Ofitsiant/kassir/admin ekranida chiqadi: "Qabul qilish" -> buyurtma oshxonaga tushadi.
@@ -23,11 +24,17 @@ const beep = () => {
   }
 };
 
-export default function QrRequestsPanel({ requests, onAccept, onReject }) {
+export default function QrRequestsPanel({ requests, orders, onAccept, onReject }) {
   const pending = useMemo(
     () => (Array.isArray(requests) ? requests : []).filter(r => r && r.status === 'pending'),
     [requests]
   );
+  // Ochiq cheki bor stollar: so'rov shu chekka qo'shiladi (dozakaz)
+  const busyTables = useMemo(() => new Set(
+    (Array.isArray(orders) ? orders : [])
+      .filter(o => o && o.table !== TAKEAWAY_TABLE && !CLOSED_ORDER_STATUSES.includes(o.status))
+      .map(o => String(o.table))
+  ), [orders]);
 
   const prevCount = useRef(pending.length);
   useEffect(() => {
@@ -58,6 +65,15 @@ export default function QrRequestsPanel({ requests, onAccept, onReject }) {
               {req.note && <p className="text-xs font-bold text-red-600 dark:text-red-300">Izoh: {req.note}</p>}
               <p className="text-xs font-black text-sky-700 dark:text-sky-300 mt-0.5">
                 {total.toLocaleString()} so'm (xizmat haqisiz)
+              </p>
+              {/* Ofitsiant qaror qilishi uchun: stol bandmi, mijoz QR stikerni skaner qilganmi */}
+              <p className="text-[11px] font-black mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                <span className={busyTables.has(String(req.table)) ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}>
+                  {busyTables.has(String(req.table)) ? "🍽️ Stol band: ochiq chekka qo'shiladi" : "🪑 Stol bo'sh: yangi chek ochiladi"}
+                </span>
+                {req.keyOk === true && <span className="text-emerald-700 dark:text-emerald-300">🔐 Stoldagi QR skaner qilingan</span>}
+                {req.keyOk === false && <span className="text-red-600 dark:text-red-300">⚠️ Eski yoki qo'lda yozilgan havola: stolda mijoz borligini tekshiring</span>}
+                {req.geoChecked && <span className="text-emerald-700 dark:text-emerald-300">📍 Kafe ichidan</span>}
               </p>
             </div>
             <div className="flex gap-2 shrink-0">

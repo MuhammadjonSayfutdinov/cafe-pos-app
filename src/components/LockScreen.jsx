@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
-import { ORDER_STATUS } from '../constants/orderStatus';
+import { CLOSED_ORDER_STATUSES } from '../constants/orderStatus';
 import { APP_BUILD, APP_BUILD_TIME } from '../pwa/update';
 
 // Qurilmadagi dastur versiyasi: telefon va kompyuter bir xil versiyadami, solishtirish uchun
@@ -84,7 +84,7 @@ export default function LockScreen({
     return allTablesList.map(tableName => {
       const nameStr = typeof tableName === 'object' ? tableName.name : String(tableName);
       const hasActiveOrder = activeOrdersList.some(
-        o => o && o.table === nameStr && o.status !== ORDER_STATUS.PAID && o.status !== ORDER_STATUS.DEBT
+        o => o && o.table === nameStr && !CLOSED_ORDER_STATUSES.includes(o.status)
       );
       return {
         name: nameStr,
@@ -165,7 +165,10 @@ export default function LockScreen({
   // ==========================================
   // 4. MIJOZ QR-MENYUSIGA STOL TANLAB KIRISH
   // ==========================================
+  // Faqat bo'sh stol ochiladi: band stolga (boshqa mijozning chekiga) buyurtma faqat o'sha
+  // stoldagi QR kodni telefon bilan skaner qilib beriladi (App.jsx ham tekshiradi)
   const handleSelectCustomerTable = (tableName) => {
+    if (tablesWithStatus.some(t => t.name === tableName && t.isOccupied)) return;
     setIsTableModalOpen(false);
     const callback = onGuestLogin || onOpenQrMenu;
     if (typeof callback === 'function') {
@@ -357,7 +360,8 @@ export default function LockScreen({
                   <span>🪑</span> Stolingizni tanlang
                 </h3>
                 <p className="text-xs font-bold text-gray-400 mt-1">
-                  QR-Menyuni ochish uchun bo'sh stollardan birini bosing
+                  QR-Menyuni ochish uchun bo'sh stollardan birini bosing.
+                  Band stolda o'tirgan bo'lsangiz, stoldagi QR kodni telefoningiz bilan skaner qiling.
                 </p>
               </div>
               <button
@@ -418,10 +422,12 @@ export default function LockScreen({
                       key={item.name}
                       type="button"
                       onClick={() => handleSelectCustomerTable(item.name)}
-                      className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-1.5 transition active:scale-95 ${
+                      disabled={item.isOccupied}
+                      title={item.isOccupied ? "Band stol: stoldagi QR kodni telefon bilan skaner qiling" : undefined}
+                      className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-1.5 transition ${
                         item.isOccupied
-                          ? 'bg-amber-50/70 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/60 hover:border-amber-400'
-                          : 'bg-emerald-50/70 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/60 hover:border-emerald-500'
+                          ? 'bg-gray-100 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700 opacity-70 cursor-not-allowed'
+                          : 'bg-emerald-50/70 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/60 hover:border-emerald-500 active:scale-95'
                       }`}
                     >
                       <span className="text-2xl">
@@ -432,10 +438,10 @@ export default function LockScreen({
                       </span>
                       <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
                         item.isOccupied
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'
+                          ? 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
                           : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
                       }`}>
-                        {item.isOccupied ? 'Band (Aktiv)' : "Bo'sh"}
+                        {item.isOccupied ? '🔒 Band · QR orqali' : "Bo'sh"}
                       </span>
                     </button>
                   ))}

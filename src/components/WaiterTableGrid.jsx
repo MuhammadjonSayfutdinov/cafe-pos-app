@@ -19,6 +19,8 @@ export default function WaiterTableGrid({
   tableTimers = {},
   selectedTable,
   onSelectTable,
+  // Mijoz chaqirgan stollar (Set): telefondan yoki mijoz ekranidan, bo'sh stol bo'lsa ham
+  calledTables,
   onClearTableCall,
   onOpenTransferModal,
   onOpenSplitModal,
@@ -133,7 +135,7 @@ export default function WaiterTableGrid({
         return sum + p * q;
       }, 0);
 
-      const hasCall = Boolean(activeOrder?.hasCall);
+      const hasCall = Boolean(activeOrder?.hasCall) || Boolean(calledTables?.has?.(tableName));
       const isBusy = Boolean(activeOrder);
       const isReserved = Boolean(reservation);
       const isTimed = Boolean(timerLive);
@@ -152,7 +154,7 @@ export default function WaiterTableGrid({
         isTimed
       };
     });
-  }, [safeTables, safeOrders, safeReservations, safeTimers, nowMs]);
+  }, [safeTables, safeOrders, safeReservations, safeTimers, nowMs, calledTables]);
 
   // Ko'rsatkichlar (Badges)
   const counts = useMemo(() => {

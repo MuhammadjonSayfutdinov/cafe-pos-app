@@ -1,6 +1,6 @@
 # PROGRESS — cafe-pos-app
 
-Oxirgi yangilanish: 2026-11-23
+Oxirgi yangilanish: 2026-11-24
 Joriy bosqich: **pilot**. 3-bosqich (Supabase) va 4-bosqichning asosiy funksiyalari `tortinchi-bosqich` branch'ida. Sozlash: `SUPABASE.md`.
 
 > Bu fayl Claude uchun yozilgan. Barcha kodni faqat Claude yozadi (Gemini ishlatilmaydi).
@@ -39,6 +39,9 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 ## Joriy vazifa
 
 **Pilot:** foydalanuvchi `supabase/qr.sql` ni ishga tushiradi, saytni Vercel'ga joylaydi, kafeda sinaydi.
+**QR himoyasi (B15–B18) dan keyin:** `supabase/qr.sql` ni Supabase'da yana bir marta to'liq ishga tushirish,
+QR stikerlarni qayta chop etish (yangi stikerda stol kaliti bor), xohlasa Admin → Tizim Sozlamalari →
+"🛡️ QR-buyurtma himoyasi" da "Faqat kafe ichidan" ni yoqish.
 Stollar uchun QR stikerlar tayyor: Admin → Tizim Sozlamalari → Stollar → "🖨️ QR stikerlar".
 Pilotda: sayt manzilini (Vercel) yozib stikerlarni chop etish, bittasini telefon bilan skaner qilib tekshirish.
 Yangi kod qurilmalarga faqat `master` ga push qilingach (Vercel joylagach) yetib boradi, keyin o'zi yangilanadi.
@@ -76,6 +79,10 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | B12 | Telegram yuborish kodi 3 joyda nusxalangan, `telegramNotifier.js` ishlatilmaydi | `CashierMode`, `WaiterMode`, `StatsMode` | 2 | [x] |
 | B13 | Taxminan 70 ta `alert/confirm` | ko'p fayllar | 2 | [x] |
 | B14 | Chekni bo'lishda `movTotals` aniqlanmagan: bo'lingandan keyin xato chiqib, oyna yopilmasdi (qayta bosilsa ikki marta bo'linardi) | `WaiterMode.jsx` (`handleConfirmSplit`) | 4 | [x] |
+| B15 | Telefondan ofitsiant chaqiruvi xodim ekraniga chiqmasdi: `pos_calls` ni hech bir ekran o'qimasdi (faqat buyurtmadagi `hasCall`); javobsiz qolgan chaqiruv serverda yangisini to'sardi | `App.jsx`, `WaiterMode.jsx`, `WaiterTableGrid.jsx`, `WaiterCallsPanel.jsx`, `qr.sql` | pilot | [x] |
+| B16 | Chek to'langach taom mijoz "Buyurtmalarim" da sariq "tayyorlanmoqda" bo'lib qolardi: telefon chek holatini bilmasdi; mijoz ekranida ro'yxat bo'shasa lokal nusxa qayta chiqardi | `CustomerQRView.jsx`, `PublicQrApp.jsx`, `App.jsx` (`handleQrRequest`), `qr.sql` (`qr_request_status`) | pilot | [x] |
+| B17 | Mijoz ekranida (kirish oynasi → "Mijoz uchun QR-Menyu") band stolni tanlab, boshqa mijozning chekiga buyurtma berish mumkin edi | `LockScreen.jsx`, `App.jsx` | pilot | [x] |
+| B18 | QR havolani qo'lda yozib (stolda o'tirmasdan, uzoqdan) istalgan stolga buyurtma va chaqiruv yuborish mumkin edi | `qr.sql` (`qr_access`), `src/qr/tableKey.js`, `QrSecuritySection.jsx`, `PublicQrApp.jsx` | pilot | [x] |
 
 ## Bosqichlar
 
@@ -138,6 +145,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | Lavozim nomi | `user.title` faqat ko'rsatish uchun (admin o'zi yozadi: "Barmen", "Bosh oshpaz"). Kirish huquqi har doim `role` bo'yicha | qabul qilindi |
 | QR kod yaratish | Qurilmaning o'zida (`src/qr/qrEncode.js`, kutubxonasiz). Oldin `api.qrserver.com` ishlatilardi: internetsiz rasm chiqmasdi (o'rniga skanerlanmaydigan soxta rasm), stol havolasi begona serverga ketardi. Sayt manzili `pos_qr_base_url` (bulut orqali barcha qurilmalarga), bo'sh bo'lsa joriy manzil; localhost/192.168.x da ogohlantirish. Stikerda xato tuzatish darajasi Q (25%): stol ustida kir bo'lsa ham o'qiladi | qabul qilindi |
 | Yangi versiyaga o'tish | Qurilma `/version.json` ni tekshiradi (ochilganda, 5 daqiqada, fondan qaytganda, internet qaytganda). Versiya = kod fayllari mazmunidan hash: kod o'zgarmasa qayta deploy yangilanish chaqirmaydi. Yangilash xavfsiz paytda: PIN oynasida 20 s harakatsiz, ishlayotgan xodimda 3 daqiqa harakatsiz (xodim o'sha ekranga PIN'siz qaytadi: sessionStorage, 1 daqiqa, bir marta; avto-qulf yopiq bo'lsa PIN so'raladi), savatcha/yetkazish formasi ochiq bo'lsa kutadi. Mijoz QR sahifasi faqat fonga o'tganda. Oldingi "Yangilansinmi?" oynasi olib tashlandi: rad etilsa, qurilma eski versiyada qolib ketardi. Sayt `master` dan joylanadi (README: "Yangi versiyani chiqarish") | qabul qilindi |
+| QR-buyurtma himoyasi | Band stolga (to'lanmagan cheki bor) telefondan faqat stoldagi QR bilan: havolada stol kaliti `k` = sha256(`pos_qr_secret` + '\|' + stol) ning 12 belgisi (`src/qr/tableKey.js`, kutubxonasiz, http da ham ishlaydi). Server tekshiradi (`qr.sql` → `qr_access`), sir mijozga ko'rinmaydi. Kalitsiz: faqat bo'sh stol yoki shu telefon o'zi ochgan chek (qabul qilingan so'rovdagi `orderId`). "Faqat kafe ichidan" (`pos_qr_geofence`, ixtiyoriy): buyurtma va chaqiruv telefon GPS kafe radiusida bo'lsa (aniqlik 150 m gacha hisobga olinadi). Mijoz ekrani (kiosk) faqat bo'sh stolni ochadi. Ofitsiant tasdig'i saqlanadi, so'rov kartasida "QR skaner qilingan / kalitsiz havola" ko'rinadi. Telefon so'rov holatini chek bo'yicha kuzatadi: to'langach ro'yxatdan o'chadi | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
 ## Commit jurnali
@@ -161,6 +169,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 14 | Kuryer bo'limi va xodim lavozim nomi | "4: kuryer bo'limi..." commiti | [x] |
 | 15 | Stollar uchun QR stikerlar | "4: stollar uchun QR stikerlar..." commiti | [x] |
 | 16 | Avtomatik yangilanish (telefon va kompyuter) | "pilot: yangi versiya qurilmalarga o'zi keladi..." commiti | [x] |
+| 17 | Chaqiruv xodimga yetadi, to'langan QR-buyurtma yo'qoladi, band stol va uzoqdan buyurtma himoyasi (B15–B18) | "pilot: ofitsiant chaqiruvi, to'langan QR-buyurtma va QR himoyasi" commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

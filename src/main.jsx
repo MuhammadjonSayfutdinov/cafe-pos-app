@@ -27,15 +27,17 @@ if (import.meta.env.PROD) {
   startUpdateChecks({ mode: isQrPage ? "customer" : "staff" });
 }
 
-// Mijoz telefonidagi QR-menyu: ?table=3-Stol (kirishsiz, alohida kichik ilova)
-const qrTable = new URLSearchParams(window.location.search).get("table");
+// Mijoz telefonidagi QR-menyu: ?table=3-Stol&k=<stol kaliti> (kirishsiz, alohida kichik ilova)
+const qrParams = new URLSearchParams(window.location.search);
+const qrTable = qrParams.get("table");
+const qrKey = qrParams.get("k") || "";
 const root = createRoot(document.getElementById("root"));
 
 if (qrTable) {
   root.render(
     <StrictMode>
       <ErrorBoundary>
-        <PublicQrApp table={qrTable} />
+        <PublicQrApp table={qrTable} tableKey={qrKey} />
       </ErrorBoundary>
       <NotificationHost />
     </StrictMode>

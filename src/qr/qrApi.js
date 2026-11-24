@@ -1,8 +1,10 @@
 // Mijoz telefonidagi QR sahifa uchun API (kirishsiz). Server tomoni: supabase/qr.sql
-//   getMenu(table) -> { cafe_name, service_fee, categories, menu }
-//   submitOrder(table, items, note) -> { ok, id, items, subTotal }
-//   callWaiter(table) -> { ok }
-//   requestStatus(ids) -> [{ id, status }]
+//   getMenu(table, ctx) -> { cafe_name, service_fee, categories, menu, access }
+//   submitOrder(table, items, note, ctx) -> { ok, id, items, subTotal }
+//   callWaiter(table, ctx) -> { ok }
+//   requestStatus(ids) -> [{ id, status, orderStatus, closed }]
+// ctx: { k: stol kaliti (QR havoladan), r: oldingi so'rov id lari, lat, lng, acc: joylashuv }
+// Xato: error.message - mijozga ko'rsatiladigan matn, error.hint - 'busy' | 'geo' | 'far'
 
 const friendlyError = (e) => {
   const msg = String(e?.message || e || '');
@@ -29,7 +31,11 @@ export async function createQrApi() {
         body: JSON.stringify(args)
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body?.message || `Xato ${res.status}`);
+      if (!res.ok) {
+        const err = new Error(body?.message || `Xato ${res.status}`);
+        err.hint = body?.hint || '';
+        throw err;
+      }
       return body;
     };
   } else if (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY) {
@@ -39,7 +45,11 @@ export async function createQrApi() {
     });
     call = async (fn, args) => {
       const { data, error } = await client.rpc(fn, args);
-      if (error) throw new Error(error.message);
+      if (error) {
+        const err = new Error(error.message);
+        err.hint = error.hint || '';
+        throw err;
+      }
       return data;
     };
   } else {
@@ -50,14 +60,17 @@ export async function createQrApi() {
     try {
       return await fn(...a);
     } catch (e) {
-      throw new Error(friendlyError(e));
+      const err = new Error(friendlyError(e));
+      err.hint = e?.hint || '';
+      throw err;
     }
   };
 
   return {
-    getMenu: wrap((table) => call('qr_menu', { p_table: table })),
-    submitOrder: wrap((table, items, note = '') => call('qr_submit_order', { p_table: table, p_items: items, p_note: note })),
-    callWaiter: wrap((table) => call('qr_call_waiter', { p_table: table })),
+    getMenu: wrap((table, ctx = {}) => call('qr_menu', { p_table: table, p_ctx: ctx })),
+    submitOrder: wrap((table, items, note = '', ctx = {}) =>
+      call('qr_submit_order', { p_table: table, p_items: items, p_note: note, p_ctx: ctx })),
+    callWaiter: wrap((table, ctx = {}) => call('qr_call_waiter', { p_table: table, p_ctx: ctx })),
     requestStatus: wrap((ids) => call('qr_request_status', { p_ids: ids }))
   };
 }

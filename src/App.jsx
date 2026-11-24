@@ -20,9 +20,10 @@ import CustomerMode from './components/CustomerMode';
 import AutoLockControl from './components/AutoLockControl';
 import SyncStatusBadge from './components/SyncStatusBadge';
 import QrRequestsPanel from './components/QrRequestsPanel';
+import WaiterCallsPanel from './components/WaiterCallsPanel';
 import { callRpc } from './sync/engine';
 import { notify } from './utils/notify';
-import { CLOSED_ORDER_STATUSES, DELIVERY_STATUS, KITCHEN_ORDER_STATUSES, ORDER_STATUS, isDeliveryOrder } from './constants/orderStatus';
+import { CLOSED_ORDER_STATUSES, DELIVERY_STATUS, KITCHEN_ORDER_STATUSES, ORDER_STATUS, TAKEAWAY_TABLE, isDeliveryOrder } from './constants/orderStatus';
 import { getRoleMeta, getUserTitle } from './constants/roles';
 import { newId } from './utils/ids';
 import { getUpdateResume, setUpdateSession } from './pwa/update';
@@ -97,6 +98,8 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(updateResume ? updateResume.user : null);
   const [view, setView] = useState(updateResume ? 'app' : 'login'); // 'login' | 'app' | 'guest_qr'
   const [guestTable, setGuestTable] = useState('1-Stol'); 
+  // Mijoz ekrani qachon ochildi: shundan oldin ochilgan chek - boshqa mijozniki (band stol)
+  const [guestStartedAt, setGuestStartedAt] = useState(0);
   const [adminActiveView, setAdminActiveView] = useState(updateResume?.adminView || 'admin'); // 'admin' | 'stats' | 'warehouse' | 'waiter' | 'cashier' | 'kitchen' | 'courier'
   
   const [overrideRequest, setOverrideRequest] = useState(null); 
@@ -212,19 +215,50 @@ export default function App() {
     setView('login');
   };
 
-  // LockScreen dagi "Bo'sh stollar ro'yxati" modalidan tanlangan stolni ochish
+  // Stolda to'lanmagan chek bormi (stol band). "Olib ketish" band bo'lmaydi: har buyurtma alohida chek
+  const findOpenTableOrder = (tableName) =>
+    tableName === TAKEAWAY_TABLE
+      ? null
+      : (Array.isArray(orders) ? orders : []).find(
+        o => o && o.table === tableName && !CLOSED_ORDER_STATUSES.includes(o.status)
+      ) || null;
+
+  // LockScreen dagi "Bo'sh stollar ro'yxati" modalidan tanlangan stolni ochish.
+  // Mijoz ekranida faqat BO'SH stol ochiladi: band stolga (boshqa mijozning chekiga) faqat
+  // o'sha stoldagi QR kodni telefon bilan skaner qilib buyurtma beriladi.
   const handleGuestLogin = (selectedTableName) => {
     const targetTable = typeof selectedTableName === 'string' && selectedTableName.trim() !== ''
       ? selectedTableName
       : '1-Stol';
+    if (findOpenTableOrder(targetTable)) {
+      notify(`🔒 ${targetTable} band. Shu stolda o'tirgan bo'lsangiz, stoldagi QR kodni telefoningiz bilan skaner qiling.`, 'error');
+      return;
+    }
     setGuestTable(targetTable);
+    setGuestStartedAt(Date.now());
     setView('guest_qr');
   };
 
   // Ofitsiant ekranidan QR kod tugmasi bosilganda
   const handleShowQrTable = (tableName) => {
     setGuestTable(tableName || '1-Stol');
+    setGuestStartedAt(Date.now());
     setView('guest_qr');
+  };
+
+  // Mijoz ekranidan buyurtma: stol shu ekran ochilgandan keyin boshqa mijozga band bo'lib qolgan
+  // bo'lsa, buyurtma o'tmaydi (o'zi ochgan chekka qo'shimcha buyurtma bera oladi)
+  const handleGuestOrderSubmit = (cartItems, tbl) => {
+    const targetTable = tbl || guestTable;
+    const openOrder = findOpenTableOrder(targetTable);
+    if (openOrder && Number(openOrder.createdAt || 0) < guestStartedAt) {
+      return {
+        ok: false,
+        error: `${targetTable} band. Shu stolda o'tirgan bo'lsangiz, stoldagi QR kodni telefoningiz bilan skaner qiling yoki ofitsiantni chaqiring.`
+      };
+    }
+    handleOrderSubmit(targetTable, cartItems);
+    return { ok: true };
   };
 
   // ==========================================
@@ -232,6 +266,7 @@ export default function App() {
   // ==========================================
   // Ombor bu yerda AYIRILMAYDI: yagona joy - kassada to'lov (CashierMode). (B1)
   // Ofitsiant buyurtmalari WaiterMode.handleSubmitOrder orqali yoziladi.
+  // Qaytaradi: taom qo'shilgan chekning id si (yangi yoki dozakaz), bo'sh savatda null
   const handleOrderSubmit = (arg1, arg2) => {
     let targetTable = guestTable || '1-Stol';
     let incomingItems = [];
@@ -249,7 +284,7 @@ export default function App() {
       incomingItems = arg1.items;
     }
 
-    if (incomingItems.length === 0) return;
+    if (incomingItems.length === 0) return null;
 
     const normalizedItems = incomingItems.map(item => {
       const q = getItemQty(item) || 1;
@@ -265,6 +300,7 @@ export default function App() {
 
     const nowMs = Date.now();
     const nowTime = new Date(nowMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let targetOrderId = null; // useSticky yangilanishni darhol (sinxron) bajaradi
 
     setOrders(prevOrders => {
       const safeOrders = Array.isArray(prevOrders) ? prevOrders : [];
@@ -284,6 +320,7 @@ export default function App() {
             : it
         );
         const combinedItems = [...prevItems, ...normalizedItems];
+        targetOrderId = existingOrder.id;
 
         updatedOrders[existingOrderIndex] = {
           ...existingOrder,
@@ -307,6 +344,7 @@ export default function App() {
         time: nowTime,
         date: new Date(nowMs).toLocaleDateString()
       };
+      targetOrderId = newOrder.id;
 
       return [{ ...newOrder, ...orderTotalsFields(newOrder, normalizedItems, serviceFee) }, ...safeOrders];
     });
@@ -315,6 +353,7 @@ export default function App() {
       "Buyurtma yaratildi",
       `${targetTable}: ${normalizedItems.map(it => `${it.quantity}× ${it.name || 'Taom'}`).join(', ')}`
     );
+    return targetOrderId;
   };
 
   // ==========================================
@@ -335,13 +374,21 @@ export default function App() {
       return;
     }
     const handledAt = Date.now();
+    // Qabul qilinsa, so'rovga chek id si yoziladi: mijoz telefoni chek holatini (tayyor, to'landi)
+    // shu bo'yicha ko'radi (supabase/qr.sql -> qr_request_status). Chek to'langach telefondagi
+    // "Buyurtmalarim" dan o'chadi.
+    const orderId = status === 'accepted'
+      ? handleOrderSubmit(req.table, Array.isArray(req.items) ? req.items : [])
+      : null;
+
     // Bajarilgan eski so'rovlarni ro'yxatdan tozalaymiz (1 kundan eski)
     setQrRequests(prev => (Array.isArray(prev) ? prev : [])
-      .map(r => (r && r.id === req.id ? { ...r, status, handledBy: currentUser?.name || '', handledAt } : r))
+      .map(r => (r && r.id === req.id
+        ? { ...r, status, handledBy: currentUser?.name || '', handledAt, ...(orderId ? { orderId: String(orderId) } : {}) }
+        : r))
       .filter(r => r && (r.status === 'pending' || handledAt - Number(r.createdAt || handledAt) < 86400000)));
 
     if (status === 'accepted') {
-      handleOrderSubmit(req.table, Array.isArray(req.items) ? req.items : []);
       notify(`✅ ${req.table}: QR-buyurtma oshxonaga yuborildi`);
     } else {
       addAuditLog("QR-buyurtma rad etildi", `${req.table}: ${(req.items || []).length} xil taom`);
@@ -368,19 +415,33 @@ export default function App() {
         {
           id: newId('call_'),
           table: targetTable,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          createdAt: Date.now()
         }
       ];
     });
   };
 
+  // Chaqiruvga javob berildi: shu stolning barcha chaqiruvlari (telefondan va eski usuldagi
+  // buyurtma belgisi hasCall) o'chadi, bulut orqali boshqa xodimlar ekranidan ham
   const handleClearCall = (callIdOrTable) => {
+    const safeCalls = Array.isArray(waiterCalls) ? waiterCalls : [];
+    const matched = safeCalls.find(c => c?.id === callIdOrTable);
+    const tableName = matched ? matched.table : callIdOrTable;
+
     setWaiterCalls(prev => {
       const safePrev = Array.isArray(prev) ? prev : [];
-      return safePrev.filter(
-        c => c?.id !== callIdOrTable && c?.table !== callIdOrTable && c !== callIdOrTable
+      const next = safePrev.filter(
+        c => c?.id !== callIdOrTable && c?.table !== tableName && c !== tableName
       );
+      return next.length === safePrev.length ? safePrev : next;
     });
+
+    if ((Array.isArray(orders) ? orders : []).some(o => o && o.table === tableName && o.hasCall)) {
+      setOrders(prev => (Array.isArray(prev) ? prev : []).map(o =>
+        o && o.table === tableName && o.hasCall ? { ...o, hasCall: false } : o
+      ));
+    }
   };
 
   // ==========================================
@@ -398,7 +459,7 @@ export default function App() {
         orders={orders}
         serviceFee={serviceFee}
         isDarkMode={isDarkMode}
-        onSubmitOrder={(cartItems, tbl) => handleOrderSubmit(tbl || guestTable, cartItems)}
+        onSubmitOrder={handleGuestOrderSubmit}
         onCallWaiter={(tbl) => handleCallWaiter(tbl || guestTable)}
         onExitGuest={() => setView('login')}
       />
@@ -513,13 +574,21 @@ export default function App() {
       {/* --- ASOSIY ISHCHI MODULLAR --- */}
       <main className="p-3 md:p-5 max-w-[1600px] mx-auto">
 
-        {/* Mijoz telefonidan kelgan QR-buyurtmalar (ofitsiant, kassir, admin) */}
+        {/* Mijoz chaqiruvlari va telefondan kelgan QR-buyurtmalar (ofitsiant, kassir, admin) */}
         {['admin', 'waiter', 'cashier'].includes(currentUser.role) && (
-          <QrRequestsPanel
-            requests={qrRequests}
-            onAccept={(req) => handleQrRequest(req, 'accepted')}
-            onReject={(req) => handleQrRequest(req, 'rejected')}
-          />
+          <>
+            <WaiterCallsPanel
+              waiterCalls={waiterCalls}
+              orders={orders}
+              onClear={handleClearCall}
+            />
+            <QrRequestsPanel
+              requests={qrRequests}
+              orders={orders}
+              onAccept={(req) => handleQrRequest(req, 'accepted')}
+              onReject={(req) => handleQrRequest(req, 'rejected')}
+            />
+          </>
         )}
 
         {/* Namuna PIN (777777, 1111, ...) hali almashtirilmagan bo'lsa ogohlantirish (B6) */}

@@ -5,6 +5,7 @@ import WaiterMenu from './WaiterMenu';
 import WaiterCart from './WaiterCart';
 import WaiterActionModals from './WaiterActionModals';
 import DeliveryOrderModal from './DeliveryOrderModal';
+import { collectTableCalls } from './WaiterCallsPanel';
 import { markUnsavedWork } from '../pwa/update';
 import { orderTotalsFields, getItemQty, getItemPrice } from '../utils/orderTotals';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
@@ -63,7 +64,10 @@ export default function WaiterMode({
   currentUser,
   onPrintReceipt,
   setReceiptToPrint,
-  addAuditLog
+  addAuditLog,
+  // Mijoz chaqiruvlari (pos_calls: telefondagi QR sahifa va mijoz ekrani) va ularni o'chirish
+  waiterCalls,
+  onClearCall
 }) {
   // =========================================================
   // 1. ZAXIRA XOTIRA VA AUDIT LOG SINXRONIZATORI
@@ -859,10 +863,21 @@ export default function WaiterMode({
     setCart([]);
   };
 
+  // Chaqiruv bor stollar: telefondan kelgan chaqiruv (pos_calls) va eski usuldagi hasCall belgisi.
+  // Oldin faqat hasCall o'qilardi: telefondan chaqirilsa stol kartochkasida hech narsa chiqmasdi.
+  const calledTables = useMemo(
+    () => new Set(collectTableCalls(waiterCalls, safeOrders).map(c => c.table)),
+    [waiterCalls, safeOrders]
+  );
+
   const handleClearTableCall = (tableName) => {
+    if (typeof onClearCall === 'function') {
+      onClearCall(tableName); // App.jsx: pos_calls va hasCall ikkalasini o'chiradi
+      return;
+    }
     updateOrders(prev =>
       (Array.isArray(prev) ? prev : []).map(o =>
-        o && o.table === tableName ? { ...o, hasCall: false } : o
+        o && o.table === tableName && o.hasCall ? { ...o, hasCall: false } : o
       )
     );
   };
@@ -1145,6 +1160,7 @@ export default function WaiterMode({
           tableTimers={tableTimers}
           selectedTable={selectedTable}
           onSelectTable={handleSelectTable}
+          calledTables={calledTables}
           onClearTableCall={handleClearTableCall}
           onOpenTransferModal={ord => {
             setTransferOrder(ord);

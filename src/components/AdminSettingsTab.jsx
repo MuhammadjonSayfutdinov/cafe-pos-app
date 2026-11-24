@@ -5,6 +5,7 @@ import { notify, confirmAsync } from '../utils/notify';
 import { localWrite } from '../sync/engine';
 import AdminSyncSection from './AdminSyncSection';
 import QrStickerSheet from './QrStickerSheet';
+import QrSecuritySection from './QrSecuritySection';
 import { VALID_ROLES } from '../constants/roles';
 
 // Telegram sozlamalari: yagona joy - src/utils/telegramNotifier.js (B12)
@@ -696,6 +697,9 @@ export default function AdminSettingsTab({
           )}
         </div>
       )}
+
+      {/* QR-BUYURTMA HIMOYASI: band stol va "faqat kafe ichidan" */}
+      <QrSecuritySection addAuditLog={addAuditLog} />
 
       {/* BULUT SINXRONLASH */}
       <AdminSyncSection />

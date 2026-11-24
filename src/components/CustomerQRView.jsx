@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ORDER_STATUS } from '../constants/orderStatus';
+import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 
 const QUICK_NOTE_TAGS = [
   'Piyozsiz',
@@ -15,9 +15,12 @@ export default function CustomerQRView({
   table = '1-Stol', 
   menuItems = [], 
   menuCategories = [], 
-  orders = [],
+  // orders berilsa (App yoki QR sahifa), "Buyurtmalarim" faqat shundan olinadi
+  orders,
   serviceFee = 0,
   isDarkMode = false, 
+  // Mijozga ogohlantirish: { tone: 'warn' | 'info', text } (masalan: band stol, joylashuv)
+  notice = null,
   onSubmitOrder, 
   onCallWaiter, 
   onExitGuest 
@@ -134,13 +137,28 @@ export default function CustomerQRView({
     });
   }, [safeMenuItems, activeCategory, searchQuery]);
 
-  // Shu stolga tegishli faol buyurtmalar (App.jsx orders'dan yoki lokal tarixdan)
+  // Shu stolga tegishli faol (yopilmagan) buyurtmalar.
+  // orders berilgan bo'lsa FAQAT shundan: oldin chek to'langach ro'yxat bo'shab qolsa, shu sahifada
+  // yuborilgan taomlarning lokal nusxasi "⏳ Oshxonada tayyorlanmoqda" (sariq) bo'lib qayta chiqardi.
+  const hasParentOrders = Array.isArray(orders);
   const myActiveOrders = useMemo(() => {
-    const globalTableOrders = safeOrders.filter(
-      o => o && o.table === table && o.status !== ORDER_STATUS.PAID && o.status !== ORDER_STATUS.DEBT
+    if (!hasParentOrders) return localSubmittedOrders;
+    return safeOrders.filter(
+      o => o && o.table === table && !CLOSED_ORDER_STATUSES.includes(o.status)
     );
-    return globalTableOrders.length > 0 ? globalTableOrders : localSubmittedOrders;
-  }, [safeOrders, table, localSubmittedOrders]);
+  }, [hasParentOrders, safeOrders, table, localSubmittedOrders]);
+
+  const noticeBox = notice?.text ? (
+    <div
+      className={`p-3 rounded-2xl border text-xs sm:text-sm font-black break-words ${
+        notice.tone === 'warn'
+          ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
+          : 'bg-sky-50 dark:bg-sky-900/30 border-sky-200 dark:border-sky-800 text-sky-800 dark:text-sky-200'
+      }`}
+    >
+      {notice.text}
+    </div>
+  ) : null;
 
   // ==========================================
   // 4. SAVAT (CART) MANTIG'I (SMART MERGE BILAN)
@@ -415,6 +433,8 @@ export default function CustomerQRView({
           </button>
         </div>
       </header>
+
+      {noticeBox && <div className="max-w-5xl mx-auto px-4 pt-3">{noticeBox}</div>}
 
       {/* =======================================================
           TAB 1: TAOMNOMA (MENYU VA QIDIRUV)
@@ -925,6 +945,8 @@ export default function CustomerQRView({
                   </span>
                 </div>
               </div>
+
+              {noticeBox}
 
               <button 
                 type="button"

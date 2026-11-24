@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import useSticky from '../hooks/useSticky';
 import QrCodeSvg from '../qr/QrCodeSvg';
 import { isQrBackendConfigured } from '../qr/qrApi';
+import { useQrTableKey } from '../qr/useQrTableKey';
 import {
   QR_BASE_URL_KEY,
   buildTableQrUrl,
@@ -106,6 +107,8 @@ export default function QrStickerSheet({ tables = [], cafeName = '', onClose, ad
   );
 
   const [savedBase, setSavedBase] = useSticky(QR_BASE_URL_KEY, '');
+  // Stol kaliti: band stolga faqat shu stikerni skaner qilgan mijoz buyurtma beradi
+  const getTableKey = useQrTableKey();
   const [draftBase, setDraftBase] = useState(() => normalizeQrBaseUrl(savedBase) || currentAppUrl());
   const [selected, setSelected] = useState(() => new Set(safeTables.filter(t => t !== TAKEAWAY)));
   const [sizeKey, setSizeKey] = useState('medium');
@@ -129,11 +132,11 @@ export default function QrStickerSheet({ tables = [], cafeName = '', onClose, ad
     const list = [];
     safeTables.forEach(table => {
       if (!selected.has(table)) return;
-      const url = buildTableQrUrl(base, table);
+      const url = buildTableQrUrl(base, table, getTableKey(table));
       for (let c = 0; c < copies; c++) list.push({ key: `${table}__${c}`, table, url });
     });
     return list;
-  }, [safeTables, selected, copies, base]);
+  }, [safeTables, selected, copies, base, getTableKey]);
 
   const perPage = size.cols * size.rows;
   const pages = useMemo(() => {
@@ -235,7 +238,7 @@ export default function QrStickerSheet({ tables = [], cafeName = '', onClose, ad
             </p>
           ) : (
             <p className="text-xs font-bold text-gray-500 dark:text-gray-400">
-              Misol: <span className="font-mono break-all">{buildTableQrUrl(base, safeTables[0] || '1-Stol')}</span>
+              Misol: <span className="font-mono break-all">{buildTableQrUrl(base, safeTables[0] || '1-Stol', getTableKey(safeTables[0] || '1-Stol'))}</span>
             </p>
           )}
         </div>
@@ -343,6 +346,7 @@ export default function QrStickerSheet({ tables = [], cafeName = '', onClose, ad
             </p>
             <p>Chop etish oynasida masshtab 100% ("Fit to page" emas). PDF sifatida saqlab, bosmaxonaga yuborish ham mumkin.</p>
             <p>Yopishtirgach telefon bilan bittasini skaner qilib, menyu ochilishini tekshiring.</p>
+            <p>🔐 Har bir stikerda stolning maxfiy kaliti bor: band stolga faqat shu stikerni skaner qilgan mijoz buyurtma beradi. Eski (kalitsiz) stikerlarni almashtiring.</p>
           </div>
           <button
             type="button"
