@@ -62,6 +62,8 @@ src/App.jsx (791)       Global state, routing, biznes-logika markazi
 src/main.jsx            React root
 src/index.css           Tailwind va scrollbar klasslari
 src/hooks/useSticky.js  localStorage + oynalararo (tablararo) sinxron
+src/pwa/                register.js (service worker, oflayn kesh), update.js (yangi versiyaga
+                        avtomatik o'tish; markUnsavedWork - yo'qolishi mumkin bo'lgan ish bor ekan kutadi)
 src/utils/telegramNotifier.js  Telegram xabarlari (hozir ishlatilmaydi!)
 
 Avtorizatsiya va umumiy:

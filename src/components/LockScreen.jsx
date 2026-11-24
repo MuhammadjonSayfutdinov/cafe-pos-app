@@ -1,6 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 import { ORDER_STATUS } from '../constants/orderStatus';
+import { APP_BUILD, APP_BUILD_TIME } from '../pwa/update';
+
+// Qurilmadagi dastur versiyasi: telefon va kompyuter bir xil versiyadami, solishtirish uchun
+const formatBuildTime = (iso) => {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
 
 const PIN_GUARD_SCOPE = 'login';
 
@@ -235,6 +244,10 @@ export default function LockScreen({
         </div>
 
       </div>
+
+      <p className="mt-6 text-[11px] font-bold text-gray-400 dark:text-gray-500 tracking-wide">
+        Versiya: {APP_BUILD}{APP_BUILD_TIME ? ` · ${formatBuildTime(APP_BUILD_TIME)}` : ''}
+      </p>
 
       {/* =======================================================
           MODAL 1: PIN TERISH OYNASI (BOSHQARUV VA XODIMLAR)

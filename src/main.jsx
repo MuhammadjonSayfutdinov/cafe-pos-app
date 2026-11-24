@@ -8,6 +8,8 @@ import PublicQrApp from "./qr/PublicQrApp.jsx";
 import { setupSync } from "./sync/index.js";
 import { runMigrations } from "./utils/migrate.js";
 import { registerServiceWorker } from "./pwa/register.js";
+import { startUpdateChecks } from "./pwa/update.js";
+import UpdateBanner from "./components/UpdateBanner.jsx";
 import "./index.css";
 
 const isQrPage = new URLSearchParams(window.location.search).has("table");
@@ -19,8 +21,11 @@ if (!isQrPage) {
   setupSync();
 }
 
-// Oflayn ishlash va planshetga o'rnatish (faqat production build'da)
-if (import.meta.env.PROD) registerServiceWorker();
+// Oflayn ishlash, planshetga o'rnatish va yangi versiyaga avtomatik o'tish (faqat production build'da)
+if (import.meta.env.PROD) {
+  registerServiceWorker();
+  startUpdateChecks({ mode: isQrPage ? "customer" : "staff" });
+}
 
 // Mijoz telefonidagi QR-menyu: ?table=3-Stol (kirishsiz, alohida kichik ilova)
 const qrTable = new URLSearchParams(window.location.search).get("table");
@@ -44,6 +49,7 @@ if (qrTable) {
         </SyncGate>
       </ErrorBoundary>
       <NotificationHost />
+      <UpdateBanner />
     </StrictMode>
   );
 }

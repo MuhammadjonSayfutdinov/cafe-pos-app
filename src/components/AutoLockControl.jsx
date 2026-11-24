@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
+import { setUpdateScreenLocked } from '../pwa/update';
 
 // =========================================================
 // VAQT VARIANTLARI (TELEFON VA KOMPYUTER SOZLAMALARIDEK)
@@ -190,6 +191,12 @@ export default function AutoLockControl({
       window.removeEventListener('scroll', updateMenuPos, true);
     };
   }, [isMenuOpen, updateMenuPos]);
+
+  // Dastur yangilanishi: qulf ekrani ochiq bo'lsa, yangilangach ham PIN so'raladi (src/pwa/update.js)
+  useEffect(() => {
+    setUpdateScreenLocked(isScreenLocked);
+  }, [isScreenLocked]);
+  useEffect(() => () => setUpdateScreenLocked(false), []);
 
   // Qulf ekrani ochiq turganda orqadagi sahifa aylanmasin (telefonda muhim)
   useEffect(() => {

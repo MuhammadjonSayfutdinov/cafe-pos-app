@@ -4,6 +4,7 @@
 // - Ilova fayllari oldindan keshlanadi: internet uzilsa ham sahifa ochiladi.
 // - Sahifaning o'zi (navigatsiya): avval internetdan, bo'lmasa keshdan.
 // - Boshqa saytlarga so'rovlar (Supabase, Telegram) keshlanmaydi.
+// - /version.json har doim internetdan (yangi versiyani bilish uchun: src/pwa/update.js).
 const VERSION = '__VERSION__';
 const CACHE = `cafe-pos-${VERSION}`;
 const PRECACHE = __PRECACHE__;
@@ -12,7 +13,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)));
 });
 
-// Yangi versiya darhol emas, foydalanuvchi "Yangilash" ni bosganda ishga tushadi
+// Yangi versiya sahifa buyrug'i bilan ishga tushadi (src/pwa/register.js)
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
@@ -32,6 +33,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname === '/version.json') return;
 
   if (req.mode === 'navigate') {
     event.respondWith(

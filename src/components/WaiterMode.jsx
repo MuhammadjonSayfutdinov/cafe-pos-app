@@ -5,6 +5,7 @@ import WaiterMenu from './WaiterMenu';
 import WaiterCart from './WaiterCart';
 import WaiterActionModals from './WaiterActionModals';
 import DeliveryOrderModal from './DeliveryOrderModal';
+import { markUnsavedWork } from '../pwa/update';
 import { orderTotalsFields, getItemQty, getItemPrice } from '../utils/orderTotals';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 import {
@@ -151,6 +152,11 @@ export default function WaiterMode({
   // =========================================================
   const [selectedTable, setSelectedTable] = useState(null);
   const [cart, setCart] = useState([]);
+  // Savatchada yuborilmagan taom bor ekan, dastur yangilanishi kutadi (src/pwa/update.js)
+  useEffect(() => {
+    markUnsavedWork('waiter_cart', Array.isArray(cart) && cart.length > 0);
+  }, [cart]);
+  useEffect(() => () => markUnsavedWork('waiter_cart', false), []);
   const [selectedCategory, setSelectedCategory] = useState('Barchasi');
   const [searchQuery, setSearchQuery] = useState('');
   // Telefon/planshetda (lg dan kichik) menyu va savatcha alohida ko'rsatiladi: 'menu' | 'cart'

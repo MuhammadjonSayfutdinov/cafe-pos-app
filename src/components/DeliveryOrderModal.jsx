@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import useSticky from '../hooks/useSticky';
+import { markUnsavedWork } from '../pwa/update';
 import { notify } from '../utils/notify';
 import { findLastDeliveryByPhone, phoneDigits } from '../utils/delivery';
 
@@ -11,6 +12,11 @@ const labelClass = 'block text-[11px] font-black uppercase tracking-wider text-g
 export default function DeliveryOrderModal({ orders = [], onClose, onSubmit }) {
   // Standart yetkazish narxi barcha qurilmalarda bir xil (bulutda sinxronlanadi)
   const [defaultFee, setDefaultFee] = useSticky('pos_delivery_fee', 0);
+  // Forma ochiq ekan, dastur yangilanishi kutadi (yozilgan manzil yo'qolmasin)
+  useEffect(() => {
+    markUnsavedWork('delivery_form', true);
+    return () => markUnsavedWork('delivery_form', false);
+  }, []);
   const [form, setForm] = useState(() => ({
     phone: '',
     customerName: '',

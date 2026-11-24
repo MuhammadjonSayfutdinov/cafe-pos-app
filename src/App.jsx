@@ -25,6 +25,7 @@ import { notify } from './utils/notify';
 import { CLOSED_ORDER_STATUSES, DELIVERY_STATUS, KITCHEN_ORDER_STATUSES, ORDER_STATUS, isDeliveryOrder } from './constants/orderStatus';
 import { getRoleMeta, getUserTitle } from './constants/roles';
 import { newId } from './utils/ids';
+import { getUpdateResume, setUpdateSession } from './pwa/update';
 
 const initialMenuItems = [
   { 
@@ -91,10 +92,12 @@ export default function App() {
   const [isOverrideEnabled, setIsOverrideEnabled] = useSticky('pos_override_enabled', true);
 
   // Routing va Sessiya Statelari
-  const [currentUser, setCurrentUser] = useState(null);
-  const [view, setView] = useState('login'); // 'login' | 'app' | 'guest_qr'
+  // Dastur yangilangach (sahifa o'zi qayta yuklanganda) xodim o'sha ekranga PIN'siz qaytadi: src/pwa/update.js
+  const [updateResume] = useState(() => getUpdateResume(users));
+  const [currentUser, setCurrentUser] = useState(updateResume ? updateResume.user : null);
+  const [view, setView] = useState(updateResume ? 'app' : 'login'); // 'login' | 'app' | 'guest_qr'
   const [guestTable, setGuestTable] = useState('1-Stol'); 
-  const [adminActiveView, setAdminActiveView] = useState('admin'); // 'admin' | 'stats' | 'warehouse' | 'waiter' | 'cashier' | 'kitchen' | 'courier'
+  const [adminActiveView, setAdminActiveView] = useState(updateResume?.adminView || 'admin'); // 'admin' | 'stats' | 'warehouse' | 'waiter' | 'cashier' | 'kitchen' | 'courier'
   
   const [overrideRequest, setOverrideRequest] = useState(null); 
   const [receiptToPrint, setReceiptToPrint] = useState(null);
@@ -120,6 +123,13 @@ export default function App() {
       return isUpdated ? safeUsers : prevUsers;
     });
   }, [setUsers]);
+
+  // Yangi versiya chiqsa, kim ishlayotganini bilish uchun (yangilangach shu xodim o'z ekraniga qaytadi)
+  useEffect(() => {
+    setUpdateSession(currentUser && view === 'app'
+      ? { userId: currentUser.id, role: currentUser.role, adminView: adminActiveView }
+      : null);
+  }, [currentUser, view, adminActiveView]);
 
   // Tungi rejim (Dark Mode) klassini HTML body'ga ulash
   useEffect(() => {

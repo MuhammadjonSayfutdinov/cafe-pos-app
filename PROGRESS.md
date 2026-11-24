@@ -41,6 +41,7 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 **Pilot:** foydalanuvchi `supabase/qr.sql` ni ishga tushiradi, saytni Vercel'ga joylaydi, kafeda sinaydi.
 Stollar uchun QR stikerlar tayyor: Admin → Tizim Sozlamalari → Stollar → "🖨️ QR stikerlar".
 Pilotda: sayt manzilini (Vercel) yozib stikerlarni chop etish, bittasini telefon bilan skaner qilib tekshirish.
+Yangi kod qurilmalarga faqat `master` ga push qilingach (Vercel joylagach) yetib boradi, keyin o'zi yangilanadi.
 Keyin pilot natijasiga qarab: PIN tekshiruvini serverga ko'chirish, Click/Payme, fiskal chek, Vitest.
 Kichik ishlar (istalgan vaqtda): `barcha-kodlar.txt` (eskirgan kod nusxasi) va `preview.html` kerakmi, ko'rib chiqish.
 
@@ -108,6 +109,8 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 ### 4-bosqich. Kafe uchun funksiyalar
 - [x] Smena ochish/yopish, haqiqiy Z-hisobot (`ShiftPanel.jsx`, `src/shift/shiftReport.js`, `pos_shifts`)
 - [x] Oflayn rejim (PWA): manifest, service worker (`src/pwa/`, `vite.config.js` plagini), `vercel.json`
+- [x] Avtomatik yangilanish: `/version.json` va build versiyasi (`vite.config.js`), `src/pwa/update.js`,
+  `UpdateBanner.jsx`; kirish oynasida versiya yozuvi
 - [ ] Click/Payme integratsiyasi
 - [ ] Onlayn-kassa va fiskal chek talablarini tekshirish (O'zbekiston)
 - [x] Texnologik karta bo'yicha ayirish, qoldiq ogohlantirishi, kamomad yozuvi (`src/utils/inventoryCalc.js`)
@@ -134,6 +137,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | Yetkazib berish | Yetkazish buyurtmasi oddiy buyurtma: stol nomi `Yetkazish #N`, `orderType: 'delivery'`, `delivery: {...}` (sxema: `orderStatus.js`). Oshxona va kassadan o'tadi. Kuryer faqat holatni belgilaydi (oldi, yo'lda, yetkazildi + mijoz qanday to'lagani), chekni kassir yopadi: ombor ayirish va smena hisobi yagona joyda qoladi. Xizmat haqi (%) olinmaydi, yetkazish narxi chekda alohida qator (`isDeliveryFee`, oshxonaga chiqmaydi). Kuryer buyurtmaga ismi bilan biriktiriladi (ismlar takrorlanmaydi) | qabul qilindi |
 | Lavozim nomi | `user.title` faqat ko'rsatish uchun (admin o'zi yozadi: "Barmen", "Bosh oshpaz"). Kirish huquqi har doim `role` bo'yicha | qabul qilindi |
 | QR kod yaratish | Qurilmaning o'zida (`src/qr/qrEncode.js`, kutubxonasiz). Oldin `api.qrserver.com` ishlatilardi: internetsiz rasm chiqmasdi (o'rniga skanerlanmaydigan soxta rasm), stol havolasi begona serverga ketardi. Sayt manzili `pos_qr_base_url` (bulut orqali barcha qurilmalarga), bo'sh bo'lsa joriy manzil; localhost/192.168.x da ogohlantirish. Stikerda xato tuzatish darajasi Q (25%): stol ustida kir bo'lsa ham o'qiladi | qabul qilindi |
+| Yangi versiyaga o'tish | Qurilma `/version.json` ni tekshiradi (ochilganda, 5 daqiqada, fondan qaytganda, internet qaytganda). Versiya = kod fayllari mazmunidan hash: kod o'zgarmasa qayta deploy yangilanish chaqirmaydi. Yangilash xavfsiz paytda: PIN oynasida 20 s harakatsiz, ishlayotgan xodimda 3 daqiqa harakatsiz (xodim o'sha ekranga PIN'siz qaytadi: sessionStorage, 1 daqiqa, bir marta; avto-qulf yopiq bo'lsa PIN so'raladi), savatcha/yetkazish formasi ochiq bo'lsa kutadi. Mijoz QR sahifasi faqat fonga o'tganda. Oldingi "Yangilansinmi?" oynasi olib tashlandi: rad etilsa, qurilma eski versiyada qolib ketardi. Sayt `master` dan joylanadi (README: "Yangi versiyani chiqarish") | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
 ## Commit jurnali
@@ -156,6 +160,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 13 | Ombor nazorati va kamomad | 285e607 | [x] |
 | 14 | Kuryer bo'limi va xodim lavozim nomi | "4: kuryer bo'limi..." commiti | [x] |
 | 15 | Stollar uchun QR stikerlar | "4: stollar uchun QR stikerlar..." commiti | [x] |
+| 16 | Avtomatik yangilanish (telefon va kompyuter) | "pilot: yangi versiya qurilmalarga o'zi keladi..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

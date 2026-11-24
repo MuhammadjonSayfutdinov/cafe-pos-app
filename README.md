@@ -24,6 +24,8 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
   Telegramiga jonli jurnal bo'lib boradi; Z-hisobot, qarz, chegirma, ombor ogohlantirishlari alohida xabar
 - **Xavfsizlik:** xavfli amallar admin PIN bilan tasdiqlanadi, 5 ta xato PIN'dan keyin vaqtincha bloklash
 - **Planshetga o'rnatish (PWA):** bosh ekranga qo'shiladi, internet uzilib sahifa yangilansa ham ochiladi
+- **Avtomatik yangilanish:** saytga yangi versiya chiqsa, telefon, planshet va kompyuter o'zi yangilanadi
+  (ish to'xtaganda; xodim o'z ekraniga PIN'siz qaytadi). Qurilmadagi versiya kirish oynasining pastida yozilgan
 
 ## Texnologiyalar
 
@@ -73,6 +75,22 @@ Admin standart PIN bilan ishlasa, ekranning tepasida ogohlantirish chiqib turadi
 - Zaxira fayliga PIN kodlar va Telegram bot tokeni yozilmaydi. Tokenni alohida, xavfsiz joyda saqlang.
 - Xotira to'lsa, dastur ogohlantiradi. Shunda zaxira nusxa olib, eski cheklar tarixini tozalang.
 
+## Yangi versiyani chiqarish (qurilmalarga yetkazish)
+
+Qurilmalar (telefon, planshet, kompyuter) dasturni **Vercel'dagi saytdan** oladi. Vercel faqat `master`
+branch'ini joylaydi. Shuning uchun yangi kod qurilmalarga yetib borishi uchun:
+
+1. O'zgarishlarni `master` ga qo'shing va GitHub'ga yuboring (`git push origin master`).
+2. Vercel 1–2 daqiqada saytni yangilaydi (Vercel → Deployments: "Ready").
+3. Qurilmalar 5 daqiqa ichida (yoki ilova qayta ochilganda) yangi versiyani ko'radi:
+   - kirish (PIN) oynasida: 20 soniyadan keyin o'zi yangilanadi;
+   - xodim ishlayotgan bo'lsa: ekran pastida "Yangilash" tugmasi chiqadi, 3 daqiqa hech narsa
+     bosilmasa o'zi yangilanadi (xodim o'sha ekranga PIN'siz qaytadi);
+   - ofitsiant savatchasida yuborilmagan taom yoki ochiq yetkazish formasi bo'lsa, yangilanish kutadi.
+4. Tekshirish: kirish oynasining pastidagi "Versiya: ..." yozuvi barcha qurilmalarda bir xil bo'lishi kerak.
+
+`npm run dev` faqat shu kompyuterda ishlaydi: telefon undagi o'zgarishni ko'rmaydi.
+
 ## Loyiha tuzilishi
 
 ```
@@ -86,6 +104,7 @@ src/
   constants/roles.js      xodim rollari (bo'limlar) va PIN uzunligi
   hooks/useSticky.js      localStorage bilan sinxron state
   sync/                   bulutda sinxronlash (dvigatel, Supabase transporti)
+  pwa/                    oflayn ishlash (service worker) va avtomatik yangilanish (update.js)
   qr/                     mijoz QR-menyusi (PublicQrApp), QR kod yaratish (qrEncode.js), stol havolasi (tableQrUrl.js)
   utils/
     ids.js                noyob id (bir nechta qurilmada to'qnashmaydi)
