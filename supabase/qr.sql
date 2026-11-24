@@ -439,7 +439,7 @@ revoke all on function public.qr_menu(text, jsonb) from public;
 revoke all on function public.qr_submit_order(text, jsonb, text, jsonb) from public;
 revoke all on function public.qr_call_waiter(text, jsonb) from public;
 revoke all on function public.qr_request_status(text[]) from public;
-revoke all on function public.qr_claim_request(text, text, text) from public;
+revoke all on function public.qr_claim_request(text, text, text) from public, anon;
 
 grant execute on function public.qr_menu(text, jsonb) to anon, authenticated;
 grant execute on function public.qr_submit_order(text, jsonb, text, jsonb) to anon, authenticated;

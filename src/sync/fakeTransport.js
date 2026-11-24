@@ -11,7 +11,10 @@ export function createFakeTransport({ url }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    if (!res.ok) throw new Error(`Soxta server xatosi: ${res.status}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.message || `Soxta server xatosi: ${res.status}`);
+    }
     return res.json();
   };
 

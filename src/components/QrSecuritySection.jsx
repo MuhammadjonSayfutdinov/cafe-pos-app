@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import useSticky from '../hooks/useSticky';
+import { callRpc } from '../sync/engine';
 import {
   DEFAULT_GEOFENCE,
   QR_GEOFENCE_KEY,
@@ -19,7 +20,43 @@ const RADIUS_OPTIONS = [100, 200, 300, 500];
 
 const formatPoint = (g) => (g.lat !== null && g.lng !== null ? `${g.lat}, ${g.lng}` : '');
 
-export default function QrSecuritySection({ addAuditLog }) {
+// Serverdagi supabase/qr.sql yangi versiyadami: yangi qr_menu "access" qaytaradi,
+// eskisida p_ctx parametri yo'q ("Could not find the function ... in the schema cache")
+const SERVER_CHECK_TEXT = {
+  checking: { tone: 'gray', text: '⏳ Server tekshirilmoqda...' },
+  ok: { tone: 'green', text: '✅ Server tayyor: supabase/qr.sql yangi versiyada, himoya ishlayapti' },
+  old: { tone: 'red', text: "⛔ supabase/qr.sql yangilanmagan! Supabase → SQL Editor'da faylni to'liq joylab Run bosing. Hozircha himoya ishlamaydi." },
+  nosync: { tone: 'red', text: "⛔ Bulut (Supabase) ulanmagan: mijoz telefonidan QR-buyurtma ishlamaydi" }
+};
+
+export default function QrSecuritySection({ addAuditLog, tables = [] }) {
+  const firstTable = (Array.isArray(tables) ? tables : [])
+    .map(t => (t && typeof t === 'object' ? t.name : t)).filter(Boolean).map(String)[0] || '';
+  const [serverCheck, setServerCheck] = useState({ state: 'checking', text: '' });
+
+  const runServerCheck = useCallback(async () => {
+    if (!firstTable) return;
+    setServerCheck({ state: 'checking', text: '' });
+    try {
+      const res = await callRpc('qr_menu', { p_table: firstTable, p_ctx: {} });
+      setServerCheck({ state: res && typeof res === 'object' && res.access ? 'ok' : 'old', text: '' });
+    } catch (e) {
+      const msg = String(e?.message || e || '');
+      if (/could not find the function|schema cache|PGRST202/i.test(msg)) setServerCheck({ state: 'old', text: '' });
+      else if (/ulanmagan/i.test(msg)) setServerCheck({ state: 'nosync', text: '' });
+      else setServerCheck({ state: 'error', text: msg });
+    }
+  }, [firstTable]);
+
+  useEffect(() => {
+    runServerCheck();
+  }, [runServerCheck]);
+
+  const check = SERVER_CHECK_TEXT[serverCheck.state] || {
+    tone: 'amber',
+    text: `⚠️ Serverni tekshirib bo'lmadi: ${serverCheck.text || "noma'lum xato"} (internetni tekshiring)`
+  };
+
   const [savedGeo, setSavedGeo] = useSticky(QR_GEOFENCE_KEY, DEFAULT_GEOFENCE);
   const [, setSecret] = useSticky(QR_SECRET_KEY, '');
   const current = normalizeGeofence(savedGeo);
@@ -102,6 +139,33 @@ export default function QrSecuritySection({ addAuditLog }) {
           <li>📍 Quyidagini yoqsangiz, buyurtma va ofitsiant chaqiruvi faqat kafe ichidan (telefon joylashuvi bo'yicha) qabul qilinadi.</li>
         </ul>
       </div>
+
+      {/* Server holati (supabase/qr.sql yangilanganmi) */}
+      {firstTable && (
+        <div
+          data-testid="qr-server-check"
+          className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-xs sm:text-sm font-black break-words ${
+            check.tone === 'green'
+              ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+              : check.tone === 'red'
+              ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
+              : check.tone === 'amber'
+              ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+              : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+          }`}
+        >
+          <span className="flex-1 min-w-0">{check.text}</span>
+          {serverCheck.state !== 'checking' && (
+            <button
+              type="button"
+              onClick={runServerCheck}
+              className="shrink-0 px-3 py-2 rounded-xl bg-white/80 dark:bg-gray-800 border border-current text-xs font-black transition active:scale-95"
+            >
+              🔄 Qayta tekshirish
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Faqat kafe ichidan */}
       <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 space-y-4">

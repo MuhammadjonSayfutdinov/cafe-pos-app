@@ -56,6 +56,21 @@ export async function createQrApi() {
     return null; // bulut sozlanmagan: QR orqali buyurtma ishlamaydi
   }
 
+  // supabase/qr.sql hali yangilanmagan bo'lsa (eski funksiyalarda p_ctx parametri yo'q), eski usulda
+  // qayta chaqiramiz: QR sahifa ishlashda davom etadi, himoya esa SQL yangilangach ishlaydi.
+  // Supabase xatosi: "Could not find the function public.qr_menu(p_ctx, p_table) in the schema cache"
+  const isOldServer = (e) => /could not find the function|schema cache|PGRST202/i.test(String(e?.message || ''));
+  const callCompat = async (fn, args) => {
+    try {
+      return await call(fn, args);
+    } catch (e) {
+      if (!Object.prototype.hasOwnProperty.call(args, 'p_ctx') || !isOldServer(e)) throw e;
+      const { p_ctx: _ctx, ...oldArgs } = args;
+      console.warn("supabase/qr.sql eski versiyada: QR himoyasi ishlamayapti. SQL Editor'da qayta ishga tushiring.");
+      return call(fn, oldArgs);
+    }
+  };
+
   const wrap = (fn) => async (...a) => {
     try {
       return await fn(...a);
@@ -67,10 +82,10 @@ export async function createQrApi() {
   };
 
   return {
-    getMenu: wrap((table, ctx = {}) => call('qr_menu', { p_table: table, p_ctx: ctx })),
+    getMenu: wrap((table, ctx = {}) => callCompat('qr_menu', { p_table: table, p_ctx: ctx })),
     submitOrder: wrap((table, items, note = '', ctx = {}) =>
-      call('qr_submit_order', { p_table: table, p_items: items, p_note: note, p_ctx: ctx })),
-    callWaiter: wrap((table, ctx = {}) => call('qr_call_waiter', { p_table: table, p_ctx: ctx })),
+      callCompat('qr_submit_order', { p_table: table, p_items: items, p_note: note, p_ctx: ctx })),
+    callWaiter: wrap((table, ctx = {}) => callCompat('qr_call_waiter', { p_table: table, p_ctx: ctx })),
     requestStatus: wrap((ids) => call('qr_request_status', { p_ids: ids }))
   };
 }

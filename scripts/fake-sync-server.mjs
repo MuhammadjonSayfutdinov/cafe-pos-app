@@ -5,6 +5,7 @@
 //
 // Kirish: istalgan email, parol "parol123".
 // Sinov boshqaruvi: POST /__offline {"on": true|false}, GET /__state, POST /__reset
+// FAKE_OLD_QR_SQL=1: yangilanmagan supabase/qr.sql ni taqlid qiladi (p_ctx parametri yo'q)
 import http from 'node:http';
 import { createHash } from 'node:crypto';
 
@@ -216,10 +217,16 @@ http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname.startsWith('/rpc/') && req.method === 'POST') {
-    const fn = rpc[url.pathname.slice(5)];
+    const name = url.pathname.slice(5);
+    const fn = rpc[name];
     if (!fn) return send(res, 404, { message: 'Funksiya topilmadi' });
     try {
-      return send(res, 200, fn((await readBody(req)) || {}));
+      const body = (await readBody(req)) || {};
+      if (process.env.FAKE_OLD_QR_SQL === '1' && 'p_ctx' in body) {
+        const params = Object.keys(body).sort().join(', ');
+        return send(res, 404, { code: 'PGRST202', message: `Could not find the function public.${name}(${params}) in the schema cache` });
+      }
+      return send(res, 200, fn(body));
     } catch (e) {
       return send(res, 400, { message: e.message, hint: e.hint || '' });
     }

@@ -41,7 +41,9 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 **Pilot:** foydalanuvchi `supabase/qr.sql` ni ishga tushiradi, saytni Vercel'ga joylaydi, kafeda sinaydi.
 **QR himoyasi (B15–B18) dan keyin:** `supabase/qr.sql` ni Supabase'da yana bir marta to'liq ishga tushirish,
 QR stikerlarni qayta chop etish (yangi stikerda stol kaliti bor), xohlasa Admin → Tizim Sozlamalari →
-"🛡️ QR-buyurtma himoyasi" da "Faqat kafe ichidan" ni yoqish.
+"🛡️ QR-buyurtma himoyasi" da "Faqat kafe ichidan" ni yoqish. Shu bo'limda yashil "✅ Server tayyor"
+chiqishi kerak (qizil "⛔ supabase/qr.sql yangilanmagan!" = SQL ishga tushirilmagan; telefon sahifasi
+baribir eski usulda ishlaydi: `qrApi.js` -> `callCompat`).
 Stollar uchun QR stikerlar tayyor: Admin → Tizim Sozlamalari → Stollar → "🖨️ QR stikerlar".
 Pilotda: sayt manzilini (Vercel) yozib stikerlarni chop etish, bittasini telefon bilan skaner qilib tekshirish.
 Yangi kod qurilmalarga faqat `master` ga push qilingach (Vercel joylagach) yetib boradi, keyin o'zi yangilanadi.

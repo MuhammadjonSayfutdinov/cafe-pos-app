@@ -699,7 +699,7 @@ export default function AdminSettingsTab({
       )}
 
       {/* QR-BUYURTMA HIMOYASI: band stol va "faqat kafe ichidan" */}
-      <QrSecuritySection addAuditLog={addAuditLog} />
+      <QrSecuritySection addAuditLog={addAuditLog} tables={safeTables} />
 
       {/* BULUT SINXRONLASH */}
       <AdminSyncSection />
