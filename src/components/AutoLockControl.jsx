@@ -2,6 +2,8 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMe
 import { createPortal } from 'react-dom';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 import { setUpdateScreenLocked } from '../pwa/update';
+import { checkPin, findUserByPin, pinLengthOf } from '../utils/pinHash';
+import { getRequiredPinLength } from '../constants/roles';
 
 // =========================================================
 // VAQT VARIANTLARI (TELEFON VA KOMPYUTER SOZLAMALARIDEK)
@@ -268,8 +270,7 @@ export default function AutoLockControl({
     }
 
     // 1. Joriy foydalanuvchining o'z PIN-kodi (universal "1111/0000" kodlar olib tashlandi, B6)
-    const currentPin = String(currentUser?.pin || currentUser?.password || '').trim();
-    if (currentPin && cleanPin === currentPin) {
+    if (checkPin(currentUser, cleanPin)) {
       resetPinGuard('autolock');
       setIsScreenLocked(false);
       setPinInput('');
@@ -289,9 +290,7 @@ export default function AutoLockControl({
       }
     }
 
-    const matchedOtherUser = allUsers.find(
-      u => u && String(u.pin || u.password || '').trim() === cleanPin
-    );
+    const matchedOtherUser = findUserByPin(allUsers, cleanPin);
 
     if (matchedOtherUser) {
       resetPinGuard('autolock');
@@ -329,7 +328,7 @@ export default function AutoLockControl({
     setPinInput(nextPin);
 
     // Agar joriy xodimning PIN uzunligiga yetgan bo'lsa avtomatik tekshiramiz
-    const expectedLen = String(currentUser?.pin || '1111').trim().length || 4;
+    const expectedLen = pinLengthOf(currentUser, getRequiredPinLength(currentUser?.role));
     if (nextPin.length >= expectedLen) {
       setTimeout(() => verifyAndUnlock(nextPin), 120);
     }

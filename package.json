@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build",
+    "typecheck": "tsc -p .",
+    "build": "tsc -p . && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -17,6 +18,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^5.0.2",
     "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
     "vite": "^7.1.5"
   },
   "allowScripts": {

@@ -1,0 +1,23 @@
+{
+  // TypeScript'ga bosqichma-bosqich o'tish: yangi va ko'chirilgan fayllar .ts, qolganlari hozircha .js/.jsx.
+  // `npm run typecheck` faqat .ts fayllarni qat'iy (strict) tekshiradi. JS fayllar tekshirilmaydi,
+  // lekin .ts fayl ularni import qila oladi (allowJs).
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "checkJs": false,
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*.ts"]
+}

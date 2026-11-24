@@ -10,17 +10,32 @@
 //     useSticky ularni SAME_TAB_EVENT orqali oladi.
 //  5. Qarama-qarshilik: bitta yozuvni ikki qurilma o'zgartirsa, oxirgi yozilgani qoladi.
 //     Hali yuborilmagan mahalliy o'zgarish serverdan kelgan eski versiyadan ustun.
+//  6. Sekin internet: har bir so'rov vaqti cheklangan (src/sync/timeouts.ts), navbat kichik
+//     qismlarda yuboriladi (yuborilgan qism navbatdan darhol o'chadi), dastur ochilganda butun
+//     baza emas, faqat oxirgi sinxrondan keyingi o'zgarishlar olinadi (to'liq tekshiruv 6 soatda bir).
 
 import {
   SAME_TAB_EVENT, RECORD_COLLECTIONS, KV_KEYS,
   isRecordCollection, isKvKey, isSyncedKey,
-  OUTBOX_KEY, DEVICE_ID_KEY, INIT_IDENTITY_KEY, LAST_SERVER_TS_KEY
+  OUTBOX_KEY, DEVICE_ID_KEY, INIT_IDENTITY_KEY, LAST_SERVER_TS_KEY, LAST_FULL_SYNC_KEY
 } from './config';
+import { withTimeout } from './timeouts';
 
 const FLUSH_DEBOUNCE_MS = 300;
 const RETRY_MIN_MS = 2000;
 const RETRY_MAX_MS = 60000;
 const CATCHUP_INTERVAL_MS = 120000;
+// Bitta so'rovda yuboriladigan yozuvlar: sekin internetda katta paket vaqtga sig'may, navbat
+// hech qachon bo'shamay qolishi mumkin edi
+const PUSH_BATCH = 100;
+// Dvigatel darajasidagi zaxira cheklov (transportning o'z cheklovidan keyin ishlaydi)
+const PUSH_TIMEOUT_MS = 60000;
+const FETCH_TIMEOUT_MS = 180000;
+const RPC_TIMEOUT_MS = 20000;
+// Shundan uzoq javob - "sekin internet" (sarlavhadagi belgida ko'rinadi)
+const SLOW_MS = 4000;
+// Dastur ochilganda butun bazani qayta tekshirish oralig'i (qolgan paytda faqat o'zgarishlar)
+const FULL_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 // ---------- yordamchilar ----------
 export const recordId = (r) =>
@@ -79,7 +94,7 @@ let subscribedOnce = false;
 const shadow = new Map(); // har bir kalitning sinxronlangan oxirgi holati
 let outbox = new Map();   // opKey -> op
 
-let status = { state: 'disabled', pending: 0, lastSyncAt: null, error: null, email: null };
+let status = { state: 'disabled', pending: 0, lastSyncAt: null, error: null, email: null, slow: false };
 const statusListeners = new Set();
 
 function setStatus(patch) {
@@ -98,6 +113,15 @@ export function subscribeSyncStatus(fn) {
   statusListeners.add(fn);
   fn(status);
   return () => statusListeners.delete(fn);
+}
+
+/** Server so'rovi: vaqt cheklovi va tezlikni o'lchash (sekin bo'lsa status.slow) */
+async function timed(promise, ms, label) {
+  const t0 = Date.now();
+  const result = await withTimeout(promise, ms, label);
+  const slow = Date.now() - t0 > SLOW_MS;
+  if (slow !== status.slow) setStatus({ slow });
+  return result;
 }
 
 // ---------- outbox ----------
@@ -191,6 +215,16 @@ function scheduleRetry(fn) {
   retryDelay = Math.min(RETRY_MAX_MS, retryDelay * 2);
 }
 
+// Yuborilgan op larni navbatdan olib tashlaymiz (yuborish paytida qayta o'zgarganlari qoladi)
+function settleOps(ops) {
+  ops.forEach(o => {
+    const k = opKey(o);
+    if (outbox.get(k) === o) outbox.delete(k);
+  });
+  saveOutbox();
+  setStatus({});
+}
+
 export async function flush() {
   if (!transport || !started || flushing || outbox.size === 0) return;
   flushing = true;
@@ -199,20 +233,21 @@ export async function flush() {
   try {
     const recs = ops.filter(o => o.kind === 'rec');
     const kvs = ops.filter(o => o.kind === 'kv');
-    if (recs.length) {
-      await transport.pushRecords(recs.map(o => ({
+    // Kichik qismlarda: internet o'rtada uzilsa, yuborib bo'lingan qism qayta yuborilmaydi
+    for (let i = 0; i < recs.length; i += PUSH_BATCH) {
+      const batch = recs.slice(i, i + PUSH_BATCH);
+      await timed(transport.pushRecords(batch.map(o => ({
         collection: o.collection, id: o.id, data: o.data ?? {}, deleted: Boolean(o.deleted), updated_by: deviceId
-      })));
+      }))), PUSH_TIMEOUT_MS, 'Yuborish');
+      settleOps(batch);
     }
     if (kvs.length) {
-      await transport.pushKv(kvs.map(o => ({ key: o.key, value: o.value ?? null, updated_by: deviceId })));
+      await timed(
+        transport.pushKv(kvs.map(o => ({ key: o.key, value: o.value ?? null, updated_by: deviceId }))),
+        PUSH_TIMEOUT_MS, 'Yuborish'
+      );
+      settleOps(kvs);
     }
-    // Yuborish paytida yangilanmagan op larni navbatdan olib tashlaymiz
-    ops.forEach(o => {
-      const k = opKey(o);
-      if (outbox.get(k) === o) outbox.delete(k);
-    });
-    saveOutbox();
     retryDelay = RETRY_MIN_MS;
     setStatus({ state: 'online', lastSyncAt: Date.now(), error: null });
   } catch (e) {
@@ -359,8 +394,27 @@ async function initialSync() {
   try {
     const identity = await transport.identity();
     const firstTime = storage()?.getItem(INIT_IDENTITY_KEY) !== identity;
-    const { records, kv } = await transport.fetchAll(null);
-    mergeInitial(records, kv, { firstTime });
+    const since = storage()?.getItem(LAST_SERVER_TS_KEY) || null;
+    const lastFull = Number(storage()?.getItem(LAST_FULL_SYNC_KEY) || 0);
+    const incremental = !firstTime && Boolean(since) && Date.now() - lastFull < FULL_SYNC_INTERVAL_MS;
+
+    if (incremental) {
+      // Qurilmadagi ma'lumot yangi: faqat oxirgi sinxrondan keyingi o'zgarishlar (sekin internetda tez)
+      const { records, kv } = await timed(transport.fetchAll(since), FETCH_TIMEOUT_MS, 'Yuklash');
+      buffering = [
+        ...records.map(r => ({ type: 'record', ...r })),
+        ...kv.map(r => ({ type: 'kv', ...r })),
+        ...buffering
+      ];
+    } else {
+      const { records, kv } = await timed(transport.fetchAll(null), FETCH_TIMEOUT_MS, 'Yuklash');
+      mergeInitial(records, kv, { firstTime });
+      try {
+        storage()?.setItem(LAST_FULL_SYNC_KEY, String(Date.now()));
+      } catch {
+        // ignore
+      }
+    }
     try {
       storage()?.setItem(INIT_IDENTITY_KEY, identity);
     } catch {
@@ -383,7 +437,7 @@ export async function catchUp() {
   if (!transport || !started) return;
   try {
     const since = storage()?.getItem(LAST_SERVER_TS_KEY) || null;
-    const { records, kv } = await transport.fetchAll(since);
+    const { records, kv } = await timed(transport.fetchAll(since), FETCH_TIMEOUT_MS, 'Yuklash');
     records.forEach(r => applyRemote({ type: 'record', ...r }));
     kv.forEach(r => applyRemote({ type: 'kv', ...r }));
     if (status.state === 'offline' && outbox.size === 0) setStatus({ state: 'online', error: null });
@@ -458,9 +512,22 @@ export function configureSync(transportInstance) {
   [...Object.keys(RECORD_COLLECTIONS), ...KV_KEYS].forEach(key => shadow.set(key, readLocal(key)));
 
   window.addEventListener('storage', handleStorageEvent);
+  // Internet qaytdi: kutish oralig'ini tiklab, darhol yuboramiz
   window.addEventListener('online', () => {
+    retryDelay = RETRY_MIN_MS;
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
     if (started) catchUp();
     else if (status.state !== 'auth') startWithRetry();
+  });
+  window.addEventListener('offline', () => {
+    if (status.state !== 'auth' && status.state !== 'disabled') setStatus({ state: 'offline', error: "Internet yo'q" });
+  });
+  // Planshet uyqudan yoki boshqa ilovadan qaytdi: o'tkazib yuborilgan o'zgarishlarni olamiz
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && started) catchUp();
   });
   setStatus({ state: 'booting' });
 }
@@ -515,6 +582,7 @@ export async function signOut({ force = false } = {}) {
   try {
     storage()?.removeItem(INIT_IDENTITY_KEY);
     storage()?.removeItem(LAST_SERVER_TS_KEY);
+    storage()?.removeItem(LAST_FULL_SYNC_KEY);
   } catch {
     // ignore
   }
@@ -535,5 +603,6 @@ export async function callRpc(fn, args) {
   if (!transport || typeof transport.rpc !== 'function') {
     throw new Error("Bulut sinxronlash ulanmagan");
   }
-  return transport.rpc(fn, args);
+  // Tugma bosilganda kutiladi: sekin internetda xodim uzoq kutib qolmasin
+  return withTimeout(transport.rpc(fn, args), RPC_TIMEOUT_MS, 'Server');
 }

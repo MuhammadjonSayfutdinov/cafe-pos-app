@@ -23,6 +23,7 @@ import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
 import { reservedByOpenOrders, stockStatus } from '../utils/inventoryCalc';
+import { findUserByPin } from '../utils/pinHash';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -275,7 +276,7 @@ export default function WaiterMode({
     );
 
     const matchedAdmin = cleanPin
-      ? adminUsers.find(u => String(u.pin || u.password || '') === cleanPin)
+      ? findUserByPin(adminUsers, cleanPin)
       : null;
 
     // Faqat haqiqiy admin PIN qabul qilinadi (oldin '0000', '123456' kabi kodlar ham o'tardi)

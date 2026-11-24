@@ -10,7 +10,7 @@
 import { getTelegramConfig, sendTelegramMessage, escapeHtml } from './telegramNotifier';
 
 const AUDIT_KEY = 'pos_audit_logs';
-const OUTBOX_KEY = 'pos_tg_feed_outbox'; // faqat shu qurilmada (src/sync/config.js da yo'q)
+const OUTBOX_KEY = 'pos_tg_feed_outbox'; // faqat shu qurilmada (src/sync/config.ts da yo'q)
 const LOCK_KEY = 'pos_tg_feed_lock';     // bir qurilmada ikki oyna ochiq bo'lsa, bittasi yuboradi
 
 const DEBOUNCE_MS = 2500;      // shu vaqt ichidagi amallar bitta xabarga yig'iladi

@@ -24,14 +24,19 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
 - **Admin:** menyu, kategoriyalar, xodimlar va PIN kodlar (lavozim nomini o'zingiz yozasiz, masalan "Barmen"), audit jurnali, zaxira nusxa, Telegram sozlamalari
 - **Telegram:** har bir amal (kirish-chiqish, buyurtma, dozakaz, oshxona, to'lov, ombor, xodim, menyu) rahbar
   Telegramiga jonli jurnal bo'lib boradi; Z-hisobot, qarz, chegirma, ombor ogohlantirishlari alohida xabar
-- **Xavfsizlik:** xavfli amallar admin PIN bilan tasdiqlanadi, 5 ta xato PIN'dan keyin vaqtincha bloklash
+- **Xavfsizlik:** xavfli amallar admin PIN bilan tasdiqlanadi, 5 ta xato PIN'dan keyin vaqtincha bloklash;
+  PIN kodlar ochiq matnda emas, xesh (tuzli SHA-256) ko'rinishida saqlanadi; saytda xavfsizlik sarlavhalari (CSP)
 - **Planshetga o'rnatish (PWA):** bosh ekranga qo'shiladi, internet uzilib sahifa yangilansa ham ochiladi
+- **Oflayn va sekin internet:** internet uzilsa ham ish davom etadi (o'zgarishlar qurilmada navbatda turadi va
+  internet qaytganda o'zi yuboriladi). Sekin internetda dastur keshdan tez ochiladi, so'rovlar osilib qolmaydi,
+  sarlavhada `🐢 Sekin internet` belgisi chiqadi
 - **Avtomatik yangilanish:** saytga yangi versiya chiqsa, telefon, planshet va kompyuter o'zi yangilanadi
   (ish to'xtaganda; xodim o'z ekraniga PIN'siz qaytadi). Qurilmadagi versiya kirish oynasining pastida yozilgan
 
 ## Texnologiyalar
 
-React 19, Vite 7, Tailwind CSS 4. Ma'lumotlar qurilmada (`localStorage`) saqlanadi; ixtiyoriy ravishda
+React 19, Vite 7, Tailwind CSS 4, TypeScript (bosqichma-bosqich: yangi va ko'chirilgan modullar `.ts`,
+qolganlari hozircha `.js/.jsx`). Ma'lumotlar qurilmada (`localStorage`) saqlanadi; ixtiyoriy ravishda
 **Supabase** orqali bir nechta qurilma o'rtasida sinxronlanadi (sozlash: [SUPABASE.md](SUPABASE.md)).
 
 ## Ishga tushirish
@@ -46,11 +51,17 @@ npm run dev
 Brauzerda `http://localhost:5173` ni oching. `npm run dev` serverni mahalliy tarmoqqa ham ochadi
 (`--host`), shuning uchun bir xil Wi-Fi'dagi planshet yoki telefondan ham kirish mumkin.
 
-Tayyor (production) versiyani yig'ish:
+Tayyor (production) versiyani yig'ish (avval TypeScript tekshiruvi o'tadi):
 
 ```bash
 npm run build
 npm run preview
+```
+
+Faqat turlarni (TypeScript) tekshirish:
+
+```bash
+npm run typecheck
 ```
 
 ## Birinchi kirish
@@ -75,6 +86,8 @@ Admin standart PIN bilan ishlasa, ekranning tepasida ogohlantirish chiqib turadi
 - Brauzer tarixi yoki sayt ma'lumotlari tozalansa, hamma narsa o'chadi. **Muntazam zaxira nusxa oling:**
   Boshqaruv → Tizim Sozlamalari → zaxira nusxani yuklab olish.
 - Zaxira fayliga PIN kodlar va Telegram bot tokeni yozilmaydi. Tokenni alohida, xavfsiz joyda saqlang.
+- PIN kodlarni hech kim (admin ham) ko'ra olmaydi: xodim PIN'ini unutsa, admin "Xodimlar va Parollar" da
+  yangisini beradi.
 - Xotira to'lsa, dastur ogohlantiradi. Shunda zaxira nusxa olib, eski cheklar tarixini tozalang.
 
 ## Yangi versiyani chiqarish (qurilmalarga yetkazish)
@@ -105,15 +118,17 @@ src/
   constants/orderStatus.js  buyurtma statuslari, to'lov turlari, yetkazib berish sxemasi
   constants/roles.js      xodim rollari (bo'limlar) va PIN uzunligi
   hooks/useSticky.js      localStorage bilan sinxron state
-  sync/                   bulutda sinxronlash (dvigatel, Supabase transporti)
+  sync/                   bulutda sinxronlash (dvigatel, Supabase transporti, timeouts.ts: sekin internet)
   pwa/                    oflayn ishlash (service worker) va avtomatik yangilanish (update.js)
   qr/                     mijoz QR-menyusi (PublicQrApp), QR kod yaratish (qrEncode.js), stol havolasi (tableQrUrl.js)
   utils/
-    ids.js                noyob id (bir nechta qurilmada to'qnashmaydi)
-    orderTotals.js        buyurtma summasini hisoblashning yagona joyi
+    ids.ts                noyob id (bir nechta qurilmada to'qnashmaydi)
+    orderTotals.ts        buyurtma summasini hisoblashning yagona joyi
     delivery.js           yetkazib berish: "Yetkazish #N" nomi, yetkazish narxi qatori, doimiy mijoz manzili
     dates.js              sana bilan ishlash (millisekund bo'yicha)
-    pinGuard.js           xato PIN urinishlarini cheklash
+    pinGuard.ts           xato PIN urinishlarini cheklash
+    pinHash.ts            PIN xeshi: saqlash, tekshirish, eski ochiq PIN'larni ko'chirish
+    sha256.ts             SHA-256 (kutubxonasiz, http da ham ishlaydi)
     notify.js             toast va tasdiqlash oynasi
     migrate.js            eski ma'lumotlarni yangi sxemaga keltirish
     telegramNotifier.js   Telegram xabarlari

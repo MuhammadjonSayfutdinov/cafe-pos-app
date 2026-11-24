@@ -47,7 +47,9 @@ baribir eski usulda ishlaydi: `qrApi.js` -> `callCompat`).
 Stollar uchun QR stikerlar tayyor: Admin → Tizim Sozlamalari → Stollar → "🖨️ QR stikerlar".
 Pilotda: sayt manzilini (Vercel) yozib stikerlarni chop etish, bittasini telefon bilan skaner qilib tekshirish.
 Yangi kod qurilmalarga faqat `master` ga push qilingach (Vercel joylagach) yetib boradi, keyin o'zi yangilanadi.
-Keyin pilot natijasiga qarab: PIN tekshiruvini serverga ko'chirish, Click/Payme, fiskal chek, Vitest.
+Keyin pilot natijasiga qarab: Click/Payme, fiskal chek, Vitest, TypeScript'ga o'tishni davom ettirish
+(navbatdagi: `src/sync/engine.js`, `src/utils/dates.js`, `inventoryCalc.js`, keyin komponentlar `.tsx`),
+internetsiz kafe ichida qurilmalar almashishi uchun mahalliy server.
 Kichik ishlar (istalgan vaqtda): `barcha-kodlar.txt` (eskirgan kod nusxasi) va `preview.html` kerakmi, ko'rib chiqish.
 
 ## Vazifa → kerakli fayllar
@@ -98,10 +100,10 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 
 ### 1-bosqich. Mantiq xatolari (2–3 kun)
 - [x] B1 ombor bitta joyda (to'lovda); bekor qilingan to'lanmagan chekda ayirish yo'q
-- [x] B10 `calcOrderTotals()` (yangi `src/utils/orderTotals.js`)
+- [x] B10 `calcOrderTotals()` (yangi `src/utils/orderTotals.ts`)
 - [x] B4 + B7 + B8 sana (`src/utils/dates.js`), qarz
 - [x] B3 + B9 taom darajasida `kitchenDoneQty`, chekni bo'lish
-- [x] B5 + B6 zaxira va PIN xavfsizligi (`src/utils/pinGuard.js`)
+- [x] B5 + B6 zaxira va PIN xavfsizligi (`src/utils/pinGuard.ts`)
 
 ### 2-bosqich. Ma'lumot qatlami va interfeys (2–3 kun)
 - [x] Statuslar uchun `src/constants/orderStatus.js` (kalitlar kod uchun; saqlanadigan qiymatlar eski ma'lumot bilan mos bo'lishi uchun o'zgartirilmadi)
@@ -113,7 +115,10 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 - [x] Variant tanlash: Supabase (pilot uchun)
 - [x] Sinxronlash qatlami `src/sync/` (useSticky o'zgarmadi: localStorage + yozuv darajasida bulut sinxroni, oflayn navbat, realtime)
 - [x] QR-menyu: mijoz telefonidan buyurtma (`supabase/qr.sql`, `src/qr/`), ofitsiant tasdig'i bilan, narx serverda
-- [ ] PIN tekshiruvini serverga ko'chirish (hozir ma'lumot RLS bilan himoyalangan, PIN qurilmada tekshiriladi)
+- [x] PIN xeshi (`src/utils/pinHash.ts`): ochiq PIN saqlanmaydi, eski ma'lumot o'zi ko'chiriladi.
+  Tekshiruv qurilmada qoldi (oflayn kirish uchun), qarang: "Qarorlar" → "PIN saqlash"
+- [x] Sekin internet: so'rov vaqt cheklovi, navbat qismlarda, qayta ochilganda faqat o'zgarishlar,
+  service worker sahifani 3,5 s da keshdan beradi (`src/sync/timeouts.ts`, `engine.js`, `sw-template.js`)
 
 ### 4-bosqich. Kafe uchun funksiyalar
 - [x] Smena ochish/yopish, haqiqiy Z-hisobot (`ShiftPanel.jsx`, `src/shift/shiftReport.js`, `pos_shifts`)
@@ -130,6 +135,9 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
   (`QrStickerSheet.jsx`, `src/qr/qrEncode.js`, `src/qr/tableQrUrl.js`); ofitsiantning bitta stol QR oynasi ham shunga o'tdi
 
 ### 5-bosqich. Sifat
+- [x] TypeScript boshlandi: `tsconfig.json` (strict, allowJs), `npm run typecheck`, build avval tekshiradi.
+  `.ts`: `sync/config`, `sync/timeouts`, `utils/ids`, `utils/pinGuard`, `utils/orderTotals`, `utils/pinHash`, `utils/sha256`
+- [x] Saytning xavfsizlik sarlavhalari (`vercel.json`: CSP, X-Frame-Options, nosniff, Referrer/Permissions-Policy)
 - [ ] `Vitest`: summa, chegirma, bonus, ombor hisobi
 - [ ] Joylashtirish (Vercel/Netlify + backend)
 
@@ -140,7 +148,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | Ombor qachon ayiriladi | To'lovda (`CashierMode.deductOrderIngredientsFromStock`). Sabab: ofitsiant buyurtmasi `App.jsx` dan o'tmaydi, kassadagi kod birlik va porsiyani hisoblaydi, bekor qilingan chekni qaytarish shart emas | qabul qilindi |
 | Taom statusi | Taomda `kitchenDoneQty`; dozakazda oshxona faqat qolgan porsiyani ko'radi | qabul qilindi |
 | Backend | Supabase (pilot). Haqiqiy ishga o'tishda shaxsiy ma'lumotlar qonuni sababli mahalliy serverga ko'chish (`supabaseTransport.js` almashtiriladi) | qabul qilindi |
-| Id lar | `src/utils/ids.js` (`newId`): bir nechta qurilmada `Date.now()` to'qnashardi | qabul qilindi |
+| Id lar | `src/utils/ids.ts` (`newId`): bir nechta qurilmada `Date.now()` to'qnashardi | qabul qilindi |
 | Telegram jonli jurnali | Har bir audit yozuvi Telegramga boradi (`src/utils/telegramFeed.js`, `useSticky` orqali). Faqat amal bajarilgan qurilma yuboradi (bulutdan kelgan yozuv yuborilmaydi), amallar 2,5 soniyada bitta xabarga yig'iladi, oflayn navbat qurilmada saqlanadi | qabul qilindi |
 | Yangi qurilmani ulash | Qurilma shu kafe hisobi bilan birinchi sinxronni tugatmaguncha ilova ochilmaydi (`SyncGate`, `isFirstSyncPending`). Komponentlarning standart qiymati (`useSticky` seed) birinchi sinxrondan oldin navbatga qo'yilmaydi. Sabab: sekin internetda yangi qurilma namuna xodimlar (777777, 2222) va menyuni bulutga yozib, admin PIN'ini qaytarardi va o'chirilgan xodimlarni tiklardi | qabul qilindi |
 | Yetkazib berish | Yetkazish buyurtmasi oddiy buyurtma: stol nomi `Yetkazish #N`, `orderType: 'delivery'`, `delivery: {...}` (sxema: `orderStatus.js`). Oshxona va kassadan o'tadi. Kuryer faqat holatni belgilaydi (oldi, yo'lda, yetkazildi + mijoz qanday to'lagani), chekni kassir yopadi: ombor ayirish va smena hisobi yagona joyda qoladi. Xizmat haqi (%) olinmaydi, yetkazish narxi chekda alohida qator (`isDeliveryFee`, oshxonaga chiqmaydi). Kuryer buyurtmaga ismi bilan biriktiriladi (ismlar takrorlanmaydi) | qabul qilindi |
@@ -149,6 +157,9 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | Yangi versiyaga o'tish | Qurilma `/version.json` ni tekshiradi (ochilganda, 5 daqiqada, fondan qaytganda, internet qaytganda). Versiya = kod fayllari mazmunidan hash: kod o'zgarmasa qayta deploy yangilanish chaqirmaydi. Yangilash xavfsiz paytda: PIN oynasida 20 s harakatsiz, ishlayotgan xodimda 3 daqiqa harakatsiz (xodim o'sha ekranga PIN'siz qaytadi: sessionStorage, 1 daqiqa, bir marta; avto-qulf yopiq bo'lsa PIN so'raladi), savatcha/yetkazish formasi ochiq bo'lsa kutadi. Mijoz QR sahifasi faqat fonga o'tganda. Oldingi "Yangilansinmi?" oynasi olib tashlandi: rad etilsa, qurilma eski versiyada qolib ketardi. Sayt `master` dan joylanadi (README: "Yangi versiyani chiqarish") | qabul qilindi |
 | QR-buyurtma himoyasi | Band stolga (to'lanmagan cheki bor) telefondan faqat stoldagi QR bilan: havolada stol kaliti `k` = sha256(`pos_qr_secret` + '\|' + stol) ning 12 belgisi (`src/qr/tableKey.js`, kutubxonasiz, http da ham ishlaydi). Server tekshiradi (`qr.sql` → `qr_access`), sir mijozga ko'rinmaydi. Kalitsiz: faqat bo'sh stol yoki shu telefon o'zi ochgan chek (qabul qilingan so'rovdagi `orderId`). "Faqat kafe ichidan" (`pos_qr_geofence`, ixtiyoriy): buyurtma va chaqiruv telefon GPS kafe radiusida bo'lsa (aniqlik 150 m gacha hisobga olinadi). Mijoz ekrani (kiosk) faqat bo'sh stolni ochadi. Ofitsiant tasdig'i saqlanadi, so'rov kartasida "QR skaner qilingan / kalitsiz havola" ko'rinadi. Telefon so'rov holatini chek bo'yicha kuzatadi: to'langach ro'yxatdan o'chadi | qabul qilindi |
 | Dizayn uslubi | Zamonaviy restoran ko'rinishi (namuna: kafe-demo.vercel.app): to'q zinc fon, amber urg'u, Geist shrifti, yumaloq (pill) tugmalar. Ranglar faqat `src/index.css` `@theme` da: `brand-*` = asosiy rang, `gray-*` = neytral zinc. `indigo` faqat amber bilan adashmasligi kerak bo'lgan holat/toifa ranglarida qoldi. Mijoz QR-menyusi doim to'q, kafe rasmi bilan (`public/images/cafe-hero.webp`, Unsplash litsenziyasi). Yangi qurilmada xodimlar ekrani ham to'q rejimda ochiladi (eski qurilmada tanlangan rejim saqlanadi). Mantiq va tuzilma o'zgarmadi: faqat `className` va ko'rinish | qabul qilindi |
+| PIN saqlash | `user.pinHash` = `s1$2000$<tuz>$<xesh>` (tuzli, 2000 marta takrorlangan SHA-256, `src/utils/pinHash.ts`) va `user.pinLength`; ochiq `pin`/`password` saqlanmaydi. App ochilganda eski ochiq PIN'lar xeshga o'tadi (bulutdan kelganlari ham). Tekshiruv qurilmada: internetsiz ham kirish kerak. 4-6 xonali PIN'ni xeshdan terib topish mumkin, shuning uchun asosiy himoya - RLS va yopiq ro'yxatdan o'tish. Admin PIN'ni ko'ra olmaydi, faqat yangisini beradi. SHA-256 kutubxonasiz (`src/utils/sha256.ts`): crypto.subtle http (192.168.x.x) da yo'q | qabul qilindi |
+| Sekin internet | Supabase so'rovlari 45 s (`createTimeoutFetch`), sessiya tekshiruvi 10 s, QR tasdiqlash 20 s. Navbat 100 tadan yuboriladi, yuborilgan qism darhol navbatdan o'chadi. Ilova ochilganda: oxirgi to'liq sinxrondan 6 soat o'tmagan bo'lsa faqat o'zgarishlar (`since`), aks holda butun baza. Sessiya tokeni tarmoq xatosi sababli yangilanmasa, saqlangan sessiya bilan ishlaydi (qayta kirish so'ralmaydi). Service worker: sahifa 3,5 s da kelmasa keshdan. Javob 4 s dan uzoq - `🐢 Sekin internet` belgisi | qabul qilindi |
+| TypeScript | Bosqichma-bosqich: `allowJs`, faqat `.ts` fayllar strict tekshiriladi. Yangi util/modul `.ts` da. Komponentlar keyinroq (`@types/react` kerak bo'ladi) | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
 ## Commit jurnali
@@ -174,6 +185,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 16 | Avtomatik yangilanish (telefon va kompyuter) | "pilot: yangi versiya qurilmalarga o'zi keladi..." commiti | [x] |
 | 17 | Chaqiruv xodimga yetadi, to'langan QR-buyurtma yo'qoladi, band stol va uzoqdan buyurtma himoyasi (B15–B18) | "pilot: ofitsiant chaqiruvi, to'langan QR-buyurtma va QR himoyasi" commiti | [x] |
 | 18 | Zamonaviy restoran dizayni (mijoz QR-menyusi va xodimlar ekranlari) | "dizayn: zamonaviy restoran ko'rinishi..." commiti | [x] |
+| 19 | PIN xeshi, xavfsizlik sarlavhalari, sekin/oflayn internet, TypeScript boshlandi | "xavfsizlik: PIN xeshi..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

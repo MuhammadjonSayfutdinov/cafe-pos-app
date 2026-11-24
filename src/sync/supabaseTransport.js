@@ -1,15 +1,31 @@
 // Supabase transporti: dvigatel bilan Supabase orasidagi yupqa qatlam.
 // Jadval tuzilishi: supabase/schema.sql
 import { createClient } from '@supabase/supabase-js';
+import { createTimeoutFetch, isNetworkError, withTimeout } from './timeouts';
 
 const PAGE_SIZE = 1000;   // PostgREST bir so'rovda ko'pi bilan 1000 qator qaytaradi
 const PUSH_CHUNK = 500;
+// Bitta HTTP so'rov uchun eng ko'p kutish (sekin internetda 1000 qatorli sahifa ham sig'sin)
+const REQUEST_TIMEOUT_MS = 45000;
+// Sessiyani tekshirish (token yangilash) shundan uzoq cho'zilsa, saqlangan sessiya bilan ishlaymiz
+const SESSION_TIMEOUT_MS = 10000;
+const AUTH_STORAGE_KEY = 'cafe_supabase_auth';
 
 export function createSupabaseTransport({ url, anonKey }) {
   const client = createClient(url, anonKey, {
     // storageKey 'pos_' bilan boshlanmaydi: favqulodda nusxa fayliga sessiya tokeni tushmasin
-    auth: { persistSession: true, autoRefreshToken: true, storageKey: 'cafe_supabase_auth' }
+    auth: { persistSession: true, autoRefreshToken: true, storageKey: AUTH_STORAGE_KEY },
+    // Sekin internetda so'rov cheksiz osilib qolmasin (src/sync/timeouts.ts)
+    global: { fetch: createTimeoutFetch(REQUEST_TIMEOUT_MS) }
   });
+
+  const storedSessionUser = () => {
+    try {
+      return JSON.parse(window.localStorage.getItem(AUTH_STORAGE_KEY) || 'null')?.user || null;
+    } catch {
+      return null;
+    }
+  };
 
   async function fetchTable(table, since) {
     const rows = [];
@@ -37,20 +53,19 @@ export function createSupabaseTransport({ url, anonKey }) {
       return `${url}|${data.session?.user?.id || 'anon'}`;
     },
     async getSession() {
+      let problem = null;
       try {
-        const { data } = await client.auth.getSession();
-        if (data.session) return data.session;
-      } catch {
-        // tarmoq xatosi: pastdagi zaxira tekshiruvga o'tamiz
+        const { data, error } = await withTimeout(client.auth.getSession(), SESSION_TIMEOUT_MS, 'Sessiya');
+        if (data?.session) return data.session;
+        problem = error || null;
+      } catch (e) {
+        problem = e; // tarmoq xatosi yoki vaqt tugadi
       }
-      // Internet yo'q va token muddati tugagan bo'lsa ham, qurilma avval ulangan bo'lsa
-      // kassa ishlashda davom etsin (internet qaytganda token avtomatik yangilanadi).
-      try {
-        const stored = JSON.parse(window.localStorage.getItem('cafe_supabase_auth') || 'null');
-        if (stored?.user && !navigator.onLine) return { user: stored.user, offline: true };
-      } catch {
-        // ignore
-      }
+      // Internet yo'q yoki juda sekin, token muddati esa tugagan bo'lsa ham: qurilma avval
+      // ulangan bo'lsa kassa ishlashda davom etsin (internet qaytganda token o'zi yangilanadi).
+      // Token haqiqatan bekor qilingan bo'lsa (tarmoq xatosi emas) - qayta kirish so'raladi.
+      const user = storedSessionUser();
+      if (user && (!navigator.onLine || isNetworkError(problem))) return { user, offline: true };
       return null;
     },
     async signIn(email, password) {

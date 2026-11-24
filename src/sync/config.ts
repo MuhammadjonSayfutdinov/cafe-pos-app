@@ -8,7 +8,10 @@
 
 export const SAME_TAB_EVENT = 'local-storage-update';
 
-export const RECORD_COLLECTIONS = Object.freeze({
+/** Boshqa qurilmadan kelgan yangi yozuv ro'yxatning qayeriga qo'shiladi */
+export type RecordPlacement = 'prepend' | 'append';
+
+export const RECORD_COLLECTIONS: Readonly<Record<string, RecordPlacement>> = Object.freeze({
   pos_orders: 'prepend',
   pos_menu: 'append',
   pos_users: 'append',
@@ -22,7 +25,7 @@ export const RECORD_COLLECTIONS = Object.freeze({
   pos_shifts: 'prepend' // kassa smenalari va Z-hisobotlar
 });
 
-export const KV_KEYS = Object.freeze([
+export const KV_KEYS: readonly string[] = Object.freeze([
   'pos_cafe_name',
   'pos_service_fee',
   'pos_tables',
@@ -39,12 +42,14 @@ export const KV_KEYS = Object.freeze([
   'pos_qr_geofence' // "faqat kafe ichidan" buyurtma: kafe joylashuvi va radius (src/qr/tableKey.js)
 ]);
 
-export const isRecordCollection = (key) => Object.prototype.hasOwnProperty.call(RECORD_COLLECTIONS, key);
-export const isKvKey = (key) => KV_KEYS.includes(key);
-export const isSyncedKey = (key) => isRecordCollection(key) || isKvKey(key);
+export const isRecordCollection = (key: string): boolean => Object.prototype.hasOwnProperty.call(RECORD_COLLECTIONS, key);
+export const isKvKey = (key: string): boolean => KV_KEYS.includes(key);
+export const isSyncedKey = (key: string): boolean => isRecordCollection(key) || isKvKey(key);
 
 // Sinxronlashning o'z xizmat kalitlari (faqat qurilmada)
 export const OUTBOX_KEY = 'pos_sync_outbox';
 export const DEVICE_ID_KEY = 'pos_device_id';
 export const INIT_IDENTITY_KEY = 'pos_sync_identity';
 export const LAST_SERVER_TS_KEY = 'pos_sync_last_ts';
+/** Oxirgi to'liq (butun baza) sinxron vaqti, ms. Qolgan paytda faqat o'zgarishlar olinadi */
+export const LAST_FULL_SYNC_KEY = 'pos_sync_last_full';

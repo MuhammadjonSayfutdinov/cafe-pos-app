@@ -27,6 +27,8 @@ import { CLOSED_ORDER_STATUSES, DELIVERY_STATUS, KITCHEN_ORDER_STATUSES, ORDER_S
 import { getRoleMeta, getUserTitle } from './constants/roles';
 import { newId } from './utils/ids';
 import { getUpdateResume, setUpdateSession } from './pwa/update';
+import { checkPin, migrateUserPins, pinLengthOf } from './utils/pinHash';
+import { isNetworkError } from './sync/timeouts';
 
 const initialMenuItems = [
   { 
@@ -66,8 +68,17 @@ const initialUsers = [
   { id: 5, name: 'Omborchi', role: 'warehouse', pin: '444444' }
 ];
 
-// Namuna PIN kodlar README'da ochiq yozilgan: ular bilan qolgan xodim haqida admin ogohlantiriladi
-const SAMPLE_PINS = new Set(initialUsers.map(u => u.pin));
+// Namuna PIN kodlar README'da ochiq yozilgan: ular bilan qolgan xodim haqida admin ogohlantiriladi.
+// initialUsers dagi ochiq PIN'lar faqat birinchi ishga tushirish uchun: App ochilganda xeshga o'tadi.
+const SAMPLE_PINS = [...new Set(initialUsers.map(u => u.pin))];
+
+/** Namuna PIN bilan qolgan xodimlar (PIN xeshlangan: har bir xodim faqat o'z uzunligidagi namunalar bilan tekshiriladi) */
+const findStaffWithSamplePin = (users) =>
+  (Array.isArray(users) ? users : []).filter(u => {
+    if (!u) return false;
+    const len = pinLengthOf(u, 0);
+    return SAMPLE_PINS.some(p => (!len || p.length === len) && checkPin(u, p));
+  });
 
 export default function App() {
   // ==========================================
@@ -103,6 +114,14 @@ export default function App() {
   const [adminActiveView, setAdminActiveView] = useState(updateResume?.adminView || 'admin'); // 'admin' | 'stats' | 'warehouse' | 'waiter' | 'cashier' | 'kitchen' | 'courier'
   
   const [overrideRequest, setOverrideRequest] = useState(null); 
+  // Namuna PIN tekshiruvi xeshlash bilan sekinroq: faqat admin uchun va ekranni to'xtatmasdan
+  const [samplePinStaff, setSamplePinStaff] = useState([]);
+  const isAdminSession = currentUser?.role === 'admin' && view === 'app';
+  useEffect(() => {
+    if (!isAdminSession) return undefined;
+    const t = setTimeout(() => setSamplePinStaff(findStaffWithSamplePin(users)), 50);
+    return () => clearTimeout(t);
+  }, [isAdminSession, users]);
   const [receiptToPrint, setReceiptToPrint] = useState(null);
 
   // ==========================================
@@ -126,6 +145,14 @@ export default function App() {
       return isUpdated ? safeUsers : prevUsers;
     });
   }, [setUsers]);
+
+  // PIN ochiq matnda saqlanmasin: eski ma'lumot (yoki eski versiyadagi qurilmadan kelgan xodim)
+  // darhol xeshga o'tkaziladi va bulut orqali boshqa qurilmalarga ham tarqaladi (src/utils/pinHash.ts)
+  useEffect(() => {
+    const hasPlainPin = Array.isArray(users) &&
+      users.some(u => u && (u.pin !== undefined || u.password !== undefined));
+    if (hasPlainPin) setUsers(prev => migrateUserPins(Array.isArray(prev) ? prev : []));
+  }, [users, setUsers]);
 
   // Yangi versiya chiqsa, kim ishlayotganini bilish uchun (yangilangach shu xodim o'z ekraniga qaytadi)
   useEffect(() => {
@@ -366,7 +393,9 @@ export default function App() {
     try {
       res = await callRpc('qr_claim_request', { p_id: req.id, p_status: status, p_by: currentUser?.name || '' });
     } catch (e) {
-      notify(`❌ So'rovni qayta ishlab bo'lmadi: ${e.message}`);
+      notify(isNetworkError(e)
+        ? "📴 Internet yo'q yoki juda sekin: QR-buyurtmani qabul qilish uchun internet kerak. Birozdan keyin qayta bosing."
+        : `❌ So'rovni qayta ishlab bo'lmadi: ${e.message}`);
       return;
     }
     if (!res?.ok) {
@@ -485,9 +514,7 @@ export default function App() {
 
   // C) ASOSIY ISHCHI DASTUR REJIMI
   const currentActiveView = currentUser.role === 'admin' ? adminActiveView : currentUser.role;
-  const staffWithSamplePin = currentUser.role === 'admin'
-    ? (Array.isArray(users) ? users : []).filter(u => u && SAMPLE_PINS.has(String(u.pin ?? '')))
-    : [];
+  const staffWithSamplePin = currentUser.role === 'admin' ? samplePinStaff : [];
   // Kuryer biriktirilmagan yetkazish buyurtmalari (admin menyusidagi belgi)
   const unassignedDeliveries = (Array.isArray(orders) ? orders : []).filter(
     o => o && isDeliveryOrder(o) && !CLOSED_ORDER_STATUSES.includes(o.status) &&

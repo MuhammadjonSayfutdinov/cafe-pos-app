@@ -4,7 +4,9 @@
 //   VITE_FAKE_SYNC_URL=http://localhost:8787 npx vite build --mode e2e --outDir dist-e2e
 //
 // Kirish: istalgan email, parol "parol123".
-// Sinov boshqaruvi: POST /__offline {"on": true|false}, GET /__state, POST /__reset
+// Sinov boshqaruvi: POST /__offline {"on": true|false}, GET /__state, POST /__reset,
+//   POST /__slow {"ms": 6000} - har bir javobni kechiktirish (sekin internet), 0 - o'chirish,
+//   GET /__stats - /all so'rovlari soni (to'liq va faqat o'zgarishlar)
 // FAKE_OLD_QR_SQL=1: yangilanmagan supabase/qr.sql ni taqlid qiladi (p_ctx parametri yo'q)
 import http from 'node:http';
 import { createHash } from 'node:crypto';
@@ -15,6 +17,8 @@ const PASSWORD = 'parol123';
 let records = new Map();
 let kv = new Map();
 let offline = false;
+let slowMs = 0;
+let stats = { allFull: 0, allSince: 0 };
 let lastTs = 0;
 const clients = new Set();
 
@@ -198,11 +202,20 @@ http.createServer(async (req, res) => {
     return send(res, 200, { records: [...records.values()], kv: [...kv.values()], offline });
   }
   if (url.pathname === '/__reset') {
-    records = new Map(); kv = new Map(); offline = false;
+    records = new Map(); kv = new Map(); offline = false; slowMs = 0;
+    stats = { allFull: 0, allSince: 0 };
     return send(res, 200, { ok: true });
+  }
+  if (url.pathname === '/__slow') {
+    slowMs = Math.max(0, Number((await readBody(req))?.ms) || 0);
+    return send(res, 200, { slowMs });
+  }
+  if (url.pathname === '/__stats') {
+    return send(res, 200, stats);
   }
 
   if (offline) return send(res, 503, { error: 'server offline' });
+  if (slowMs && url.pathname !== '/events') await new Promise(r => setTimeout(r, slowMs));
 
   if (url.pathname === '/events') {
     res.writeHead(200, {
@@ -237,6 +250,7 @@ http.createServer(async (req, res) => {
   }
   if (url.pathname === '/all') {
     const since = url.searchParams.get('since');
+    if (since) stats.allSince += 1; else stats.allFull += 1;
     const f = r => !since || r.updated_at >= since;
     return send(res, 200, { records: [...records.values()].filter(f), kv: [...kv.values()].filter(f) });
   }

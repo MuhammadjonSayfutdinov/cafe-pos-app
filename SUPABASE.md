@@ -133,8 +133,19 @@ stollarning buyurtmalari ko'rinmaydi.
 - **QR-buyurtma ofitsiant tasdig'idan o'tadi.** Mijoz telefonidan kelgan buyurtma ofitsiant/kassir/admin
   ekranida "📱 QR-buyurtma" bo'lib chiqadi va "Qabul qilish" bosilgandan keyingina oshxonaga tushadi.
   Bitta stoldan daqiqasiga 3 tadan ortiq so'rov qabul qilinmaydi. Narx telefondan emas, serverdagi menyudan olinadi.
-- **PIN tekshiruvi qurilmada** bajariladi. Bulutdagi ma'lumot kafe hisobi bilan himoyalangan, lekin
-  ulangan qurilmani qo'lga kiritgan odam ma'lumotlarni ko'ra oladi. Planshetlarni qulflab qo'ying.
+- **PIN tekshiruvi qurilmada** bajariladi (internetsiz ham kirish uchun). PIN'lar ochiq matnda emas, xesh
+  ko'rinishida saqlanadi (`src/utils/pinHash.ts`). Lekin 4-6 xonali PIN'da variant oz: bulutdagi ma'lumotni
+  o'qiy olgan odam xeshni terib topishi mumkin. Shuning uchun asosiy himoya - ro'yxatdan o'tish yopiq
+  bo'lishi (3-qadam). Ulangan qurilmani qo'lga kiritgan odam ma'lumotlarni ko'ra oladi: planshetlarni qulflang.
+- **PIN xeshiga o'tish:** yangi versiya ochilganda eski ochiq PIN'lar o'zi xeshga o'tadi. Shundan keyin
+  eski versiyada qolgan qurilmada xodimlar kira olmaydi. Qurilmalar yangi versiyaga o'zi o'tadi (avtomatik
+  yangilanish); o'tmagan bo'lsa, sahifani yangilang.
+- **Internet butunlay uzilsa** har bir qurilma alohida ishlashda davom etadi, lekin qurilmalar bir-biriga
+  ma'lumot uzata olmaydi: ofitsiant planshetidagi buyurtma oshxona ekraniga internet qaytgach yetadi.
+  Kafe ichida internetsiz almashish uchun mahalliy server kerak (keyingi bosqich).
+- **Saytning xavfsizlik sarlavhalari** (`vercel.json`, CSP): brauzer faqat shu sayt, `*.supabase.co` va
+  `api.telegram.org` ga ulanadi. Supabase uchun o'z domeningizni ishlatsangiz, `vercel.json` dagi
+  `connect-src` ga uni qo'shing (aks holda sinxronlash ishlamaydi).
 - **Shaxsiy ma'lumotlar:** O'zbekiston qonunchiligiga ko'ra fuqarolarning shaxsiy ma'lumotlari
   mamlakat ichidagi serverlarda saqlanishi talab qilinadi. Pilotdan haqiqiy ishga o'tishda mahalliy
   serverga ko'chish rejalashtirilgan. Kod shunga tayyor: faqat transport qatlami

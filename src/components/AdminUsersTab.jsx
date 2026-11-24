@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
 import { ROLE_OPTIONS, TITLE_SUGGESTIONS, getRequiredPinLength } from '../constants/roles';
+import { findPinOwner, hasPin, pinLengthOf, withPin } from '../utils/pinHash';
 
 const EMPTY_FORM = { name: '', title: '', role: 'waiter', pin: '', canSeeSales: true };
 
@@ -17,13 +18,18 @@ export default function AdminUsersTab({
   const safeUsers = Array.isArray(users) ? users : [];
 
   const [editingId, setEditingId] = useState(null);
-  const [showPins, setShowPins] = useState({}); // Qaysi xodimning parolini ochiq ko'rsatish
   const [filterGroup, setFilterGroup] = useState('all'); // 'all' | 'management' | 'staff'
   const [searchQuery, setSearchQuery] = useState('');
   
   // Yangi yoki tahrirlanayotgan xodim ma'lumotlari.
   // title - lavozim nomi (admin o'zi yozadi), role - qaysi bo'limga kira oladi
   const [formData, setFormData] = useState(EMPTY_FORM);
+
+  // PIN ochiq matnda saqlanmaydi (src/utils/pinHash.ts): tahrirlashda maydon bo'sh turadi.
+  // Bo'sh qoldirilsa eski PIN qoladi (agar yangi rol ham shu uzunlikdagi PIN talab qilsa).
+  const editingUser = editingId ? safeUsers.find(u => u && u.id === editingId) : null;
+  const canKeepPin = Boolean(editingUser) && hasPin(editingUser) &&
+    pinLengthOf(editingUser, getRequiredPinLength(editingUser.role)) === getRequiredPinLength(formData.role);
 
   // Tizimdagi mavjud rollar va ularning PIN talablari (yagona joy: src/constants/roles.js)
   const roleOptions = ROLE_OPTIONS.map(r => ({
@@ -93,7 +99,7 @@ export default function AdminUsersTab({
       generated = String(Math.floor(min + Math.random() * (max - min + 1)));
       attempts += 1;
     } while (
-      safeUsers.some(u => String(u.pin) === generated && u.id !== editingId) &&
+      findPinOwner(safeUsers, generated, editingId) &&
       attempts < 100
     );
 
@@ -111,14 +117,16 @@ export default function AdminUsersTab({
     const cleanPin = String(formData.pin || '').trim();
 
     // 1. Validatsiya: Bo'sh maydonlarni tekshirish
-    if (!cleanName || !cleanPin) {
-      notify("Iltimos, xodim ismini va PIN-kodni to'liq kiriting!");
+    if (!cleanName || (!cleanPin && !canKeepPin)) {
+      notify(editingUser && hasPin(editingUser)
+        ? "Lavozim o'zgargani uchun PIN uzunligi ham o'zgaradi: yangi PIN-kod kiriting!"
+        : "Iltimos, xodim ismini va PIN-kodni to'liq kiriting!");
       return;
     }
 
     // 2. Validatsiya: PIN uzunligini qat'iy tekshirish
     const requiredLength = getRequiredPinLength(formData.role);
-    if (cleanPin.length !== requiredLength) {
+    if (cleanPin && cleanPin.length !== requiredLength) {
       notify(`Xato! "${getRoleMeta(formData.role).badgeName}" lavozimi uchun PIN-kod aynan ${requiredLength} xonali raqam bo'lishi shart!`);
       return;
     }
@@ -133,9 +141,7 @@ export default function AdminUsersTab({
     }
 
     // 4. Validatsiya: Bir xil PIN-kod boshqa xodimda bor-yo'qligini tekshirish (LockScreen uchun juda muhim!)
-    const duplicatePinUser = safeUsers.find(
-      u => u && String(u.pin || '').trim() === cleanPin && u.id !== editingId
-    );
+    const duplicatePinUser = cleanPin ? findPinOwner(safeUsers, cleanPin, editingId) : null;
     if (duplicatePinUser) {
       notify(`⛔️ Ushbu PIN-kod boshqa xodimga (${duplicatePinUser.name}) biriktirilgan! Tizimga kirishda to'qnashuv bo'lmasligi uchun boshqa PIN-kod kiriting.`);
       return;
@@ -144,16 +150,17 @@ export default function AdminUsersTab({
     if (editingId) {
       // TAHRIRLASH REJIMI
       if (typeof setUsers === 'function') {
-        setUsers(prev => prev.map(user => 
-          user.id === editingId ? { 
-            ...user, 
+        setUsers(prev => prev.map(user => {
+          if (user.id !== editingId) return user;
+          const updated = {
+            ...user,
             name: cleanName,
             title: cleanTitle,
             role: formData.role,
-            pin: cleanPin,
             canSeeSales: formData.role === 'waiter' ? Boolean(formData.canSeeSales) : (formData.role === 'admin')
-          } : user
-        ));
+          };
+          return cleanPin ? withPin(updated, cleanPin) : updated;
+        }));
       }
       if (typeof addAuditLog === 'function') {
         addAuditLog("Xodim tahrirlandi", `${cleanName} (${cleanTitle || getRoleMeta(formData.role).badgeName}) ma'lumotlari yangilandi`);
@@ -161,14 +168,13 @@ export default function AdminUsersTab({
       setEditingId(null);
     } else {
       // YANGI XODIM QO'SHISH REJIMI
-      const newUser = {
+      const newUser = withPin({
         id: newId('user_'),
         name: cleanName,
         title: cleanTitle,
         role: formData.role,
-        pin: cleanPin,
         canSeeSales: formData.role === 'waiter' ? Boolean(formData.canSeeSales) : (formData.role === 'admin')
-      };
+      }, cleanPin);
       if (typeof setUsers === 'function') {
         setUsers(prev => [...prev, newUser]);
       }
@@ -187,7 +193,7 @@ export default function AdminUsersTab({
       name: user.name || '',
       title: user.title || '',
       role: user.role || 'waiter',
-      pin: String(user.pin || ''),
+      pin: '',
       canSeeSales: user.canSeeSales !== undefined ? Boolean(user.canSeeSales) : true
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -237,10 +243,6 @@ export default function AdminUsersTab({
         handleCancel();
       }
     }
-  };
-
-  const togglePinVisibility = (id) => {
-    setShowPins(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   const handleCancel = () => {
@@ -369,7 +371,7 @@ export default function AdminUsersTab({
             <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  PIN-kod ({requiredLenForForm} xonali) *
+                  {canKeepPin ? `Yangi PIN-kod (${requiredLenForForm} xonali)` : `PIN-kod (${requiredLenForForm} xonali) *`}
                 </label>
                 <button
                   type="button"
@@ -386,8 +388,8 @@ export default function AdminUsersTab({
                 inputMode="numeric"
                 value={formData.pin} 
                 onChange={handleInputChange} 
-                placeholder={`${requiredLenForForm} ta raqam...`}
-                required
+                placeholder={canKeepPin ? "O'zgartirmaslik uchun bo'sh qoldiring" : `${requiredLenForForm} ta raqam...`}
+                required={!canKeepPin}
                 className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-brand-500 text-gray-900 dark:text-white font-black tracking-[0.25em] transition"
               />
             </div>
@@ -540,17 +542,16 @@ export default function AdminUsersTab({
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                         PIN ({isLongPin ? '6' : '4'}):
                       </span>
-                      <span className="font-black text-sm text-gray-900 dark:text-white tracking-[0.25em]">
-                        {showPins[user.id] ? user.pin : '•'.repeat(isLongPin ? 6 : 4)}
-                      </span>
-                      <button 
-                        type="button"
-                        onClick={() => togglePinVisibility(user.id)}
-                        className="ml-1 text-gray-400 hover:text-brand-600 transition focus:outline-hidden"
-                        title="Parolni ko'rsatish/yashirish"
-                      >
-                        {showPins[user.id] ? '🙈' : '👁️'}
-                      </button>
+                      {hasPin(user) ? (
+                        <span
+                          className="font-black text-sm text-gray-900 dark:text-white tracking-[0.25em]"
+                          title="PIN shifrlangan holda saqlanadi. Unutilgan bo'lsa, tahrirlab yangisini bering"
+                        >
+                          {'•'.repeat(isLongPin ? 6 : 4)} 🔒
+                        </span>
+                      ) : (
+                        <span className="font-black text-xs text-rose-600">O'rnatilmagan</span>
+                      )}
                     </div>
 
                     {/* Ofitsiant uchun savdoni ko'rish ruxsati tugmasi */}

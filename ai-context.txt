@@ -36,7 +36,7 @@ haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
 7. Sanani matn sifatida solishtirmang (toLocaleDateString() bilan ==).
    Vaqt filtri uchun createdAt (millisekund) dan foydalaning.
 8. Pulni butun so'mda hisoblang. Jami summani qo'lda qayta yozmang: yagona
-   hisob funksiyasi (src/utils/orderTotals.js -> calcOrderTotals) bo'lsa,
+   hisob funksiyasi (src/utils/orderTotals.ts -> calcOrderTotals) bo'lsa,
    shundan foydalaning; hali yo'q bo'lsa, uni yarating.
 9. Omborni (xomashyo) ayirish faqat BITTA joyda bo'ladi. Qaysi joyda
    ekanligi PROGRESS.md dagi "Qarorlar" bo'limida yozilgan. Boshqa joyda
@@ -56,6 +56,13 @@ haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
     chegara). indigo faqat holat/toifa rangi sifatida qolgan (oshxonada "Yangi",
     "Plastik" to'lov, ofitsiant roli...) - amber bilan adashmasin.
     Shrift: Geist (public/fonts, oflayn ishlaydi). Mijoz QR-menyusi doim to'q.
+12b. TypeScript (bosqichma-bosqich): yangi util/modul .ts da yoziladi (strict).
+    Kichik .js util'ni o'zgartirayotganda .ts ga ko'chiring (git mv). Komponentlar
+    (.jsx) hozircha JS. Tekshiruv: npm run typecheck (npm run build ham tekshiradi).
+12c. PIN: ochiq matnda saqlamang va solishtirmang (u.pin === x emas). Faqat
+    src/utils/pinHash.ts: checkPin, findUserByPin, findPinOwner, withPin, stripPin.
+12d. Tarmoq: yangi server so'rovi vaqt bilan cheklanadi (src/sync/timeouts.ts),
+    internet yo'qda ish to'xtamasligi kerak (ma'lumot qurilmada, keyin yuboriladi).
 13. Vazifa oxirida qisqa hisobot bering: o'zgargan fayllar, nima qilindi,
     qanday sinab ko'rish kerak.
 
@@ -100,7 +107,7 @@ Ofitsiant:
 
 Admin:
   AdminPanel (319), AdminDashboard (453), AdminMenuTab (893),
-  AdminCategoriesTab (350), AdminUsersTab (563), AdminEmployeesTab (466),
+  AdminCategoriesTab (350), AdminUsersTab (563),
   AdminAuditLogsTab (381), AdminSettingsTab (683)
 
 Kassa:

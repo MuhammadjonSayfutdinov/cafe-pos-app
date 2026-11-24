@@ -7,6 +7,7 @@ import AdminSyncSection from './AdminSyncSection';
 import QrStickerSheet from './QrStickerSheet';
 import QrSecuritySection from './QrSecuritySection';
 import { VALID_ROLES } from '../constants/roles';
+import { copyPinFrom, migrateUserPins, stripPin } from '../utils/pinHash';
 
 // Telegram sozlamalari: yagona joy - src/utils/telegramNotifier.js (B12)
 const readTelegramConfig = getTelegramConfig;
@@ -247,12 +248,10 @@ export default function AdminSettingsTab({
   };
 
   const handleExportBackup = () => {
-    // PIN kodlar va Telegram tokeni faylga yozilmaydi (B5)
-    const safeUsersForExport = (Array.isArray(users) ? users : []).map(u => {
-      if (!u || typeof u !== 'object') return u;
-      const { pin: _pin, password: _password, ...rest } = u;
-      return rest;
-    });
+    // PIN kodlar (xeshi ham) va Telegram tokeni faylga yozilmaydi (B5)
+    const safeUsersForExport = (Array.isArray(users) ? users : []).map(u =>
+      u && typeof u === 'object' ? stripPin(u) : u
+    );
     const { botToken: _botToken, ...safeTelegramConfig } = telegramConfig || {};
 
     const backupPayload = {
@@ -311,7 +310,8 @@ export default function AdminSettingsTab({
           if (Array.isArray(parsed.users) && typeof setUsers === 'function') {
             const fileHasPins = parsed.users.some(u => u && u.pin !== undefined);
             if (fileHasPins) {
-              setUsers(parsed.users);
+              // Eski formatdagi fayl: ochiq PIN'lar darhol xeshga o'tkaziladi
+              setUsers(migrateUserPins(parsed.users));
             } else {
               // Yangi formatda PIN yo'q: hozirgi PIN kodlar saqlanadi, PIN-siz yangi xodim qo'shilmaydi
               setUsers(prev => {
@@ -319,7 +319,7 @@ export default function AdminSettingsTab({
                 return parsed.users
                   .map(u => {
                     const existing = current.find(c => c && String(c.id) === String(u.id));
-                    return existing ? { ...u, pin: existing.pin } : null;
+                    return existing ? copyPinFrom(u, existing) : null;
                   })
                   .filter(Boolean)
                   .concat(current.filter(c => c && !parsed.users.some(u => String(u.id) === String(c.id))));

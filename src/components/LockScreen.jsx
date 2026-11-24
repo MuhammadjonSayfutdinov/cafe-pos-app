@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 import { CLOSED_ORDER_STATUSES } from '../constants/orderStatus';
 import { APP_BUILD, APP_BUILD_TIME } from '../pwa/update';
+import { findUserByPin } from '../utils/pinHash';
 
 // Qurilmadagi dastur versiyasi: telefon va kompyuter bir xil versiyadami, solishtirish uchun
 const formatBuildTime = (iso) => {
@@ -130,16 +131,10 @@ export default function LockScreen({
 
   const verifyPin = (enteredPin) => {
     const safeUsers = Array.isArray(users) ? users : [];
-    const matchedUser = safeUsers.find(u => {
-      const userPin = String(u.pin || '').trim();
+    const matchedUser = findUserByPin(safeUsers, enteredPin, u => {
       const role = String(u.role || '').toLowerCase();
       const isManagementRole = role === 'admin' || role === 'warehouse' || role === 'omborchi';
-
-      if (selectedGroup === 'management') {
-        return isManagementRole && userPin === enteredPin;
-      } else {
-        return !isManagementRole && userPin === enteredPin;
-      }
+      return selectedGroup === 'management' ? isManagementRole : !isManagementRole;
     });
 
     if (matchedUser) {

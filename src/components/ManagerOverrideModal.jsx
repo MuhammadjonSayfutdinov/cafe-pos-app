@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { findUserByPin, hasPin } from '../utils/pinHash';
 
 export default function ManagerOverrideModal({ 
   request,
@@ -32,7 +33,7 @@ export default function ManagerOverrideModal({
     );
 
     // Standart '777777' zaxirasi olib tashlandi (B6): faqat bazadagi haqiqiy adminlar
-    return filteredAdmins.filter(a => String(a.pin || '').trim().length > 0);
+    return filteredAdmins.filter(a => hasPin(a));
   }, [users]);
 
   // ==========================================
@@ -61,9 +62,7 @@ export default function ManagerOverrideModal({
     const cleanPin = String(pinToVerify || '').trim();
     if (!cleanPin) return;
 
-    const validAdmin = adminUsers.find(
-      a => String(a.pin || '').trim() === cleanPin
-    );
+    const validAdmin = findUserByPin(adminUsers, cleanPin);
 
     if (validAdmin) {
       setErrorMsg('');
