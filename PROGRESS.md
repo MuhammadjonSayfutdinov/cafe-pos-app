@@ -10,7 +10,11 @@ Joriy bosqich: **pilot**. 3-bosqich (Supabase) va 4-bosqichning asosiy funksiyal
 
 **Foydalanuvchi:** o'zbek tilida, qisqa javob yoz. Butun faylni qayta yozma: faqat o'zgargan funksiyani yoz.
 
-**Cheklovlar:** dasturni ishga tushira olmayman va GitHub'ga yoza olmayman. Foydalanuvchi kodni VS Code'ga ko'chiradi, sinaydi, xato bo'lsa konsol matnini (5–10 qator) yuboradi.
+**Commit va push (foydalanuvchi qarori, 2026-11-25):** GitHub'ga yoza oladigan sessiyada Claude o'zgarishni
+o'zi `master` ga commit va push qiladi (so'ramasdan). Oldin `npm run build` o'tishi shart. Foydalanuvchi
+kodni VS Code'ga `git pull` bilan oladi.
+
+**Cheklovlar (GitHub'ga yoza olmaydigan sessiyada):** foydalanuvchi kodni VS Code'ga ko'chiradi, sinaydi, xato bo'lsa konsol matnini (5–10 qator) yuboradi.
 
 **Sessiya boshida:**
 1. Bu fayl va `ai-context.txt` ni o'qi.
@@ -29,7 +33,7 @@ Joriy bosqich: **pilot**. 3-bosqich (Supabase) va 4-bosqichning asosiy funksiyal
 
 1. Foydalanuvchi yangi chat ochadi va "Joriy vazifa" ni yozadi (pastdagi andoza).
 2. Claude kerakli fayllarni o'qiydi va tuzatishni beradi.
-3. Foydalanuvchi VS Code'da qo'llaydi, sinaydi va commit qiladi ("<bosqich>: <vazifa>").
+3. Claude `master` ga commit va push qiladi ("<bosqich>: <vazifa>"); foydalanuvchi `git pull` qilib sinaydi.
 4. Xato chiqsa, shu chatda konsol matnini yuboradi, Claude tuzatadi.
 5. Qabul qilingach, jadvaldagi `[ ]` → `[x]` va commit hash yoziladi.
 
