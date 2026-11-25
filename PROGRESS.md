@@ -8,7 +8,8 @@ Joriy bosqich: **pilot**. 3-bosqich (Supabase) va 4-bosqichning asosiy funksiyal
 
 ## Claude uchun ko'rsatmalar
 
-**Foydalanuvchi:** o'zbek tilida, qisqa javob yoz. Butun faylni qayta yozma: faqat o'zgargan funksiyani yoz.
+**Foydalanuvchi:** o'zbek tilida, qisqa va sodda javob yoz. Doimiy qoidalar: `CLAUDE.md` (hamma ishni o'zing qil,
+foydalanuvchi qilishi kerak bo'lganini alohida ajrat, har bir buyruq uchun kutilgan javobni yoz).
 
 **Commit va push (foydalanuvchi qarori, 2026-11-25):** GitHub'ga yoza oladigan sessiyada Claude o'zgarishni
 o'zi `master` ga commit va push qiladi (so'ramasdan). Oldin `npm run build` o'tishi shart. Foydalanuvchi
