@@ -72,6 +72,9 @@ haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
 Qatorlar soni taxminiy. Katta fayllar (>800) bo'lishga mo'ljallanmagan:
 tegayotganda kerakli funksiyani toping, butun faylni o'qimang.
 
+server/hub.mjs          Kafe mahalliy serveri (Node, npm run hub): dist ni beradi, /api (qurilmalar),
+                        store.mjs (snapshot + jurnal), upstream.mjs (bulut bilan sinxron).
+                        Qo'llanma: MAHALLIY-SERVER.md. Tekshiruv: tsc -p server (// @ts-check)
 src/App.jsx (791)       Global state, routing, biznes-logika markazi
 src/main.jsx            React root
 src/index.css           Tailwind, dizayn tokenlari (brand rangi, neytral gray, Geist shrift)

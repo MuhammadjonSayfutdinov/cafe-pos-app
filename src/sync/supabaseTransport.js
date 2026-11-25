@@ -48,6 +48,7 @@ export function createSupabaseTransport({ url, anonKey }) {
   }
 
   return {
+    kind: 'supabase',
     async identity() {
       const { data } = await client.auth.getSession();
       return `${url}|${data.session?.user?.id || 'anon'}`;

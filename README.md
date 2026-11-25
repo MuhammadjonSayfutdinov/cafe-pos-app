@@ -30,6 +30,9 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
 - **Oflayn va sekin internet:** internet uzilsa ham ish davom etadi (o'zgarishlar qurilmada navbatda turadi va
   internet qaytganda o'zi yuboriladi). Sekin internetda dastur keshdan tez ochiladi, so'rovlar osilib qolmaydi,
   sarlavhada `🐢 Sekin internet` belgisi chiqadi
+- **Kafe mahalliy serveri:** kassa kompyuterida `npm run hub` - internet butunlay uzilsa ham ofitsiant,
+  oshxona va kassa Wi-Fi orqali bir-birini ko'radi; internet qaytganda server bulut bilan o'zi sinxronlanadi
+  (qo'llanma: [MAHALLIY-SERVER.md](MAHALLIY-SERVER.md))
 - **Avtomatik yangilanish:** saytga yangi versiya chiqsa, telefon, planshet va kompyuter o'zi yangilanadi
   (ish to'xtaganda; xodim o'z ekraniga PIN'siz qaytadi). Qurilmadagi versiya kirish oynasining pastida yozilgan
 
@@ -56,6 +59,12 @@ Tayyor (production) versiyani yig'ish (avval TypeScript tekshiruvi o'tadi):
 ```bash
 npm run build
 npm run preview
+```
+
+Kafe mahalliy serveri (build'dan keyin, qo'llanma: [MAHALLIY-SERVER.md](MAHALLIY-SERVER.md)):
+
+```bash
+npm run hub
 ```
 
 Faqat turlarni (TypeScript) tekshirish:
@@ -110,6 +119,8 @@ branch'ini joylaydi. Shuning uchun yangi kod qurilmalarga yetib borishi uchun:
 
 ```
 supabase/schema.sql       Supabase jadvallari va xavfsizlik qoidalari
+server/                   kafe mahalliy serveri: hub.mjs (HTTP, qurilmalar), store.mjs (disk),
+                          upstream.mjs (bulut bilan sinxron), start-windows.bat
 scripts/                  sinov uchun soxta sinxron server
 src/
   App.jsx                 global state, rollar bo'yicha ekranlar, QR-buyurtma
@@ -118,7 +129,8 @@ src/
   constants/orderStatus.js  buyurtma statuslari, to'lov turlari, yetkazib berish sxemasi
   constants/roles.js      xodim rollari (bo'limlar) va PIN uzunligi
   hooks/useSticky.js      localStorage bilan sinxron state
-  sync/                   bulutda sinxronlash (dvigatel, Supabase transporti, timeouts.ts: sekin internet)
+  sync/                   sinxronlash: dvigatel, transportlar (Supabase, hubTransport.ts - mahalliy server),
+                          types.ts (transport shartnomasi), timeouts.ts (sekin internet)
   pwa/                    oflayn ishlash (service worker) va avtomatik yangilanish (update.js)
   qr/                     mijoz QR-menyusi (PublicQrApp), QR kod yaratish (qrEncode.js), stol havolasi (tableQrUrl.js)
   utils/

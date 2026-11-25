@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "typecheck": "tsc -p .",
-    "build": "tsc -p . && vite build",
-    "preview": "vite preview"
+    "typecheck": "tsc -p . && tsc -p server",
+    "build": "tsc -p . && tsc -p server && vite build",
+    "preview": "vite preview",
+    "hub": "node server/hub.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^20.19.43",
     "@vitejs/plugin-react": "^5.0.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",

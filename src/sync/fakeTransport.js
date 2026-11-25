@@ -19,6 +19,7 @@ export function createFakeTransport({ url }) {
   };
 
   return {
+    kind: 'fake',
     async identity() {
       return `${base}|${window.localStorage.getItem(SESSION_KEY) || 'anon'}`;
     },

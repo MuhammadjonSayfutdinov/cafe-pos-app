@@ -1,14 +1,18 @@
-// Sinxronlashni ishga tushirish: .env.local dagi sozlamaga qarab transport tanlanadi.
+// Sinxronlashni ishga tushirish: transport tanlanadi.
+//  - sahifa kafe mahalliy serveridan ochilgan bo'lsa (<meta name="cafe-hub">, server/hub.mjs qo'yadi)
+//    yoki VITE_HUB_URL berilgan bo'lsa (dasturchi rejimi): mahalliy server (internetsiz ham ishlaydi)
 //  - VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY bo'lsa: Supabase
 //  - aks holda: sinxronlash o'chiq, dastur avvalgidek faqat shu qurilmada ishlaydi
 import { configureSync, bootSync, markBooting } from './engine';
 
 export async function setupSync() {
   const env = import.meta.env;
-  const useFake = env.MODE === 'e2e' && env.VITE_FAKE_SYNC_URL;
-  const useSupabase = !useFake && env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY;
+  const servedByHub = Boolean(document.querySelector('meta[name="cafe-hub"]'));
+  const useHub = servedByHub || Boolean(env.VITE_HUB_URL);
+  const useFake = !useHub && env.MODE === 'e2e' && env.VITE_FAKE_SYNC_URL;
+  const useSupabase = !useHub && !useFake && env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY;
 
-  if (!useFake && !useSupabase) {
+  if (!useHub && !useFake && !useSupabase) {
     configureSync(null);
     return;
   }
@@ -17,7 +21,10 @@ export async function setupSync() {
   markBooting();
   let transport;
   try {
-    if (useFake) {
+    if (useHub) {
+      const { createHubTransport } = await import('./hubTransport');
+      transport = createHubTransport({ baseUrl: servedByHub ? '' : env.VITE_HUB_URL });
+    } else if (useFake) {
       const { createFakeTransport } = await import('./fakeTransport');
       transport = createFakeTransport({ url: env.VITE_FAKE_SYNC_URL });
     } else {

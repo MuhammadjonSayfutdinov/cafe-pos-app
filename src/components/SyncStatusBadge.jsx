@@ -20,7 +20,26 @@ export default function SyncStatusBadge() {
 
   if (!view) return null;
 
-  const title = status.state === 'offline'
+  // Kafe mahalliy serveri: qurilma serverga ulangan; bulut bilan aloqani server o'zi yuritadi
+  const hub = status.transport === 'hub';
+  const up = status.upstream;
+  const upOffline = hub && up && (up.state === 'offline' || up.state === 'error');
+  if (hub && status.state === 'online' && !status.slow && !status.pending) {
+    view.icon = '🖥️';
+    view.text = upOffline ? `Server · bulutsiz${up.pending ? ` (${up.pending})` : ''}` : 'Server';
+    if (upOffline) view.cls = 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800';
+  }
+  const upstreamText = !hub || !up ? ''
+    : up.state === 'disabled' ? '\nBulut: ulanmagan (faqat kafe ichida ishlaydi)'
+    : up.state === 'online' ? `\nBulut: ulangan${up.pending ? `, ${up.pending} ta yuborilmoqda` : ''}`
+    : up.state === 'error' ? `\nBulut: xato - ${up.error || ''}`
+    : `\nBulut: internet yo'q, ${up.pending} ta o'zgarish serverda navbatda (kafe ichida ish davom etadi)`;
+
+  const title = hub && status.state === 'offline'
+    ? `Kafe serveriga ulanib bo'lmadi (server kompyuteri yoki Wi-Fi). O'zgarishlar qurilmada saqlanadi va server bilan aloqa tiklanganda yuboriladi.${status.error ? `\n${status.error}` : ''}`
+    : hub
+    ? `Kafe serveriga ulangan${status.lastSyncAt ? ` (oxirgi sinxron: ${new Date(status.lastSyncAt).toLocaleTimeString()})` : ''}${upstreamText}`
+    : status.state === 'offline'
     ? `Internet yo'q yoki server javob bermayapti. O'zgarishlar qurilmada saqlanadi va internet qaytganda yuboriladi.${status.error ? `\n${status.error}` : ''}`
     : status.slow
     ? "Internet sekin: ish davom etadi, o'zgarishlar qurilmada saqlanib, navbat bilan yuboriladi."
@@ -35,6 +54,7 @@ export default function SyncStatusBadge() {
       title={title}
       data-sync-state={status.state}
       data-sync-slow={status.slow ? 'true' : undefined}
+      data-sync-upstream={hub && up ? up.state : undefined}
       className={`h-10 px-3 rounded-xl border text-xs font-black flex items-center gap-1.5 whitespace-nowrap transition active:scale-95 ${view.cls}`}
     >
       <span>{view.icon}</span>

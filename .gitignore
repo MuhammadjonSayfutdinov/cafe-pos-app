@@ -4,3 +4,4 @@ dist
 .env.local
 .env.*.local
 dist-e2e
+hub-data

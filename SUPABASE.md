@@ -140,9 +140,9 @@ stollarning buyurtmalari ko'rinmaydi.
 - **PIN xeshiga o'tish:** yangi versiya ochilganda eski ochiq PIN'lar o'zi xeshga o'tadi. Shundan keyin
   eski versiyada qolgan qurilmada xodimlar kira olmaydi. Qurilmalar yangi versiyaga o'zi o'tadi (avtomatik
   yangilanish); o'tmagan bo'lsa, sahifani yangilang.
-- **Internet butunlay uzilsa** har bir qurilma alohida ishlashda davom etadi, lekin qurilmalar bir-biriga
-  ma'lumot uzata olmaydi: ofitsiant planshetidagi buyurtma oshxona ekraniga internet qaytgach yetadi.
-  Kafe ichida internetsiz almashish uchun mahalliy server kerak (keyingi bosqich).
+- **Internet butunlay uzilsa** (qurilmalar to'g'ridan-to'g'ri bulutga ulangan bo'lsa) har bir qurilma alohida
+  ishlashda davom etadi, lekin bir-biriga ma'lumot uzata olmaydi. Yechim - kafe mahalliy serveri:
+  [MAHALLIY-SERVER.md](MAHALLIY-SERVER.md) (qurilmalar Wi-Fi orqali serverga, server bulutga ulanadi).
 - **Saytning xavfsizlik sarlavhalari** (`vercel.json`, CSP): brauzer faqat shu sayt, `*.supabase.co` va
   `api.telegram.org` ga ulanadi. Supabase uchun o'z domeningizni ishlatsangiz, `vercel.json` dagi
   `connect-src` ga uni qo'shing (aks holda sinxronlash ishlamaydi).

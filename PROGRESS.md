@@ -51,9 +51,12 @@ baribir eski usulda ishlaydi: `qrApi.js` -> `callCompat`).
 Stollar uchun QR stikerlar tayyor: Admin → Tizim Sozlamalari → Stollar → "🖨️ QR stikerlar".
 Pilotda: sayt manzilini (Vercel) yozib stikerlarni chop etish, bittasini telefon bilan skaner qilib tekshirish.
 Yangi kod qurilmalarga faqat `master` ga push qilingach (Vercel joylagach) yetib boradi, keyin o'zi yangilanadi.
+**Mahalliy server (1-versiya tayyor):** kafeda sinash - kassa kompyuterida `MAHALLIY-SERVER.md` bo'yicha
+`npm run hub`, planshetlarni `http://<IP>:8080` orqali ulash, Wi-Fi'ni internetdan uzib buyurtma → oshxona → kassa.
 Keyin pilot natijasiga qarab: Click/Payme, fiskal chek, Vitest, TypeScript'ga o'tishni davom ettirish
-(navbatdagi: `src/sync/engine.js`, `src/utils/dates.js`, `inventoryCalc.js`, keyin komponentlar `.tsx`),
-internetsiz kafe ichida qurilmalar almashishi uchun mahalliy server.
+(navbatdagi: `src/sync/engine.js`, `src/utils/dates.js`, `inventoryCalc.js`, keyin komponentlar `.tsx`).
+Mahalliy server uchun keyingi qadamlar: server o'chsa ham sahifa ochilishi (https yoki o'rnatiladigan ilova),
+serverni avtomatik yangilash.
 Kichik ishlar (istalgan vaqtda): `barcha-kodlar.txt` (eskirgan kod nusxasi) va `preview.html` kerakmi, ko'rib chiqish.
 
 ## Vazifa → kerakli fayllar
@@ -129,6 +132,8 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 - [x] Oflayn rejim (PWA): manifest, service worker (`src/pwa/`, `vite.config.js` plagini), `vercel.json`
 - [x] Avtomatik yangilanish: `/version.json` va build versiyasi (`vite.config.js`), `src/pwa/update.js`,
   `UpdateBanner.jsx`; kirish oynasida versiya yozuvi
+- [x] Kafe mahalliy serveri (`server/`, `src/sync/hubTransport.ts`, `MAHALLIY-SERVER.md`): internetsiz
+  kafe ichida almashish, server bulut bilan sinxronlanadi, qurilmalar server paroli bilan ulanadi
 - [ ] Click/Payme integratsiyasi
 - [ ] Onlayn-kassa va fiskal chek talablarini tekshirish (O'zbekiston)
 - [x] Texnologik karta bo'yicha ayirish, qoldiq ogohlantirishi, kamomad yozuvi (`src/utils/inventoryCalc.js`)
@@ -163,6 +168,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | Dizayn uslubi | Zamonaviy restoran ko'rinishi (namuna: kafe-demo.vercel.app): to'q zinc fon, amber urg'u, Geist shrifti, yumaloq (pill) tugmalar. Ranglar faqat `src/index.css` `@theme` da: `brand-*` = asosiy rang, `gray-*` = neytral zinc. `indigo` faqat amber bilan adashmasligi kerak bo'lgan holat/toifa ranglarida qoldi. Mijoz QR-menyusi doim to'q, kafe rasmi bilan (`public/images/cafe-hero.webp`, Unsplash litsenziyasi). Yangi qurilmada xodimlar ekrani ham to'q rejimda ochiladi (eski qurilmada tanlangan rejim saqlanadi). Mantiq va tuzilma o'zgarmadi: faqat `className` va ko'rinish | qabul qilindi |
 | PIN saqlash | `user.pinHash` = `s1$2000$<tuz>$<xesh>` (tuzli, 2000 marta takrorlangan SHA-256, `src/utils/pinHash.ts`) va `user.pinLength`; ochiq `pin`/`password` saqlanmaydi. App ochilganda eski ochiq PIN'lar xeshga o'tadi (bulutdan kelganlari ham). Tekshiruv qurilmada: internetsiz ham kirish kerak. 4-6 xonali PIN'ni xeshdan terib topish mumkin, shuning uchun asosiy himoya - RLS va yopiq ro'yxatdan o'tish. Admin PIN'ni ko'ra olmaydi, faqat yangisini beradi. SHA-256 kutubxonasiz (`src/utils/sha256.ts`): crypto.subtle http (192.168.x.x) da yo'q | qabul qilindi |
 | Sekin internet | Supabase so'rovlari 45 s (`createTimeoutFetch`), sessiya tekshiruvi 10 s, QR tasdiqlash 20 s. Navbat 100 tadan yuboriladi, yuborilgan qism darhol navbatdan o'chadi. Ilova ochilganda: oxirgi to'liq sinxrondan 6 soat o'tmagan bo'lsa faqat o'zgarishlar (`since`), aks holda butun baza. Sessiya tokeni tarmoq xatosi sababli yangilanmasa, saqlangan sessiya bilan ishlaydi (qayta kirish so'ralmaydi). Service worker: sahifa 3,5 s da kelmasa keshdan. Javob 4 s dan uzoq - `🐢 Sekin internet` belgisi | qabul qilindi |
+| Mahalliy server | Kassa kompyuterida Node server (`npm run hub`, kutubxonasiz; bulut uchun supabase-js). Dasturni ham server beradi (`dist`), sahifa `http://<IP>:8080` dan ochiladi: https sahifadan http LAN manzilga so'rov brauzerda taqiqlangan (mixed content). Server `index.html` ga `<meta name="cafe-hub">` qo'yadi, dastur shundan mahalliy server transportini tanlaydi (`src/sync/index.js`). Qurilma API'si fake server bilan bir xil (`/api/all?since`, `/records`, `/kv`, SSE `/events`, `/rpc/qr_claim_request`), qo'shimcha: server paroli → token (`/api/auth`, 10 xato → 5 daqiqa blok, parol o'zgarsa tokenlar bekor, 401 → ulash oynasi). Ma'lumot: `hub-data/` (snapshot + jurnal, elektr o'chsa ham). Bulut bilan: server bitta "qurilma" (`updated_by = hub_<id>`), har 3 s so'raydi (realtime yo'q: Node 20 da WebSocket yo'q), navbat diskda, qoidalar `engine.js` bilan bir xil (oxirgi yozuv g'olib, yuborilmagan mahalliy ustun). QR tasdiqlash faqat bulut orqali (atomik). http da service worker yo'q: server o'chsa sahifani qayta yuklab bo'lmaydi | qabul qilindi |
 | TypeScript | Bosqichma-bosqich: `allowJs`, faqat `.ts` fayllar strict tekshiriladi. Yangi util/modul `.ts` da. Komponentlar keyinroq (`@types/react` kerak bo'ladi) | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
@@ -190,6 +196,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 17 | Chaqiruv xodimga yetadi, to'langan QR-buyurtma yo'qoladi, band stol va uzoqdan buyurtma himoyasi (B15–B18) | "pilot: ofitsiant chaqiruvi, to'langan QR-buyurtma va QR himoyasi" commiti | [x] |
 | 18 | Zamonaviy restoran dizayni (mijoz QR-menyusi va xodimlar ekranlari) | "dizayn: zamonaviy restoran ko'rinishi..." commiti | [x] |
 | 19 | PIN xeshi, xavfsizlik sarlavhalari, sekin/oflayn internet, TypeScript boshlandi | "xavfsizlik: PIN xeshi..." commiti | [x] |
+| 20 | Kafe mahalliy serveri (internetsiz ishlash) | "4: kafe mahalliy serveri..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

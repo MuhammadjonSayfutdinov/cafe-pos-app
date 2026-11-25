@@ -16,7 +16,7 @@ export default function SyncGate({ children }) {
     return () => clearTimeout(t);
   }, [status.state]);
 
-  if (status.state === 'auth') return <DeviceLogin />;
+  if (status.state === 'auth') return <DeviceLogin hub={status.transport === 'hub'} />;
 
   // Yangi qurilma: bulut ma'lumoti kelmaguncha ilova ochilmaydi. Aks holda namuna xodimlar
   // (777777, 2222...) bilan kirish mumkin bo'lardi va ular bulutdagi ma'lumotni buzardi.
@@ -45,6 +45,7 @@ export default function SyncGate({ children }) {
 
 function FirstSyncScreen({ status }) {
   const failed = status.state === 'offline';
+  const hub = status.transport === 'hub';
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -60,11 +61,15 @@ function FirstSyncScreen({ status }) {
         <div className="w-14 h-14 rounded-full border-4 border-gray-200 dark:border-gray-700 border-t-brand-500 animate-spin" />
       )}
       <p className="font-black text-gray-800 dark:text-gray-100">
-        {failed ? "Bulutdan ma'lumot olib bo'lmadi" : "Ma'lumotlar bulutdan yuklanmoqda..."}
+        {failed
+          ? (hub ? "Kafe serveridan ma'lumot olib bo'lmadi" : "Bulutdan ma'lumot olib bo'lmadi")
+          : (hub ? "Ma'lumotlar kafe serveridan yuklanmoqda..." : "Ma'lumotlar bulutdan yuklanmoqda...")}
       </p>
       <p className="max-w-sm text-xs font-bold text-gray-500 dark:text-gray-400">
         {failed
-          ? "Internetni tekshiring. Dastur o'zi qayta urinib turadi. Bu qurilma birinchi marta ulanmoqda, shuning uchun menyu va xodimlar kelmaguncha ochilmaydi."
+          ? (hub
+            ? "Server kompyuteri yoqilganini va qurilma kafe Wi-Fi'siga ulanganini tekshiring. Dastur o'zi qayta urinib turadi."
+            : "Internetni tekshiring. Dastur o'zi qayta urinib turadi. Bu qurilma birinchi marta ulanmoqda, shuning uchun menyu va xodimlar kelmaguncha ochilmaydi.")
           : "Bu qurilma birinchi marta ulanmoqda. Internet sekin bo'lsa, biroz kuting."}
       </p>
       {failed && (
@@ -89,7 +94,8 @@ function FirstSyncScreen({ status }) {
   );
 }
 
-function DeviceLogin() {
+// hub: sahifa kafe mahalliy serveridan ochilgan (faqat server paroli so'raladi)
+function DeviceLogin({ hub = false }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -97,8 +103,8 @@ function DeviceLogin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
-      setError('Email va parolni kiriting');
+    if ((!hub && !email.trim()) || !password) {
+      setError(hub ? 'Server parolini kiriting' : 'Email va parolni kiriting');
       return;
     }
     setBusy(true);
@@ -109,9 +115,11 @@ function DeviceLogin() {
       const msg = String(err?.message || err);
       setError(
         /invalid login credentials|noto'g'ri/i.test(msg)
-          ? "Email yoki parol noto'g'ri"
-          : /fetch|network|failed/i.test(msg)
-          ? "Internet aloqasi yo'q. Ulanishni tekshirib, qayta urinib ko'ring."
+          ? (hub ? "Server paroli noto'g'ri" : "Email yoki parol noto'g'ri")
+          : /fetch|network|failed|javob bermadi/i.test(msg)
+          ? (hub
+            ? "Kafe serveriga ulanib bo'lmadi. Server kompyuteri yoqilganini va Wi-Fi'ni tekshiring."
+            : "Internet aloqasi yo'q. Ulanishni tekshirib, qayta urinib ko'ring.")
           : msg
       );
     } finally {
@@ -126,13 +134,18 @@ function DeviceLogin() {
         className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-3xl p-6 sm:p-8 shadow-xl border border-gray-100 dark:border-gray-700 space-y-4"
       >
         <div className="text-center">
-          <div className="text-4xl mb-2">☁️</div>
-          <h1 className="text-xl font-black text-gray-900 dark:text-white">Qurilmani ulash</h1>
+          <div className="text-4xl mb-2">{hub ? '🖥️' : '☁️'}</div>
+          <h1 className="text-xl font-black text-gray-900 dark:text-white">
+            {hub ? 'Kafe serveriga ulash' : 'Qurilmani ulash'}
+          </h1>
           <p className="mt-1 text-xs font-bold text-gray-500 dark:text-gray-400">
-            Bu qurilmani kafe hisobiga bir marta ulang. Keyin xodimlar odatdagidek PIN bilan kiradi.
+            {hub
+              ? "Bu qurilmani kafe serveriga bir marta ulang (parol server kompyuterida, .env.local faylidagi HUB_PASSWORD). Keyin xodimlar odatdagidek PIN bilan kiradi."
+              : 'Bu qurilmani kafe hisobiga bir marta ulang. Keyin xodimlar odatdagidek PIN bilan kiradi.'}
           </p>
         </div>
 
+        {!hub && (
         <label className="block">
           <span className="text-[11px] font-black uppercase text-gray-500">Email</span>
           <input
@@ -143,9 +156,10 @@ function DeviceLogin() {
             className="mt-1 w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-gray-900 dark:text-white outline-hidden focus:border-brand-500"
           />
         </label>
+        )}
 
         <label className="block">
-          <span className="text-[11px] font-black uppercase text-gray-500">Parol</span>
+          <span className="text-[11px] font-black uppercase text-gray-500">{hub ? 'Server paroli' : 'Parol'}</span>
           <input
             type="password"
             autoComplete="current-password"

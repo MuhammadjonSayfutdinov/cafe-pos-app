@@ -20,6 +20,7 @@ import {
   OUTBOX_KEY, DEVICE_ID_KEY, INIT_IDENTITY_KEY, LAST_SERVER_TS_KEY, LAST_FULL_SYNC_KEY
 } from './config';
 import { withTimeout } from './timeouts';
+import { isAuthRequiredError } from './types';
 
 const FLUSH_DEBOUNCE_MS = 300;
 const RETRY_MIN_MS = 2000;
@@ -94,7 +95,8 @@ let subscribedOnce = false;
 const shadow = new Map(); // har bir kalitning sinxronlangan oxirgi holati
 let outbox = new Map();   // opKey -> op
 
-let status = { state: 'disabled', pending: 0, lastSyncAt: null, error: null, email: null, slow: false };
+// transport: 'supabase' | 'hub' | 'fake'; upstream: mahalliy serverning bulut bilan aloqasi (faqat hub)
+let status = { state: 'disabled', pending: 0, lastSyncAt: null, error: null, email: null, slow: false, transport: null, upstream: null };
 const statusListeners = new Set();
 
 function setStatus(patch) {
@@ -113,6 +115,25 @@ export function subscribeSyncStatus(fn) {
   statusListeners.add(fn);
   fn(status);
   return () => statusListeners.delete(fn);
+}
+
+/**
+ * Server qurilmani tanimadi (mahalliy server paroli o'zgargan yoki qurilma uzilgan):
+ * ulash oynasi chiqadi. Yuborilmagan o'zgarishlar navbatda qoladi va qayta ulangach yuboriladi.
+ */
+function requireAuth(e) {
+  if (!isAuthRequiredError(e)) return false;
+  started = false;
+  subscribedOnce = false;
+  if (unsubscribe) unsubscribe();
+  unsubscribe = null;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  if (catchupTimer) clearInterval(catchupTimer);
+  setStatus({ state: 'auth', error: String(e?.message || e) });
+  return true;
 }
 
 /** Server so'rovi: vaqt cheklovi va tezlikni o'lchash (sekin bo'lsa status.slow) */
@@ -251,8 +272,10 @@ export async function flush() {
     retryDelay = RETRY_MIN_MS;
     setStatus({ state: 'online', lastSyncAt: Date.now(), error: null });
   } catch (e) {
-    setStatus({ state: 'offline', error: String(e?.message || e) });
-    scheduleRetry(flush);
+    if (!requireAuth(e)) {
+      setStatus({ state: 'offline', error: String(e?.message || e) });
+      scheduleRetry(flush);
+    }
   } finally {
     flushing = false;
     if (outbox.size > 0 && status.state === 'online') scheduleFlush();
@@ -274,6 +297,11 @@ function noteServerTs(ts) {
 
 function applyRemote(ev) {
   if (!ev) return;
+  if (ev.type === 'hub') {
+    // Mahalliy server o'zining bulut bilan aloqasi haqida xabar beradi (server/upstream.mjs)
+    setStatus({ upstream: ev.upstream || null });
+    return;
+  }
   if (buffering) {
     buffering.push(ev);
     return;
@@ -442,6 +470,7 @@ export async function catchUp() {
     kv.forEach(r => applyRemote({ type: 'kv', ...r }));
     if (status.state === 'offline' && outbox.size === 0) setStatus({ state: 'online', error: null });
   } catch (e) {
+    if (requireAuth(e)) return;
     setStatus({ state: 'offline', error: String(e?.message || e) });
   }
   flush();
@@ -469,8 +498,10 @@ async function startWithRetry() {
     try {
       await initialSync();
     } catch (e) {
-      setStatus({ state: 'offline', error: String(e?.message || e) });
-      scheduleRetry(startWithRetry);
+      if (!requireAuth(e)) {
+        setStatus({ state: 'offline', error: String(e?.message || e) });
+        scheduleRetry(startWithRetry);
+      }
     } finally {
       initialRunning = null;
     }
@@ -508,6 +539,7 @@ export function configureSync(transportInstance) {
       // ignore
     }
   }
+  setStatus({ transport: transport.kind || null });
   outbox = loadOutbox();
   [...Object.keys(RECORD_COLLECTIONS), ...KV_KEYS].forEach(key => shadow.set(key, readLocal(key)));
 

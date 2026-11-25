@@ -1,0 +1,21 @@
+{
+  // Mahalliy server (Node.js) JS fayllarini TypeScript bilan tekshirish (// @ts-check).
+  // Ishga tushirish uchun build kerak emas: node server/hub.mjs
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["*.mjs"]
+}
