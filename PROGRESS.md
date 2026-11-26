@@ -52,7 +52,9 @@ baribir eski usulda ishlaydi: `qrApi.js` -> `callCompat`).
 Stollar uchun QR stikerlar tayyor: Admin → Tizim Sozlamalari → Stollar → "🖨️ QR stikerlar".
 Pilotda: sayt manzilini (Vercel) yozib stikerlarni chop etish, bittasini telefon bilan skaner qilib tekshirish.
 Yangi kod qurilmalarga faqat `master` ga push qilingach (Vercel joylagach) yetib boradi, keyin o'zi yangilanadi.
-**Mahalliy server (1-versiya tayyor):** kafeda sinash - kassa kompyuterida `MAHALLIY-SERVER.md` bo'yicha
+**Mahalliy server (1-versiya tayyor, 2026-11-26 dan VAQTINCHA TO'XTATILGAN - foydalanuvchi qarori):**
+kod `master` da, lekin kafeda o'rnatilmagan; foydalanuvchi o'zi "davom ettiramiz" demaguncha bu ishni taklif
+qilma va eslatma. Davom ettirilganda: kafeda sinash - kassa kompyuterida `MAHALLIY-SERVER.md` bo'yicha
 `npm run hub`, planshetlarni `http://<IP>:8080` orqali ulash, Wi-Fi'ni internetdan uzib buyurtma → oshxona → kassa.
 Keyin pilot natijasiga qarab: Click/Payme, fiskal chek, Vitest, TypeScript'ga o'tishni davom ettirish
 (navbatdagi: `src/sync/engine.js`, `src/utils/dates.js`, `inventoryCalc.js`, keyin komponentlar `.tsx`).
