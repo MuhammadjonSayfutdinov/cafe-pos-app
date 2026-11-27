@@ -667,7 +667,7 @@ export default function CustomerQRView({
                       </div>
 
                       <span className={`px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${
-                        ord.status === 'rejected'
+                        ord.status === 'rejected' || ord.status === ORDER_STATUS.CANCELLED
                           ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'
                           : ord.status === 'pending'
                           ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
@@ -681,6 +681,8 @@ export default function CustomerQRView({
                           ? '⏳ Ofitsiant tasdiqlashini kutmoqda'
                           : ord.status === 'rejected'
                           ? '❌ Rad etildi'
+                          : ord.status === ORDER_STATUS.CANCELLED
+                          ? '❌ Bekor qilindi (ofitsiantdan so\'rang)'
                           : ord.status === 'accepted'
                           ? '✅ Qabul qilindi, tayyorlanmoqda'
                           : ord.status === ORDER_STATUS.READY

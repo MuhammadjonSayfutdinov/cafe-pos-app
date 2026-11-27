@@ -72,6 +72,16 @@ haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
     (hasTwoFactor, verifySecondFactor, withTwoFactor, stripTwoFactor, keepTwoFactorFrom). Yangi joyda
     admin PIN tekshirsangiz: PIN to'g'ri + hasTwoFactor(user) -> TwoFactorCodeModal, kod tasdiqlangach
     amalni bajaring. Eksportda stripTwoFactor, tiklashda keepTwoFactorFrom (fayldagisi olinmaydi).
+12g. Oshxona holati TAOM (chek qatori) darajasida: src/utils/kitchenFlow.ts. Chek qatorlarini
+    faqat shu yerdagi funksiyalar bilan o'zgartiring: markLinesReady (oshxona tayyor), rejectLines
+    (oshxona rad etdi), serveReadyLines (mijozga berildi), applyWaiterCart / appendKitchenItems
+    (dozakaz), reduceLine / cancelWholeOrder (xodim bekor qildi), keepInKitchenOnPayment (kassa).
+    O'qish: kitchenSummary, pendingQtyOf, readyQtyOf, servedQtyOf, isKitchenVisible.
+    Chekni HECH QACHON savatcha yoki oyna ochilgandagi eski nusxa bilan butunlay qayta yozmang:
+    o'zgarishni setOrders(prev => ...) ichida chekning eng so'nggi holatiga qo'llang
+    (boshqa qurilma shu orada oshxona belgisini, rad etishni yoki QR-buyurtmani yozgan bo'lishi mumkin).
+    Qatorni tartib raqami bilan emas, kaliti bilan toping: lineIdOf(item, idx, order.id).
+    Chek o'chirilmaydi: bekor qilinsa ORDER_STATUS.CANCELLED. Tekshiruv: npm run test:kitchen.
 13. Vazifa oxirida qisqa hisobot bering: o'zgargan fayllar, nima qilindi,
     qanday sinab ko'rish kerak.
 
@@ -135,7 +145,10 @@ Kassa:
   CashierOrderList (113), CashierPaymentControls (327), CashierReceipt (184)
 
 Oshxona:
-  KitchenMode (1088)
+  KitchenMode (1300)          Buyurtmalar, taomni tanlab "tayyor", rad etish, stop-list, SLA
+  KitchenRejectModal          Taomni (yoki butun chekni) rad etish oynasi: porsiya, sabab, stop-list
+  KitchenNoticesPanel         Ofitsiant/kassa/admin ekrani tepasida: oshxona rad etdi, to'langan chek tayyor
+  utils/kitchenFlow.ts        Taom darajasidagi holat va amallar (yagona joy), scripts/test-kitchen-flow.mjs
 
 Ombor:
   WarehouseMode (502), WarehouseStockTab (1136), WarehousePrepTab (583),
@@ -174,10 +187,18 @@ pos_menu (taom):
 pos_orders (buyurtma):
   { id (string, Date.now()), createdAt (ms), table, waiter,
     items: [{cartItemId, id, name, baseName, variantName, price,
-             quantity, note}],
+             quantity, note, sentQty, kitchenDoneQty, servedQty,
+             kitchenSentAt, kitchenReadyAt, noKitchen?}],
     subTotal, serviceFee (foiz), serviceFeeAmount, discount, total,
     status, paymentMethod, paymentDetails, time ("14:30"), date (matn) }
   "date" va "time" faqat ko'rsatish uchun; hisob-kitob uchun createdAt.
+  Oshxona (taom darajasida, src/utils/kitchenFlow.ts): kitchenDoneQty - oshxona tayyor degan
+    porsiya, servedQty - mijozga berilgan, quantity - chekdagi (rad etilgan/bekor qilingan
+    porsiya ayiriladi). Buyurtmada: kitchenRejections [{id, lineId, name, qty, price, reason, by,
+    at, refundDue?, ackAt?, ackBy?}] - oshxona rad etgan; kitchenCancellations [{id, lineId, name,
+    qty, by, reason, at, ackAt?}] - xodim bekor qilgan (oshxonaga xabar); kitchenOpen - oshxona
+    tugatmasdan to'langan (oshxonada qoladi); readyNotice {at, ackAt?} - to'langan chek tayyor;
+    refundDue - to'langan chekdan rad etilgan taom puli; cancelledAt, cancelledBy, cancelReason.
   Yetkazish buyurtmasi: table "Yetkazish #N", orderType 'delivery',
     delivery: { customerName, phone, address, landmark, note, fee, status
     ('kutilmoqda' | "yo'lda" | 'yetkazildi'), courier, courierId, assignedAt,
@@ -186,7 +207,9 @@ pos_orders (buyurtma):
 
 Statuslar (haqiqatda ishlatiladiganlar):
   'Yangi' -> 'Tayyorlanmoqda' -> 'Tayyor' -> 'Yetkazildi' -> "To'langan"
-  Qo'shimcha: 'Qarz', 'Arxiv'. 'Bekor qilindi' hozircha kodda ishlatilmaydi.
+  Qo'shimcha: 'Qarz', 'Arxiv', 'Bekor qilindi' (ORDER_STATUS.CANCELLED: chek o'chirilmaydi, yopiq).
+  Ochiq chek statusi taomlardan hisoblanadi (kitchenFlow.deriveStatus): oshxonada porsiya bor -
+  'Yangi'/'Tayyorlanmoqda', hammasi tayyor - 'Tayyor', hammasi berilgan - 'Yetkazildi'.
   Yangi holat qo'shsangiz, constants fayliga kiriting (qo'lda yozmang).
 
 pos_users (xodim): { id, name, title?, role, pin, canSeeSales? }
@@ -220,6 +243,10 @@ pos_calls: [{ id, table, time, createdAt, source?: 'qr', keyOk? }]
 - Chegirma jami summadan oshmasligi kerak; katta chegirma admin PIN so'raydi
   (isOverrideEnabled yoqilgan bo'lsa).
 - Oshxona: 0-10 daq yashil, 10-20 sariq, 20+ qizil; izoh (note) yorqin.
+  Oshpaz taomlarni bosib tanlaydi: "Tanlanganlar tayyor" faqat ularni ofitsiantga yuboradi,
+  tanlov bo'lmasa "Hammasi tayyor" (sex filtri bo'lsa - faqat shu sexdagilar). "Rad etish":
+  faqat hali tayyor bo'lmagan porsiya, sabab majburiy, ofitsiant/kassaga darhol xabar.
+  Kassa oshxonadagi chekni to'lasa ogohlantiradi, chek oshxonada qoladi va tayyor bo'lgach xabar.
 - Ombor: quantity <= minLimit bo'lsa "Kam qoldi" belgisi.
 - Statistika: faqat "To'langan" (va alohida blokda 'Qarz') hisoblanadi.
 - Xavfsiz amallar (o'chirish, zaxira tiklash, bazani tozalash) admin PIN

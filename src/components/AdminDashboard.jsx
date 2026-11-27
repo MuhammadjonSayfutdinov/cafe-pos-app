@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { getRecordTimeMs, isTodayMs } from '../utils/dates';
-import { ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
+import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
 
 export default function AdminDashboard({ 
   orders = [],
@@ -68,10 +68,10 @@ export default function AdminDashboard({
     );
   }, [periodOrders]);
 
+  // Faqat ochiq cheklar. Oldin faqat "To'langan" va "Qarz" chiqarilardi: smena yopilgach arxivga
+  // o'tgan cheklar "Hozir zalda faol" bo'lib, summa va stollar soni keskin oshib ko'rinardi
   const activeOpenOrders = useMemo(() => {
-    return safeOrders.filter(
-      o => o && o.status !== ORDER_STATUS.PAID && o.status !== ORDER_STATUS.DEBT
-    );
+    return safeOrders.filter(o => o && !CLOSED_ORDER_STATUSES.includes(o.status));
   }, [safeOrders]);
 
   // ==========================================

@@ -69,7 +69,9 @@ const hhmm = () => new Date().toTimeString().slice(0, 5);
 const recentQr = (t) => live('pos_qr_requests').filter(r => (!t || r.data.table === t) && Date.now() - Date.parse(r.created_at) < 60000).length;
 
 // supabase/qr.sql -> qr_table_busy, qr_access
-const CLOSED = ["To'langan", 'Qarz', 'Arxiv'];
+const CLOSED = ["To'langan", 'Qarz', 'Arxiv', 'Bekor qilindi'];
+// qr_request_status: bekor qilingan chek telefonda "❌ Bekor qilindi" bo'lib ko'rinsin (yopilgan deb olinmaydi)
+const PAID_CLOSED = ["To'langan", 'Qarz', 'Arxiv'];
 const hintError = (message, hint) => Object.assign(new Error(message), { hint });
 const tableBusy = (t) => t !== 'Olib ketish' && live('pos_orders').some(o => o.data.table === t && !CLOSED.includes(o.data.status || ''));
 const access = (table, ctxRaw) => {
@@ -174,7 +176,7 @@ const rpc = {
       const o = r.data.orderId
         ? orders.find(x => x.id === String(r.data.orderId))
         : orders.find(x => !x.deleted && x.data.table === r.data.table && !CLOSED.includes(x.data.status || ''));
-      if (o) return { id: r.id, status, orderStatus: o.data.status || null, closed: o.deleted || CLOSED.includes(o.data.status || '') };
+      if (o) return { id: r.id, status, orderStatus: o.data.status || null, closed: o.deleted || PAID_CLOSED.includes(o.data.status || '') };
       return { id: r.id, status, orderStatus: null, closed: Number(r.data.handledAt || 0) < Date.now() - 60000 };
     });
   },

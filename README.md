@@ -5,8 +5,12 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
 
 ## Imkoniyatlar
 
-- **Ofitsiant:** stollar xaritasi, buyurtma va dozakaz, chekni bo'lish, stolni ko'chirish, bron, VIP soatbay taymer
-- **Oshxona (KDS):** buyurtmalar navbati, kechikish ogohlantirishi (SLA), stop-list; dozakazda faqat yangi porsiyalar chiqadi
+- **Ofitsiant:** stollar xaritasi, buyurtma va dozakaz, chekni bo'lish, stolni ko'chirish, bron, VIP soatbay taymer;
+  qaysi taom oshxonada, qaysi biri tayyor va berilgan - taom darajasida, tayyorlarini qisman topshirish
+- **Oshxona (KDS):** buyurtmalar navbati, kechikish ogohlantirishi (SLA), stop-list; bir nechta taomni belgilab faqat
+  ularni "tayyor" qilish; taomni yoki butun chekni sabab bilan rad etish (ofitsiant va kassaga darhol xabar,
+  ixtiyoriy stop-list); dozakazda faqat yangi porsiyalar chiqadi (ovoz va "🆕 Qo'shimcha" belgisi); xodim bekor qilgan
+  taom haqida qizil xabar; oldindan to'langan chek tayyor bo'lguncha oshxonada qoladi
 - **Kassa:** naqd, plastik, Click/Payme, aralash va qarzga to'lov; chegirma, bonus/keshbek, pre-chek, qarzlar ro'yxati;
   smena ochish/yopish, sanalgan naqd va farq, Z-hisobot (chop etish, Telegram), smenalar tarixi
 - **Mijoz QR-menyusi:** stoldagi QR kod orqali o'z telefonidan buyurtma (ofitsiant tasdiqlaydi), ofitsiantni chaqirish
@@ -71,6 +75,12 @@ Faqat turlarni (TypeScript) tekshirish:
 
 ```bash
 npm run typecheck
+```
+
+Oshxona mantig'ini (taom darajasida tayyor, rad etish, dozakaz, to'langan chek) tekshirish:
+
+```bash
+npm run test:kitchen
 ```
 
 ## Birinchi kirish

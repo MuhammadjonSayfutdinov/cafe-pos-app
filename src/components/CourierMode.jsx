@@ -10,6 +10,7 @@ import {
 import { getDeliveryStatus, mapsUrl, telUrl } from '../utils/delivery';
 import { getCreatedTimeMs, isTodayMs } from '../utils/dates';
 import { notify, confirmAsync } from '../utils/notify';
+import { serveReadyLines } from '../utils/kitchenFlow';
 
 // Kuryer mijozdan qanday pul oldi (kassir shu usul bilan chekni yopadi)
 const COLLECT_METHODS = [
@@ -233,8 +234,9 @@ export default function CourierMode({
     const ok = patchDelivery(
       order.id,
       o => isOpen(o) && getDeliveryStatus(o) === DELIVERY_STATUS.ON_WAY && (!isCourier || isMine(o)),
-      () => ({
-        order: { status: ORDER_STATUS.DELIVERED },
+      (o) => ({
+        // Tayyor porsiyalar mijozga berildi (ofitsiant ekranida "tayyor" belgisi qolib ketmasin)
+        order: { items: serveReadyLines(o, deliveredAt).order.items, status: ORDER_STATUS.DELIVERED },
         delivery: { status: DELIVERY_STATUS.DELIVERED, deliveredAt, collectedMethod: method }
       })
     );

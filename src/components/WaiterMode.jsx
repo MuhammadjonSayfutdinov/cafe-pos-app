@@ -7,12 +7,11 @@ import WaiterActionModals from './WaiterActionModals';
 import DeliveryOrderModal from './DeliveryOrderModal';
 import { collectTableCalls } from './WaiterCallsPanel';
 import { markUnsavedWork } from '../pwa/update';
-import { orderTotalsFields, getItemQty, getItemPrice } from '../utils/orderTotals';
+import { orderTotalsFields, getItemQty } from '../utils/orderTotals';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 import {
   CLOSED_ORDER_STATUSES,
   DELIVERY_STATUS,
-  KITCHEN_ORDER_STATUSES,
   ORDER_STATUS,
   ORDER_TYPE,
   isDeliveryOrder,
@@ -26,6 +25,22 @@ import { reservedByOpenOrders, stockStatus } from '../utils/inventoryCalc';
 import { findUserByPin } from '../utils/pinHash';
 import { hasTwoFactor } from '../utils/twoFactor';
 import TwoFactorCodeModal from './TwoFactorCodeModal';
+import {
+  applyWaiterCart,
+  cancelWholeOrder,
+  deriveStatus,
+  doneQtyOf,
+  kitchenSummary,
+  lineIdOf,
+  materializeOrder,
+  newKitchenLine,
+  rebaseCart,
+  reduceLine,
+  sameCart,
+  servedQtyOf,
+  serveReadyLines,
+  stripHeavyFields
+} from '../utils/kitchenFlow';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -192,10 +207,12 @@ export default function WaiterMode({
 
   const prevReadyCountRef = useRef(0);
 
+  // Ovoz: oshxona taom tayyorladi (chekning bir qismi bo'lsa ham) yoki mijoz chaqirdi
   useEffect(() => {
-    const readyOrCalledCount = safeOrders.filter(
-      o => o && (o.status === ORDER_STATUS.READY || o.hasCall)
-    ).length;
+    const readyOrCalledCount = safeOrders.reduce((sum, o) => {
+      if (!o || CLOSED_ORDER_STATUSES.includes(o.status)) return sum;
+      return sum + kitchenSummary(o).ready + (o.hasCall ? 1 : 0);
+    }, 0);
 
     if (readyOrCalledCount > prevReadyCountRef.current) {
       playWaiterBeep();
@@ -216,36 +233,43 @@ export default function WaiterMode({
   }, [safeOrders, selectedTable]);
 
   // =========================================================
-  // 3. 🔥 OSHXONA VA KASSANI JONLI YANGILOVCHI FUNKSIYA (BUG FIX!)
+  // 3. CHEKNI ENG SO'NGGI HOLATIDAN O'ZGARTIRISH
   // =========================================================
-  const syncOrderInDatabase = useCallback((nextCartItems) => {
-    if (!currentTableOrder) return;
+  // Oldin savatchaning eski nusxasi butun chekni qayta yozardi: oshxona "tayyor" belgilari,
+  // oshxona rad etgan taomlar va boshqa qurilmada qo'shilgan taomlar (QR-buyurtma) o'chib ketardi.
+  // Endi o'zgarish chekning eng so'nggi holatiga qo'llanadi (src/utils/kitchenFlow.ts).
+  const applyToCurrentOrder = useCallback((fn) => {
+    if (!currentTableOrder) return null;
+    const orderId = String(currentTableOrder.id);
+    let result = null;
+    updateOrders(prev => (Array.isArray(prev) ? prev : []).map(o => {
+      if (!o || String(o.id) !== orderId) return o;
+      result = fn(o);
+      return result && result.order ? result.order : o;
+    }));
+    return result;
+  }, [currentTableOrder, updateOrders]);
 
-    // AGAR CHEKDAGI BARCHA TAOMLAR O'CHIRILGAN BO'LSA -> BUYURTMANI OSHXONA VA KASSADAN HAM O'CHIRAMIZ!
-    if (!Array.isArray(nextCartItems) || nextCartItems.length === 0) {
-      updateOrders(prev =>
-        (Array.isArray(prev) ? prev : []).filter(
-          o => o && String(o.id) !== String(currentTableOrder.id)
-        )
-      );
-      setCart([]);
-      setSelectedTable(null);
-      return;
+  // Savatcha chekning eng so'nggi holatiga moslashadi (oshxona rad etdi, QR-buyurtma qo'shildi,
+  // kassa yopdi): shu qurilmada qo'shilgan, hali yuborilmagan porsiyalar saqlanadi
+  useEffect(() => {
+    if (!selectedTable) return;
+    setCart(prev => {
+      const next = rebaseCart(prev, currentTableOrder);
+      return sameCart(prev, next) ? prev : next;
+    });
+  }, [selectedTable, currentTableOrder]);
+
+  // Ochiq turgan stolning cheki boshqa qurilmada yopilsa yoki bekor qilinsa - xabar
+  const lastOpenOrderRef = useRef({ table: null, id: null });
+  useEffect(() => {
+    const id = currentTableOrder ? String(currentTableOrder.id) : null;
+    const last = lastOpenOrderRef.current;
+    if (selectedTable && last.table === selectedTable && last.id && !id) {
+      notify(`ℹ️ ${selectedTable} cheki boshqa qurilmada yopildi yoki bekor qilindi`);
     }
-
-    // Agar chekda taomlar qolgan bo'lsa -> Oshxona va Kassadagi buyurtmani darhol yangilaymiz!
-    updateOrders(prev =>
-      (Array.isArray(prev) ? prev : []).map(o =>
-        o && String(o.id) === String(currentTableOrder.id)
-          ? {
-              ...o,
-              items: nextCartItems,
-              ...orderTotalsFields(o, nextCartItems, o.serviceFee ?? serviceFee)
-            }
-          : o
-      )
-    );
-  }, [currentTableOrder, serviceFee, updateOrders]);
+    lastOpenOrderRef.current = { table: selectedTable, id };
+  }, [currentTableOrder, selectedTable]);
 
   // =========================================================
   // 4. 🔒 ADMIN PIN TEKSHIRUV MOTORI
@@ -335,23 +359,9 @@ export default function WaiterMode({
         !CLOSED_ORDER_STATUSES.includes(o.status)
     );
 
-    if (existing && Array.isArray(existing.items)) {
-      setCart(
-        existing.items.map((item, idx) => {
-          const currentQ = Number(item.quantity ?? item.qty ?? 1) || 1;
-          return {
-            ...item,
-            cartItemId: item.cartItemId || `${item.id || idx}_${idx}`,
-            quantity: currentQ,
-            qty: currentQ,
-            sentQty: Number(item.sentQty ?? currentQ) || currentQ,
-            price: Number(item.price ?? item.variants?.[0]?.price ?? 0) || 0
-          };
-        })
-      );
-    } else {
-      setCart([]);
-    }
+    // Savatcha = chekdagi qatorlar (sentQty = chekdagi porsiya). Qator kaliti chek yozuvidagi bilan
+    // bir xil (lineIdOf): yuborilganda eski taom yangi qator bo'lib ikkilanib qolmaydi
+    setCart(existing ? rebaseCart([], existing) : []);
   };
 
   // Stol ekranidan chiqish (yetkazish uchun kiritilgan, lekin yuborilmagan ma'lumot ham tozalanadi)
@@ -462,7 +472,9 @@ export default function WaiterMode({
       return [
         ...prev,
         {
-          ...dishItem,
+          // Menyu rasmlari (5-50 KB) va tavsifi chek qatoriga ko'chirilmaydi: oldin har bir taom
+          // qatori rasm nusxasini olib, qurilma xotirasi va bulut sinxroni tez to'lardi
+          ...stripHeavyFields(dishItem),
           id: dishItem.id,
           baseName: dishItem.name,
           name: fullDisplayName,
@@ -507,30 +519,28 @@ export default function WaiterMode({
       requestSecurityApproval(
         `🔒 ${selectedTable}: "${targetItem.name}" taomini kamaytirish (-${removedCount} pors / -${lostSum.toLocaleString()} s)`,
         (reason) => {
-          const updatedCart = cart
-            .map((item, idx) => {
-              if (!item) return null;
-              const isMatch =
-                item.cartItemId === targetIdentifier ||
-                String(item.id) === String(targetIdentifier) ||
-                item.name === targetIdentifier ||
-                idx === targetIdentifier;
-              if (!isMatch) return item;
+          const lineId = String(targetItem.cartItemId || '');
+          // Chekdagi porsiya (yuborilmagan qism ham kamaytirilgan bo'ladi)
+          const nextOrderQty = Math.max(0, Math.min(sentQty, nextQty));
+          const result = applyToCurrentOrder(o => reduceLine(o, lineId, nextOrderQty, {
+            by: currentUser?.name || 'Ofitsiant',
+            reason,
+            now: Date.now()
+          }));
 
+          setCart(prev => prev
+            .map(item => {
+              if (!item || item.cartItemId !== lineId) return item;
               return nextQty > 0
-                ? {
-                    ...item,
-                    quantity: nextQty,
-                    qty: nextQty,
-                    sentQty: Math.min(sentQty, nextQty)
-                  }
+                ? { ...item, quantity: nextQty, qty: nextQty, sentQty: Math.min(sentQty, nextQty) }
                 : null;
             })
-            .filter(Boolean);
-
-          setCart(updatedCart);
-          // DARHOL OSHXONA VA KASSANI YANGILASH!
-          syncOrderInDatabase(updatedCart);
+            .filter(Boolean));
+          // Oxirgi taom ham olindi: chek "Bekor qilindi", stol bo'shaydi
+          if (result?.order?.status === ORDER_STATUS.CANCELLED) {
+            setCart([]);
+            setSelectedTable(null);
+          }
 
           // DARHOL AUDIT LOG'GA YOZISH!
           recordAuditLog(
@@ -545,7 +555,8 @@ export default function WaiterMode({
             `🍽 <b>Taom:</b> ${escapeHtml(targetItem.name)} (-${removedCount} pors)`,
             `💰 <b>Kamaygan summa:</b> <b>-${lostSum.toLocaleString()} so'm</b>`,
             `👤 <b>Ofitsiant:</b> ${escapeHtml(currentUser?.name || 'Ofitsiant')}`,
-            `📝 <b>Sababi:</b> ${escapeHtml(reason)}`
+            `📝 <b>Sababi:</b> ${escapeHtml(reason)}`,
+            result?.cancelledPending > 0 ? `👨‍🍳 Oshxonaga xabar ketdi: ${result.cancelledPending} porsiya tayyorlanmaydi` : null
           ]);
         }
       );
@@ -569,7 +580,7 @@ export default function WaiterMode({
         })
         .filter(Boolean)
     );
-  }, [cart, currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, syncOrderInDatabase, recordAuditLog]);
+  }, [cart, currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, applyToCurrentOrder, recordAuditLog]);
 
   // 🔒 Taomni savatchadan butunlay o'chirish (`🗑`) -> Oshxona va Kassadan DARHOL o'chiradi!
   const handleRemoveFromCart = useCallback((targetIdentifier) => {
@@ -595,19 +606,21 @@ export default function WaiterMode({
       requestSecurityApproval(
         `🔒 ${selectedTable}: "${targetItem.name}" (x${currentQty}) taomini o'chirish (-${lostSum.toLocaleString()} s)`,
         (reason) => {
-          const updatedCart = cart.filter((item, idx) => {
-            if (!item) return false;
-            const isMatch =
-              item.cartItemId === targetIdentifier ||
-              String(item.id) === String(targetIdentifier) ||
-              item.name === targetIdentifier ||
-              idx === targetIdentifier;
-            return !isMatch;
-          });
+          const lineId = String(targetItem.cartItemId || '');
+          const result = sentQty > 0
+            ? applyToCurrentOrder(o => reduceLine(o, lineId, 0, {
+              by: currentUser?.name || 'Ofitsiant',
+              reason,
+              now: Date.now()
+            }))
+            : null;
 
-          setCart(updatedCart);
-          // DARHOL OSHXONA VA KASSADAN O'CHIRISH!
-          syncOrderInDatabase(updatedCart);
+          setCart(prev => prev.filter(item => item && item.cartItemId !== lineId));
+          // Oxirgi taom ham olindi: chek "Bekor qilindi", stol bo'shaydi
+          if (result?.order?.status === ORDER_STATUS.CANCELLED) {
+            setCart([]);
+            setSelectedTable(null);
+          }
 
           // DARHOL AUDIT LOG'GA YOZISH!
           recordAuditLog(
@@ -622,7 +635,8 @@ export default function WaiterMode({
             `🗑 <b>O'chirilgan taom:</b> ${escapeHtml(targetItem.name)} (x${currentQty})`,
             `💰 <b>Summa:</b> <b>-${lostSum.toLocaleString()} so'm</b>`,
             `👤 <b>Ofitsiant:</b> ${escapeHtml(currentUser?.name || 'Ofitsiant')}`,
-            `📝 <b>Sababi:</b> ${escapeHtml(reason)}`
+            `📝 <b>Sababi:</b> ${escapeHtml(reason)}`,
+            result?.cancelledPending > 0 ? `👨‍🍳 Oshxonaga xabar ketdi: ${result.cancelledPending} porsiya tayyorlanmaydi` : null
           ]);
         }
       );
@@ -640,17 +654,22 @@ export default function WaiterMode({
         return !isMatch;
       })
     );
-  }, [cart, currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, syncOrderInDatabase, recordAuditLog]);
+  }, [cart, currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, applyToCurrentOrder, recordAuditLog]);
 
-  // 🔒 Stol buyurtmasini to'liq bekor qilish (Oshxona va Kassadan butunlay o'chirish)
+  // 🔒 Stol buyurtmasini to'liq bekor qilish. Chek o'chirilmaydi: "Bekor qilindi" bo'ladi (stol bo'shaydi,
+  // statistika hisoblamaydi), oshxonada turgan taomlar haqida oshxonaga xabar boradi
   const handleCancelEntireOrder = useCallback(() => {
     if (!currentTableOrder) return;
     const orderTotal = Number(currentTableOrder.finalTotal || currentTableOrder.total || 0);
 
     requestSecurityApproval(
-      `🛑 ${selectedTable} buyurtmasini to'liq bekor qilish va o'chirish (-${orderTotal.toLocaleString()} s)`,
+      `🛑 ${selectedTable} buyurtmasini to'liq bekor qilish (-${orderTotal.toLocaleString()} s)`,
       (reason) => {
-        syncOrderInDatabase([]);
+        applyToCurrentOrder(o => ({
+          order: cancelWholeOrder(o, { by: currentUser?.name || 'Ofitsiant', reason, now: Date.now() })
+        }));
+        setCart([]);
+        setSelectedTable(null);
 
         recordAuditLog(
           "Stol buyurtmasi to'liq bekor qilindi (PIN)",
@@ -666,7 +685,7 @@ export default function WaiterMode({
         ]);
       }
     );
-  }, [currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, syncOrderInDatabase, recordAuditLog]);
+  }, [currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, applyToCurrentOrder, recordAuditLog]);
 
   const handleUpdateNote = useCallback((targetIdentifier, nextNote) => {
     setCart(prev =>
@@ -730,32 +749,6 @@ export default function WaiterMode({
   const handleSubmitOrder = () => {
     if (!selectedTable || !Array.isArray(cart) || cart.length === 0) return;
 
-    // Oshxonaga yangi porsiya ketyaptimi? (sentQty - avval yuborilgan miqdor)
-    const hasNewPortions = cart.some(
-      item => item && (getItemQty(item) || 1) > (Number(item.sentQty) || 0)
-    );
-
-    // Buyurtma oshxonadan o'tib bo'lgan bo'lsa, avval yuborilgan porsiyalar tayyor hisoblanadi
-    // (kitchenDoneQty maydoni yo'q eski buyurtmalar uchun)
-    const orderPastKitchen = Boolean(
-      currentTableOrder && !KITCHEN_ORDER_STATUSES.includes(currentTableOrder.status)
-    );
-
-    const normalizedCart = cart.map((item, idx) => {
-      const qty = getItemQty(item) || 1;
-      const prevDone = item.kitchenDoneQty !== undefined
-        ? Number(item.kitchenDoneQty) || 0
-        : (orderPastKitchen ? Number(item.sentQty) || 0 : 0);
-      return {
-        ...item,
-        cartItemId: item.cartItemId || `ci_${item.id || idx}_${Date.now()}`,
-        price: getItemPrice(item),
-        quantity: qty,
-        sentQty: qty,
-        kitchenDoneQty: Math.min(qty, prevDone)
-      };
-    });
-
     // Jurnal (va Telegram) uchun: oshxonaga shu safar ketayotgan porsiyalar, masalan "2× Osh, 1× Choy"
     const newPortionsText = cart
       .map(item => {
@@ -772,28 +765,20 @@ export default function WaiterMode({
     const activeBooking = reservations?.[selectedTable];
 
     if (currentTableOrder) {
-      const feePct = currentTableOrder.serviceFee ?? serviceFee;
-      const totalAmount = orderTotalsFields(currentTableOrder, normalizedCart, feePct).total;
-
-      updateOrders(prev =>
-        (Array.isArray(prev) ? prev : []).map(o => {
-          if (!o || String(o.id) !== String(currentTableOrder.id)) return o;
-          // Dozakaz (B3): butun buyurtma emas, faqat yangi porsiyalar oshxonaga qaytadi.
-          // Faqat izoh/miqdor kamaygan bo'lsa status o'zgarmaydi.
-          const isPastKitchen = !KITCHEN_ORDER_STATUSES.includes(o.status);
-          const backToKitchen = hasNewPortions && isPastKitchen;
-          return {
-            ...o,
-            items: normalizedCart,
-            ...orderTotalsFields(o, normalizedCart, feePct),
-            status: backToKitchen ? ORDER_STATUS.NEW : o.status,
-            kitchenRoundAt: backToKitchen ? nowMs : o.kitchenRoundAt
-          };
-        })
-      );
+      // Dozakaz (B3): faqat yangi porsiyalar oshxonaga qaytadi. Chekning eng so'nggi holatiga qo'llanadi:
+      // oshxona belgilari, rad etilganlar va boshqa qurilmada qo'shilgan taomlar saqlanadi (B23)
+      const result = applyToCurrentOrder(o => applyWaiterCart(o, cart, nowMs));
+      if (result?.blocked) {
+        // Chek shu soniyada boshqa qurilmada yopilgan: savatcha yangilanadi, qayta bosilsa yangi chek ochiladi
+        notify(`⚠️ ${selectedTable} cheki boshqa qurilmada yopildi. Yangi taomlarni yangi chek sifatida yuborish uchun qayta bosing.`);
+        return;
+      }
+      const saved = result?.order || currentTableOrder;
+      const totalAmount = Number(saved.total ?? saved.finalTotal ?? 0) || 0;
+      const kinds = Array.isArray(saved.items) ? saved.items.length : 0;
       recordAuditLog(
         'Buyurtma yangilandi',
-        `${selectedTable}: ${newPortionsText ? `dozakaz ${newPortionsText} • ` : ''}Jami ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)`
+        `${selectedTable}: ${newPortionsText ? `dozakaz ${newPortionsText} • ` : ''}Jami ${totalAmount.toLocaleString()} so'm (${kinds} xil taom)`
       );
     } else {
       const delivery = isDeliveryTable(selectedTable) && pendingDelivery?.table === selectedTable
@@ -803,10 +788,13 @@ export default function WaiterMode({
         notify("⚠️ Yetkazish ma'lumoti topilmadi. Qaytadan \"🛵 Yangi yetkazish\" tugmasini bosing.");
         return;
       }
+      const kitchenLines = cart
+        .filter(item => item && (getItemQty(item) || 0) > 0)
+        .map(item => newKitchenLine(item, getItemQty(item) || 1, nowMs));
       // Yetkazish narxi chekda alohida qator (oshxonaga chiqmaydi)
       const orderItems = delivery && delivery.fee > 0
-        ? [...normalizedCart, buildDeliveryFeeItem(delivery.fee)]
-        : normalizedCart;
+        ? [...kitchenLines, buildDeliveryFeeItem(delivery.fee)]
+        : kitchenLines;
       const baseOrder = {
         id: newId(),
         createdAt: nowMs,
@@ -835,15 +823,37 @@ export default function WaiterMode({
         } : {})
       };
       const newOrder = { ...baseOrder, ...orderTotalsFields(baseOrder, orderItems, serviceFee) };
-      const totalAmount = newOrder.total;
 
-      updateOrders(prev => [newOrder, ...(Array.isArray(prev) ? prev : [])]);
-      recordAuditLog(
-        delivery ? 'Yangi yetkazish buyurtmasi' : 'Yangi buyurtma ochildi',
-        `${selectedTable}: ${totalAmount.toLocaleString()} so'm (${normalizedCart.length} xil taom)${newPortionsText ? ` • ${newPortionsText}` : ''}${
-          delivery ? ` • ${delivery.customerName || 'Mijoz'}, ${delivery.phone}, ${delivery.address}` : ''
-        }`
-      );
+      // Shu orada boshqa qurilma shu stolga chek ochgan bo'lsa (masalan, QR-buyurtma qabul qilindi),
+      // ikkinchi ochiq chek ochilmaydi: taomlar o'sha chekka qo'shiladi (oldin ikki chek bo'lib, biri
+      // ofitsiant va kassa ekranida ko'rinmay qolardi)
+      let mergedInto = null;
+      updateOrders(prev => {
+        const list = Array.isArray(prev) ? prev : [];
+        const idx = delivery
+          ? -1
+          : list.findIndex(o => o && o.table === selectedTable && !CLOSED_ORDER_STATUSES.includes(o.status));
+        if (idx === -1) return [newOrder, ...list];
+        const merged = applyWaiterCart(list[idx], cart, nowMs).order;
+        mergedInto = merged;
+        const next = [...list];
+        next[idx] = merged;
+        return next;
+      });
+
+      if (mergedInto) {
+        recordAuditLog(
+          'Buyurtma yangilandi',
+          `${selectedTable}: ochiq chekka qo'shildi${newPortionsText ? ` • ${newPortionsText}` : ''} • Jami ${Number(mergedInto.total || 0).toLocaleString()} so'm`
+        );
+      } else {
+        recordAuditLog(
+          delivery ? 'Yangi yetkazish buyurtmasi' : 'Yangi buyurtma ochildi',
+          `${selectedTable}: ${newOrder.total.toLocaleString()} so'm (${kitchenLines.length} xil taom)${newPortionsText ? ` • ${newPortionsText}` : ''}${
+            delivery ? ` • ${delivery.customerName || 'Mijoz'}, ${delivery.phone}, ${delivery.address}` : ''
+          }`
+        );
+      }
     }
 
     if (activeBooking) {
@@ -864,19 +874,21 @@ export default function WaiterMode({
       notify("🛵 Bu yetkazish buyurtmasi: uni kuryer o'z bo'limida \"Mijozga yetkazildi\" deb belgilaydi");
       return;
     }
-    updateOrders(prev =>
-      (Array.isArray(prev) ? prev : []).map(o =>
-        o && String(o.id) === String(currentTableOrder.id)
-          ? { ...o, status: ORDER_STATUS.DELIVERED }
-          : o
-      )
-    );
+    // Faqat tayyor porsiyalar beriladi; oshxonada qolgani bo'lsa chek oshxonada qoladi
+    const result = applyToCurrentOrder(o => serveReadyLines(o, Date.now()));
+    if (!result || result.served === 0) {
+      notify("⚠️ Mijozga beriladigan tayyor taom yo'q");
+      return;
+    }
+    const allDone = result.order.status === ORDER_STATUS.DELIVERED;
     recordAuditLog(
       'Mijozga yetkazildi',
-      `${currentTableOrder.table || selectedTable}: ${Number(currentTableOrder.total ?? currentTableOrder.finalTotal ?? 0).toLocaleString()} so'm`
+      `${currentTableOrder.table || selectedTable}: ${result.served} porsiya${allDone ? '' : ' (qolgani hali oshxonada)'} • ${Number(result.order.total ?? result.order.finalTotal ?? 0).toLocaleString()} so'm`
     );
-    setSelectedTable(null);
-    setCart([]);
+    if (allDone) {
+      setSelectedTable(null);
+      setCart([]);
+    }
   };
 
   // Chaqiruv bor stollar: telefondan kelgan chaqiruv (pos_calls) va eski usuldagi hasCall belgisi.
@@ -989,9 +1001,10 @@ export default function WaiterMode({
       category: 'VIP Xizmat',
       price: lineItemPrice,
       quantity: 1,
-      qty: 1,
       sentQty: 1,
       kitchenDoneQty: 1,
+      servedQty: 1,
+      noKitchen: true,
       note: `Tarif: ${timerStats.hourlyRate.toLocaleString()} s/soat`
     };
 
@@ -1044,11 +1057,23 @@ export default function WaiterMode({
     e.preventDefault();
     if (!transferOrder || !targetTransferTable) return;
 
-    updateOrders(prev =>
-      (Array.isArray(prev) ? prev : []).map(o =>
+    // Shu orada boshqa qurilma maqsad stolga chek ochgan bo'lsa, ko'chirilmaydi (bir stolda ikki
+    // ochiq chek bo'lib, biri ekranlarda ko'rinmay qolardi)
+    let blocked = false;
+    updateOrders(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      blocked = list.some(o =>
+        o && o.table === targetTransferTable && !CLOSED_ORDER_STATUSES.includes(o.status) &&
+        String(o.id) !== String(transferOrder.id));
+      if (blocked) return prev;
+      return list.map(o =>
         o && String(o.id) === String(transferOrder.id) ? { ...o, table: targetTransferTable } : o
-      )
-    );
+      );
+    });
+    if (blocked) {
+      notify(`⚠️ ${targetTransferTable} band bo'lib qoldi: boshqa stolni tanlang`);
+      return;
+    }
     recordAuditLog("Stol ko'chirildi", `${transferOrder.table} -> ${targetTransferTable}`);
     setTransferOrder(null);
     setTargetTransferTable('');
@@ -1058,61 +1083,98 @@ export default function WaiterMode({
     e.preventDefault();
     if (!splitOrder || !splitTargetTable) return;
 
-    const originalItems = Array.isArray(splitOrder.items) ? splitOrder.items : [];
-    const remainingItems = [];
-    const movedItems = [];
-
-    originalItems.forEach((item, idx) => {
-      const totalQty = getItemQty(item) || 1;
-      const moveQty = Math.min(totalQty, Math.max(0, Math.floor(Number(splitQuantities[idx]) || 0)));
-      const doneQty = Math.min(totalQty, Number(item.kitchenDoneQty) || 0);
-      // Tayyor porsiyalar avval ko'chiriladigan qismga beriladi
-      const movedDone = Math.min(moveQty, doneQty);
-
-      if (moveQty > 0) {
-        movedItems.push({
-          ...item,
-          cartItemId: `${item.cartItemId || item.id || idx}_split_${Date.now()}`,
-          quantity: moveQty,
-          qty: moveQty,
-          sentQty: moveQty,
-          kitchenDoneQty: movedDone
-        });
+    const nowMs = Date.now();
+    const feePct = splitOrder.serviceFee ?? serviceFee;
+    // Bo'lish chekning ENG SO'NGGI holatidan (oyna ochiq turganda oshxona taom tayyorlagan yoki
+    // rad etgan bo'lishi mumkin) va qator kaliti bo'yicha (oldin ro'yxatdagi tartib raqami bo'yicha)
+    let outcome = null;
+    updateOrders(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      const idx = list.findIndex(o => o && String(o.id) === String(splitOrder.id));
+      if (idx === -1 || CLOSED_ORDER_STATUSES.includes(list[idx].status)) {
+        outcome = { error: "Chek topilmadi yoki yopilgan" };
+        return prev;
       }
-      if (totalQty - moveQty > 0) {
-        const remQ = totalQty - moveQty;
-        remainingItems.push({ ...item, quantity: remQ, qty: remQ, sentQty: remQ, kitchenDoneQty: doneQty - movedDone });
+      if (list.some(o => o && o.table === splitTargetTable && !CLOSED_ORDER_STATUSES.includes(o.status))) {
+        outcome = { error: `${splitTargetTable} band bo'lib qoldi: boshqa stolni tanlang` };
+        return prev;
       }
+      const latest = materializeOrder(list[idx]);
+      const remainingItems = [];
+      const movedItems = [];
+      (Array.isArray(latest.items) ? latest.items : []).forEach((item, i) => {
+        if (!item) return;
+        const lineId = lineIdOf(item, i, latest.id);
+        const totalQty = getItemQty(item) || 1;
+        const moveQty = Math.min(totalQty, Math.max(0, Math.floor(Number(splitQuantities[lineId]) || 0)));
+        const doneQty = doneQtyOf(item, latest);
+        const servedQty = servedQtyOf(item, latest);
+        // Tayyor (va berilgan) porsiyalar avval ko'chiriladigan qismga beriladi
+        const movedDone = Math.min(moveQty, doneQty);
+        const movedServed = Math.min(movedDone, servedQty);
+
+        if (moveQty > 0) {
+          movedItems.push({
+            ...item,
+            cartItemId: `${lineId}_split_${nowMs}`,
+            quantity: moveQty,
+            sentQty: moveQty,
+            kitchenDoneQty: movedDone,
+            servedQty: movedServed
+          });
+        }
+        if (totalQty - moveQty > 0) {
+          const remQ = totalQty - moveQty;
+          remainingItems.push({
+            ...item,
+            quantity: remQ,
+            sentQty: remQ,
+            kitchenDoneQty: doneQty - movedDone,
+            servedQty: Math.min(servedQty - movedServed, doneQty - movedDone)
+          });
+        }
+      });
+
+      if (movedItems.length === 0 || remainingItems.length === 0) {
+        outcome = { error: "Chekni bo'lish uchun kamida 1 ta taomni yangi stolga ajrating va eski stolda ham kamida 1 ta taom qolsin!" };
+        return prev;
+      }
+
+      const splitBase = {
+        ...latest,
+        id: newId(),
+        table: splitTargetTable,
+        items: movedItems,
+        // Pre-chek va oshxona xabarlari eski chekka tegishli, yangi chekka o'tmaydi
+        isPreCheckPrinted: false,
+        preCheckCount: 0,
+        preCheckTotalSnapshot: undefined,
+        kitchenRejections: [],
+        kitchenCancellations: []
+      };
+      // Status har bir chekning o'z taomlaridan (masalan, oshxonadagilari ko'chgan bo'lsa eski chek "Tayyor")
+      const newSplitOrder = {
+        ...splitBase,
+        ...orderTotalsFields(splitBase, movedItems, feePct),
+        status: deriveStatus(splitBase, movedItems)
+      };
+      outcome = { newSplitOrder };
+      const next = [...list];
+      next[idx] = {
+        ...latest,
+        items: remainingItems,
+        ...orderTotalsFields(latest, remainingItems, feePct),
+        status: deriveStatus(latest, remainingItems)
+      };
+      return [newSplitOrder, ...next];
     });
 
-    if (movedItems.length === 0 || remainingItems.length === 0) {
-      notify("Chekni bo'lish uchun kamida 1 ta taomni yangi stolga ajrating va eski stolda ham kamida 1 ta taom qolsin!");
+    if (!outcome || outcome.error) {
+      notify(outcome?.error || "Chekni bo'lib bo'lmadi");
       return;
     }
 
-    const feePct = splitOrder.serviceFee ?? serviceFee;
-    const splitBase = {
-      ...splitOrder,
-      id: newId(),
-      table: splitTargetTable,
-      items: movedItems,
-      // Pre-chek eski chekka tegishli, yangi chekka o'tmaydi
-      isPreCheckPrinted: false,
-      preCheckCount: 0,
-      preCheckTotalSnapshot: undefined
-    };
-    const newSplitOrder = { ...splitBase, ...orderTotalsFields(splitBase, movedItems, feePct) };
-
-    updateOrders(prev => [
-      newSplitOrder,
-      ...(Array.isArray(prev) ? prev : []).map(o =>
-        o && String(o.id) === String(splitOrder.id)
-          ? { ...o, items: remainingItems, ...orderTotalsFields(o, remainingItems, feePct) }
-          : o
-      )
-    ]);
-
-    recordAuditLog("Chek bo'lindi", `${splitOrder.table} -> ${splitTargetTable} (${newSplitOrder.total.toLocaleString()} s)`);
+    recordAuditLog("Chek bo'lindi", `${splitOrder.table} -> ${splitTargetTable} (${outcome.newSplitOrder.total.toLocaleString()} s)`);
     setSplitOrder(null);
     setSplitTargetTable('');
     setSplitQuantities({});
@@ -1289,7 +1351,7 @@ export default function WaiterMode({
                 currentTableOrder={currentTableOrder}
                 activeOrder={currentTableOrder}
                 existingOrder={currentTableOrder}
-                serviceFee={serviceFee}
+                serviceFee={currentTableOrder ? (currentTableOrder.serviceFee ?? serviceFee) : serviceFee}
                 onUpdateQuantity={handleUpdateQuantity}
                 updateQuantity={handleUpdateQuantity}
                 updateQty={handleUpdateQuantity}

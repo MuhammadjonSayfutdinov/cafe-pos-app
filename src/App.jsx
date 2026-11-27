@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 // MAXSUS HOOK
 import useSticky from './hooks/useSticky';
-import { orderTotalsFields, getItemQty, getItemPrice } from './utils/orderTotals';
+import { orderTotalsFields, getItemQty } from './utils/orderTotals';
+import { ackNotices, appendKitchenItems, newKitchenLine, serveReadyLines } from './utils/kitchenFlow';
 
 // KOMPONENTLAR
 import LockScreen from './components/LockScreen';
@@ -21,9 +22,10 @@ import AutoLockControl from './components/AutoLockControl';
 import SyncStatusBadge from './components/SyncStatusBadge';
 import QrRequestsPanel from './components/QrRequestsPanel';
 import WaiterCallsPanel from './components/WaiterCallsPanel';
+import KitchenNoticesPanel from './components/KitchenNoticesPanel';
 import { callRpc } from './sync/engine';
 import { notify } from './utils/notify';
-import { CLOSED_ORDER_STATUSES, DELIVERY_STATUS, KITCHEN_ORDER_STATUSES, ORDER_STATUS, TAKEAWAY_TABLE, isDeliveryOrder } from './constants/orderStatus';
+import { CLOSED_ORDER_STATUSES, DELIVERY_STATUS, ORDER_STATUS, TAKEAWAY_TABLE, isDeliveryOrder } from './constants/orderStatus';
 import { getRoleMeta, getUserTitle } from './constants/roles';
 import { newId } from './utils/ids';
 import { getUpdateResume, setUpdateSession } from './pwa/update';
@@ -311,21 +313,13 @@ export default function App() {
       incomingItems = arg1.items;
     }
 
-    if (incomingItems.length === 0) return null;
-
-    const normalizedItems = incomingItems.map(item => {
-      const q = getItemQty(item) || 1;
-      return {
-        ...item,
-        cartItemId: item.cartItemId || `${Date.now()}_${Math.random()}`,
-        price: getItemPrice(item),
-        quantity: q,
-        sentQty: q,
-        kitchenDoneQty: 0
-      };
-    });
-
     const nowMs = Date.now();
+    // Oshxonaga ketadigan qatorlar (taom darajasidagi holat bilan: src/utils/kitchenFlow.ts)
+    const normalizedItems = incomingItems
+      .filter(item => item && typeof item === 'object')
+      .map(item => newKitchenLine(item, getItemQty(item) || 1, nowMs));
+    if (normalizedItems.length === 0) return null;
+
     const nowTime = new Date(nowMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     let targetOrderId = null; // useSticky yangilanishni darhol (sinxron) bajaradi
 
@@ -339,22 +333,15 @@ export default function App() {
       if (existingOrderIndex !== -1 && targetTable !== 'Olib ketish') {
         const updatedOrders = [...safeOrders];
         const existingOrder = updatedOrders[existingOrderIndex];
-        // Dozakaz (B3): eski taomlar qayta pishirilmaydi, oshxona faqat yangi porsiyalarni ko'radi
-        const isPastKitchen = !KITCHEN_ORDER_STATUSES.includes(existingOrder.status);
-        const prevItems = (Array.isArray(existingOrder.items) ? existingOrder.items : []).map(it =>
-          it && isPastKitchen && it.kitchenDoneQty === undefined
-            ? { ...it, kitchenDoneQty: getItemQty(it) }
-            : it
-        );
-        const combinedItems = [...prevItems, ...normalizedItems];
         targetOrderId = existingOrder.id;
-
+        // Dozakaz (B3): eski taomlar qayta pishirilmaydi, oshxona faqat yangi porsiyalarni ko'radi;
+        // tayyor/berilgan belgilar saqlanadi, chek oshxonadan o'tgan bo'lsa yana 'Yangi' bo'ladi
         updatedOrders[existingOrderIndex] = {
-          ...existingOrder,
-          items: combinedItems,
-          ...orderTotalsFields(existingOrder, combinedItems, existingOrder.serviceFee ?? serviceFee),
-          status: isPastKitchen ? ORDER_STATUS.NEW : existingOrder.status,
-          kitchenRoundAt: isPastKitchen ? nowMs : existingOrder.kitchenRoundAt,
+          ...appendKitchenItems(
+            { ...existingOrder, serviceFee: existingOrder.serviceFee ?? serviceFee },
+            normalizedItems,
+            nowMs
+          ),
           updatedAt: nowTime
         };
 
@@ -471,6 +458,18 @@ export default function App() {
         o && o.table === tableName && o.hasCall ? { ...o, hasCall: false } : o
       ));
     }
+  };
+
+  // Oshxona xabari (rad etilgan taom yoki to'langan chek tayyor) ko'rildi: barcha qurilmalarda yopiladi
+  const handleAckKitchenNotice = (notice) => {
+    if (!notice?.orderId) return;
+    const by = currentUser?.name || '';
+    const now = Date.now();
+    setOrders(prev => (Array.isArray(prev) ? prev : []).map(o => {
+      if (!o || String(o.id) !== String(notice.orderId)) return o;
+      if (notice.kind === 'ready') return ackNotices(serveReadyLines(o, now).order, 'ready', by, now);
+      return ackNotices(o, 'rejections', by, now);
+    }));
   };
 
   // ==========================================
@@ -610,6 +609,10 @@ export default function App() {
               waiterCalls={waiterCalls}
               orders={orders}
               onClear={handleClearCall}
+            />
+            <KitchenNoticesPanel
+              orders={orders}
+              onAck={handleAckKitchenNotice}
             />
             <QrRequestsPanel
               requests={qrRequests}

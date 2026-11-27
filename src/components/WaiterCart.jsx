@@ -1,6 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { ORDER_STATUS, isDeliveryTable, isNoServiceFeeTable } from '../constants/orderStatus';
+import { isDeliveryTable, isNoServiceFeeTable } from '../constants/orderStatus';
 import { confirmAsync } from '../utils/notify';
+import {
+  isKitchenItem,
+  kitchenSummary,
+  orderLines,
+  pendingQtyOf,
+  readyQtyOf,
+  servedQtyOf
+} from '../utils/kitchenFlow';
+
+const linesText = (list) => list.map(l => `${l.qty}× ${l.name}`).join(', ');
 
 const QUICK_CHEF_NOTES = [
   "Piyozsiz",
@@ -49,6 +59,20 @@ export default function WaiterCart({
   const safeCart = Array.isArray(cart) ? cart : [];
   const isPreCheckLocked = Boolean(resolvedOrder?.isPreCheckPrinted);
   const preCheckCount = Number(resolvedOrder?.preCheckCount) || 0;
+
+  // Oshxona holati (taom darajasida): tayyor, lekin mijozga hali berilmagan porsiyalar va
+  // oshxona rad etgan taomlar (src/utils/kitchenFlow.ts)
+  const kitchenInfo = useMemo(() => {
+    if (!resolvedOrder) return { summary: null, readyLines: [], rejections: [] };
+    const summary = kitchenSummary(resolvedOrder);
+    const readyLines = orderLines(resolvedOrder)
+      .filter(({ item }) => isKitchenItem(item) && readyQtyOf(item, resolvedOrder) > 0)
+      .map(({ item }) => ({ name: item.name, qty: readyQtyOf(item, resolvedOrder) }));
+    const rejections = (Array.isArray(resolvedOrder.kitchenRejections) ? resolvedOrder.kitchenRejections : [])
+      .filter(r => r && r.qty > 0)
+      .slice(-6);
+    return { summary, readyLines, rejections };
+  }, [resolvedOrder]);
 
   // Savatcha matematikasi
   const cartSummary = useMemo(() => {
@@ -205,19 +229,38 @@ export default function WaiterCart({
         )}
       </div>
 
-      {/* AGAR OSHXONADA TAOM TAYYOR BO'LGAN BO'LSA — TEZKOR TOPSHIRISH TUGMASI */}
-      {resolvedOrder && resolvedOrder.status === ORDER_STATUS.READY && (
-        <div className="my-2.5 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-400 dark:border-emerald-600 space-y-2 shrink-0 animate-fade-in">
-          <p className="text-xs font-black text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
-            <span>🔔</span> Oshxonada taomlar tayyor bo'ldi!
+      {/* OSHXONADA TAYYOR BO'LGAN TAOMLAR (chekning bir qismi bo'lsa ham) — TOPSHIRISH TUGMASI */}
+      {resolvedOrder && kitchenInfo.readyLines.length > 0 && (
+        <div className="my-2.5 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-400 dark:border-emerald-600 space-y-2 shrink-0 animate-fade-in" data-testid="waiter-ready-block">
+          <p className="text-xs font-black text-emerald-800 dark:text-emerald-200 flex items-start gap-1.5 break-words">
+            <span>🔔</span>
+            <span>Tayyor, olib boring: {linesText(kitchenInfo.readyLines)}</span>
           </p>
+          {kitchenInfo.summary?.pending > 0 && (
+            <p className="text-[11px] font-bold text-emerald-700/80 dark:text-emerald-300/80">
+              👨‍🍳 Qolgan {kitchenInfo.summary.pending} porsiya hali oshxonada
+            </p>
+          )}
           <button
             type="button"
             onClick={() => typeof handleDeliver === 'function' && handleDeliver()}
             className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider shadow-md transition active:scale-95"
           >
-            ✅ Mijozga Yetkazildi (Topshirildi)
+            ✅ Mijozga berildi ({kitchenInfo.summary?.ready || 0} porsiya)
           </button>
+        </div>
+      )}
+
+      {/* OSHXONA RAD ETGAN TAOMLAR (chekdan olib tashlangan, mijozga ayting) */}
+      {resolvedOrder && kitchenInfo.rejections.length > 0 && (
+        <div className="my-1.5 p-3 rounded-2xl bg-red-50 dark:bg-red-900/25 border border-red-300 dark:border-red-800 space-y-1 shrink-0" data-testid="waiter-rejections">
+          <p className="text-[11px] font-black uppercase text-red-700 dark:text-red-300">❌ Oshxona rad etdi (chekdan olindi)</p>
+          {kitchenInfo.rejections.map(r => (
+            <p key={r.id} className={`text-xs font-bold break-words ${r.ackAt ? 'text-gray-500 dark:text-gray-400' : 'text-red-700 dark:text-red-200'}`}>
+              {r.qty}× {r.name} — {r.reason}
+              {r.at ? ` (${new Date(r.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}
+            </p>
+          ))}
         </div>
       )}
 
@@ -243,6 +286,13 @@ export default function WaiterCart({
 
             const isReductionProtected = isPreCheckLocked || (sentQty > 0 && qty <= sentQty);
             const isDeleteProtected = isPreCheckLocked || sentQty > 0;
+            // Chekdagi (yuborilgan) qism uchun oshxona holati
+            const sentPart = { ...item, quantity: sentQty };
+            const isKitchenLine = isKitchenItem(item);
+            const pendingQ = sentQty > 0 && resolvedOrder ? pendingQtyOf(sentPart, resolvedOrder) : 0;
+            const readyQ = sentQty > 0 && resolvedOrder ? readyQtyOf(sentPart, resolvedOrder) : 0;
+            const servedQ = sentQty > 0 && resolvedOrder ? servedQtyOf(sentPart, resolvedOrder) : 0;
+            const unsentQ = Math.max(0, qty - sentQty);
 
             return (
               <div
@@ -259,13 +309,29 @@ export default function WaiterCart({
                       <h4 className="font-black text-sm text-gray-900 dark:text-white leading-snug">
                         {item.name}
                       </h4>
-                      {sentQty > 0 ? (
+                      {sentQty > 0 && isKitchenLine && pendingQ > 0 && (
                         <span className="px-1.5 py-0.5 rounded-sm bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 font-black text-[9px] uppercase">
-                          🔒 Oshxonada: {sentQty}
+                          👨‍🍳 Oshxonada: {pendingQ}
                         </span>
-                      ) : (
+                      )}
+                      {sentQty > 0 && isKitchenLine && readyQ > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-sm bg-emerald-500 text-white font-black text-[9px] uppercase">
+                          🔔 Tayyor: {readyQ}
+                        </span>
+                      )}
+                      {sentQty > 0 && isKitchenLine && servedQ > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-sm bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-black text-[9px] uppercase">
+                          🍽 Berildi: {servedQ}
+                        </span>
+                      )}
+                      {sentQty > 0 && !isKitchenLine && (
+                        <span className="px-1.5 py-0.5 rounded-sm bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-black text-[9px] uppercase">
+                          🔒 Chekda
+                        </span>
+                      )}
+                      {unsentQ > 0 && (
                         <span className="px-1.5 py-0.5 rounded-sm bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-black text-[9px] uppercase">
-                          🆕 Yangi
+                          🆕 Yangi{sentQty > 0 ? `: +${unsentQ}` : ''}
                         </span>
                       )}
                     </div>

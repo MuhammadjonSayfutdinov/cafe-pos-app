@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DELIVERY_STATUS, ORDER_STATUS, isDeliveryOrder } from '../constants/orderStatus';
+import { kitchenSummary } from '../utils/kitchenFlow';
 
 const DEBT_PAY_METHODS = ['Naqd', 'Plastik', 'Click', 'Payme'];
 
@@ -193,6 +194,22 @@ export default function CashierOrderList({
                       {displayTotal.toLocaleString()} so'm
                     </p>
                   )}
+
+                  {/* Oshxona holati (taom darajasida): to'lovdan oldin bilish uchun */}
+                  {(() => {
+                    const k = kitchenSummary(order);
+                    if (k.pending === 0 && k.ready === 0) return null;
+                    return (
+                      <p className="text-[11px] font-black mt-1 flex flex-wrap gap-x-2">
+                        {k.pending > 0 && (
+                          <span className="text-indigo-600 dark:text-indigo-400">👨‍🍳 Oshxonada: {k.pending} pors</span>
+                        )}
+                        {k.ready > 0 && (
+                          <span className="text-emerald-600 dark:text-emerald-400">🔔 Tayyor: {k.ready} pors</span>
+                        )}
+                      </p>
+                    );
+                  })()}
 
                   {isDeliveryOrder(order) && (
                     <p className="text-[11px] font-black text-orange-600 dark:text-orange-400 mt-1">

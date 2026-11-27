@@ -4,13 +4,14 @@ import CashierOrderList from './CashierOrderList';
 import CashierReceipt from './CashierReceipt';
 import CashierPaymentControls from './CashierPaymentControls';
 import { calcOrderTotals } from '../utils/orderTotals';
-import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD, isDeliveryOrder } from '../constants/orderStatus';
+import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD, isDeliveryOrder } from '../constants/orderStatus';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
 import ShiftPanel from './ShiftPanel';
 import { getOpenShift } from '../shift/shiftReport';
 import { itemUsage, normalizeUnit } from '../utils/inventoryCalc';
+import { cancelWholeOrder, keepInKitchenOnPayment, kitchenSummary } from '../utils/kitchenFlow';
 
 // ==========================================
 // 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
@@ -680,7 +681,7 @@ export default function CashierMode({
   // ==========================================
   // 11. TO'LOVNI TASDIQLASH VA PRE-CHEK HIMOYASI
   // ==========================================
-  const handlePaymentSubmit = () => {
+  const handlePaymentSubmit = async () => {
     if (!selectedOrder) return;
     if (!openShift) {
       notify('⚠️ Avval smenani oching (yuqoridagi "Smenani ochish" tugmasi)');
@@ -708,6 +709,19 @@ export default function CashierMode({
     if (paymentMethod === PAYMENT_METHOD.DEBT && (!cleanDebtor || cleanPhoneDigits(cleanDebtorPhone).length < 9)) {
       notify("⛔️ Qarzga yozish uchun mijozning ismi va to'liq telefon raqamini (kamida 9 ta raqam) kiriting!");
       return;
+    }
+
+    // Oshxona hali tayyorlayotgan chek (masalan, "Olib ketish"da oldindan to'lov). Oldin to'lov
+    // qilinishi bilan chek oshxona ekranidan yo'qolib, taom tayyorlanmay qolardi.
+    const kitchenLeft = KITCHEN_ORDER_STATUSES.includes(selectedOrder.status)
+      ? kitchenSummary(selectedOrder).pending
+      : 0;
+    if (kitchenLeft > 0) {
+      const ok = await confirmAsync(
+        `⚠️ ${selectedOrder.table}: oshxonada hali ${kitchenLeft} porsiya tayyorlanmoqda.\nTo'lov qabul qilinsa ham oshxona tayyorlashni davom ettiradi, tayyor bo'lgach ofitsiant va kassaga xabar chiqadi. Davom etamizmi?`,
+        { confirmText: "Ha, to'lovni qabul qilish", danger: false }
+      );
+      if (!ok) return;
     }
 
     const executeCloseOrder = () => {
@@ -767,6 +781,8 @@ export default function CashierMode({
 
       const closedOrderObject = {
         ...selectedOrder,
+        // Oshxona tugatmagan bo'lsa: chek oshxona ekranida qoladi (kitchenOpen)
+        ...keepInKitchenOnPayment(selectedOrder),
         status: nextStatus,
         paymentMethod,
         subTotal: totals.subTotal,
@@ -955,10 +971,16 @@ export default function CashierMode({
 
     const performDelete = async () => {
       const targetOrder = safeOrders.find(o => o && String(o.id) === String(orderId));
-      if (!await confirmAsync(`⚠️ Rostdan ham "${tableName}" buyurtmasini butunlay o'chirmoqchimisiz?`)) return;
+      if (!await confirmAsync(`⚠️ Rostdan ham "${tableName}" buyurtmasini bekor qilmoqchimisiz?\nStol bo'shaydi, chek "Bekor qilindi" bo'lib jurnalda qoladi, oshxonaga xabar boradi.`)) return;
 
+      // Chek o'chirilmaydi: "Bekor qilindi" (statistika hisoblamaydi). Oshxonada turgan taomlar
+      // haqida oshxonaga xabar boradi (oldin chek jim o'chib, oshpaz tayyorlashda davom etardi)
       updateOrders(prev =>
-        (Array.isArray(prev) ? prev : []).filter(o => o && String(o.id) !== String(orderId))
+        (Array.isArray(prev) ? prev : []).map(o =>
+          o && String(o.id) === String(orderId)
+            ? cancelWholeOrder(o, { by: currentUser?.name || 'Kassir', reason: 'Kassada bekor qilindi', now: Date.now() })
+            : o
+        )
       );
 
       if (String(selectedOrderId) === String(orderId)) {

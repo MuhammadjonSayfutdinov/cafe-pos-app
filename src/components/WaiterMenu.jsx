@@ -81,7 +81,9 @@ export default function WaiterMenu({
       const baseKey = c.baseName || c.name;
       const qty = Number(c.quantity ?? c.qty ?? 1) || 0;
       map[baseKey] = (map[baseKey] || 0) + qty;
-      map[c.name] = (map[c.name] || 0) + qty;
+      // Nomi asosiy nom bilan bir xil bo'lsa (bitta porsiyali taom) ikki marta qo'shilmaydi:
+      // oldin menyu kartasida "✓ 2 ta" chiqardi, savatchada esa 1 ta edi
+      if (c.name && c.name !== baseKey) map[c.name] = (map[c.name] || 0) + qty;
     });
     return map;
   }, [cart]);

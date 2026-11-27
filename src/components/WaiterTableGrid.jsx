@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
+import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
+import { kitchenSummary, unackedRejections } from '../utils/kitchenFlow';
 import { notify } from '../utils/notify';
 
 // =========================================================
@@ -137,6 +138,10 @@ export default function WaiterTableGrid({
 
       const hasCall = Boolean(activeOrder?.hasCall) || Boolean(calledTables?.has?.(tableName));
       const isBusy = Boolean(activeOrder);
+      // Taom darajasida: oshxona tayyorlagan, lekin mijozga berilmagan porsiyalar (chekning bir
+      // qismi bo'lsa ham) va oshxona rad etgan (ofitsiant hali ko'rmagan) taomlar
+      const readyPortions = activeOrder ? kitchenSummary(activeOrder).ready : 0;
+      const rejectedCount = activeOrder ? unackedRejections(activeOrder) : 0;
       const isReserved = Boolean(reservation);
       const isTimed = Boolean(timerLive);
 
@@ -148,6 +153,8 @@ export default function WaiterTableGrid({
         timerLive,
         orderSubTotal,
         itemsCount: items.reduce((s, i) => s + (Number(i?.quantity ?? i?.qty ?? 1) || 0), 0),
+        readyPortions,
+        rejectedCount,
         hasCall,
         isBusy,
         isReserved,
@@ -338,6 +345,8 @@ export default function WaiterTableGrid({
             timerLive,
             orderSubTotal,
             itemsCount,
+            readyPortions,
+            rejectedCount,
             hasCall,
             isBusy,
             isReserved,
@@ -367,9 +376,9 @@ export default function WaiterTableGrid({
               {/* 1. TEPA QISM: STOL NOMI, STATUS VA QR TUGMASI */}
               <div>
                 <div className="flex justify-between items-start gap-2 mb-3">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <div
-                      className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-black shadow-xs ${
+                      className={`w-11 h-11 shrink-0 rounded-2xl flex items-center justify-center text-xl font-black shadow-xs ${
                         isTakeaway
                           ? 'bg-indigo-600 text-white'
                           : isBusy
@@ -383,8 +392,8 @@ export default function WaiterTableGrid({
                     >
                       {isTakeaway ? '🛍️' : isReserved ? '📌' : isTimed ? '⏱️' : '🪑'}
                     </div>
-                    <div>
-                      <h3 className="font-black text-base sm:text-lg text-gray-900 dark:text-white leading-tight">
+                    <div className="min-w-0">
+                      <h3 className="font-black text-base sm:text-lg text-gray-900 dark:text-white leading-tight truncate">
                         {tableName}
                       </h3>
                       <span className="text-[11px] font-bold text-gray-400 block">
@@ -399,11 +408,15 @@ export default function WaiterTableGrid({
                     </div>
                   </div>
 
-                  {/* QR-Kod va Buyurtma Statusi */}
-                  <div className="flex items-center gap-1.5">
-                    {isBusy && activeOrder?.status && (
-                      <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase ${getStatusBadgeStyle(activeOrder.status)}`}>
-                        {activeOrder.status === ORDER_STATUS.READY ? '🔔 Tayyor!' : activeOrder.status}
+                  {/* QR-Kod va Buyurtma Statusi (oshxona taom tayyorlagan bo'lsa - nechta porsiya) */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isBusy && readyPortions > 0 ? (
+                      <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase whitespace-nowrap ${getStatusBadgeStyle(ORDER_STATUS.READY)}`}>
+                        🔔 {readyPortions} tayyor
+                      </span>
+                    ) : isBusy && activeOrder?.status && (
+                      <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase whitespace-nowrap ${getStatusBadgeStyle(activeOrder.status)}`}>
+                        {activeOrder.status}
                       </span>
                     )}
 
@@ -422,6 +435,18 @@ export default function WaiterTableGrid({
                     )}
                   </div>
                 </div>
+
+                {/* 1.1 OSHXONA XABARI: rad etilgan taom va qisman tayyor chek */}
+                {isBusy && rejectedCount > 0 && (
+                  <div className="mb-3 px-3 py-2 rounded-2xl bg-red-600 text-white text-[11px] font-black shadow-md shadow-red-600/30">
+                    ❌ Oshxona taomni rad etdi: mijozga ayting (stolni oching)
+                  </div>
+                )}
+                {isBusy && readyPortions > 0 && KITCHEN_ORDER_STATUSES.includes(activeOrder?.status) && (
+                  <div className="mb-3 px-3 py-2 rounded-2xl bg-emerald-50 dark:bg-emerald-900/25 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-[11px] font-black">
+                    🔔 Bir qismi tayyor, qolgani hali oshxonada
+                  </div>
+                )}
 
                 {/* 2. MIJOZ QO'NG'IROQCHASI (AGAR CHAQIRGAN BO'LSA) */}
                 {hasCall && (

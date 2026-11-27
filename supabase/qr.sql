@@ -36,7 +36,8 @@ as $$
   );
 $$;
 
--- Stol band: to'lanmagan cheki bor. "Olib ketish" band bo'lmaydi (har buyurtma alohida chek)
+-- Stol band: to'lanmagan cheki bor. "Olib ketish" band bo'lmaydi (har buyurtma alohida chek).
+-- 'Bekor qilindi' (oshxona hamma taomni rad etgan yoki xodim bekor qilgan chek) ham yopiq
 create or replace function public.qr_table_busy(p_table text)
 returns boolean
 language sql stable security definer set search_path = public
@@ -45,7 +46,7 @@ as $$
     select 1 from pos_records o
      where o.collection = 'pos_orders' and not o.deleted
        and o.data ->> 'table' = p_table
-       and coalesce(o.data ->> 'status', '') not in ('To''langan', 'Qarz', 'Arxiv')
+       and coalesce(o.data ->> 'status', '') not in ('To''langan', 'Qarz', 'Arxiv', 'Bekor qilindi')
   );
 $$;
 
@@ -95,7 +96,7 @@ begin
        where q.collection = 'pos_qr_requests' and q.id = any (v_ids)
          and q.data ->> 'table' = p_table and q.data ->> 'status' = 'accepted'
          and o.data ->> 'table' = p_table
-         and coalesce(o.data ->> 'status', '') not in ('To''langan', 'Qarz', 'Arxiv')
+         and coalesce(o.data ->> 'status', '') not in ('To''langan', 'Qarz', 'Arxiv', 'Bekor qilindi')
     );
   end if;
 
@@ -394,6 +395,7 @@ as $$
          )), '[]'::jsonb)
     from pos_records r
     left join lateral (
+      -- 'Bekor qilindi' bu yerda yopiq hisoblanmaydi: telefonda "❌ Bekor qilindi" bo'lib ko'rinadi
       select x.data ->> 'status' as status,
              (x.deleted or coalesce(x.data ->> 'status', '') in ('To''langan', 'Qarz', 'Arxiv')) as closed
         from pos_records x
@@ -402,7 +404,7 @@ as $$
          and case when coalesce(r.data ->> 'orderId', '') <> ''
                   then x.id = r.data ->> 'orderId'
                   else x.data ->> 'table' = r.data ->> 'table' and not x.deleted
-                       and coalesce(x.data ->> 'status', '') not in ('To''langan', 'Qarz', 'Arxiv')
+                       and coalesce(x.data ->> 'status', '') not in ('To''langan', 'Qarz', 'Arxiv', 'Bekor qilindi')
              end
        order by x.updated_at desc
        limit 1

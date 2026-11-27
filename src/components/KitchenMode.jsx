@@ -1,6 +1,23 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ORDER_STATUS, isDeliveryOrder } from '../constants/orderStatus';
 import { localWrite } from '../sync/engine';
+import {
+  ackNotices,
+  collectKitchenCancellations,
+  doneQtyOf,
+  isClosedStatus,
+  isKitchenItem,
+  isKitchenVisible,
+  kitchenSummary,
+  markLinesReady,
+  orderLines,
+  pendingQtyOf,
+  rejectLines,
+  startCooking
+} from '../utils/kitchenFlow';
+import KitchenRejectModal from './KitchenRejectModal';
+import { notify } from '../utils/notify';
+import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 
 // =========================================================
 // STANDART SLA SOZLAMALARI (DAQIQALARDA)
@@ -29,6 +46,17 @@ const writeLocalJSON = (key, value) => {
   }
   localWrite(key, value); // sinxronlanadigan kalit bo'lsa bulutga ham (pos_kds_* faqat qurilmada)
 };
+
+// Kunlik SLA hisobining sanasi (yangi kunda o'zi nolga tushadi)
+const dayKeyOf = (ms) => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+};
+const EMPTY_SLA = { onTimeCount: 0, delayedCount: 0, totalCookSeconds: 0 };
+// Oshpaz tanlagan taomlar (faqat shu qurilmada): { "chekId|qatorKaliti": true }
+const SELECTED_KEY = 'pos_kds_selected';
+const selKey = (orderId, lineId) => `${orderId}|${lineId}`;
+const linesText = (lines) => lines.map(l => `${l.qty}× ${l.name}`).join(', ');
 
 // =========================================================
 // WEB AUDIO API OVOZ GENERATORI (MP3 FAYLLAR KERAK EMAS)
@@ -93,8 +121,12 @@ export default function KitchenMode({
 
   // Har bir buyurtmaning boshlangan vaqtini saqlovchi xarita (Refreshda ham yo'qolmaydi)
   const [orderStartTimes, setOrderStartTimes] = useState(() => readLocalJSON('pos_kds_start_times', {}));
-  // Chek ichidagi alohida pishgan taomlarni belgilash xaritasi
-  const [checkedSubItems, setCheckedSubItems] = useState(() => readLocalJSON('pos_kds_checked_items', {}));
+  // Oshpaz tanlagan taomlar. Oldin ekrandagi tartib raqami bo'yicha saqlanardi: sex filtri yoki
+  // dozakazdan keyin boshqa taom belgilangan bo'lib qolardi. Bu faqat tanlov: "Tayyor" bosilgach
+  // holat chekning o'ziga (taom qatoriga) yoziladi va barcha qurilmalarga boradi.
+  const [selected, setSelected] = useState(() => readLocalJSON(SELECTED_KEY, {}) || {});
+  // Rad etish oynasi: { orderId, preselectedIds }
+  const [rejectTarget, setRejectTarget] = useState(null);
   // Ovozli trevogasi o'chirilgan (mute qilingan) buyurtmalar
   const [mutedOrderIds, setMutedOrderIds] = useState([]);
   // SLA sozlamalari
@@ -102,10 +134,13 @@ export default function KitchenMode({
     ...DEFAULT_SLA_CONFIG,
     ...(readLocalJSON('pos_kds_sla_config', {}) || {})
   }));
-  // Kunlik SLA statistikasi (Nechta vaqtida, nechta kechikib chiqdi)
-  const [slaHistory, setSlaHistory] = useState(() =>
-    readLocalJSON('pos_kds_sla_history', { onTimeCount: 0, delayedCount: 0, totalCookSeconds: 0 })
-  );
+  // Kunlik SLA statistikasi (Nechta vaqtida, nechta kechikib chiqdi). day - qaysi kunniki:
+  // oldin hech qachon nolga tushmasdi ("Bugun" yozuvi butun vaqt yig'indisini ko'rsatardi)
+  const [slaHistory, setSlaHistory] = useState(() => {
+    const saved = readLocalJSON('pos_kds_sla_history', null);
+    const today = dayKeyOf(Date.now());
+    return saved && saved.day === today ? saved : { ...EMPTY_SLA, day: today };
+  });
 
   // UI Statelari
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'stoplist'
@@ -116,8 +151,9 @@ export default function KitchenMode({
   const [isSlaModalOpen, setIsSlaModalOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
-  // Oldingi buyurtmalar sonini eslab qolish (yangi buyurtma tushganda ovoz chiqarish uchun)
-  const prevOrderIdsRef = useRef(null);
+  // Har chekdagi oshxona porsiyalari soni (yangi chek yoki dozakaz tushganda ovoz chiqarish uchun)
+  const prevPendingRef = useRef(null);
+  const prevCancelCountRef = useRef(null);
   const lastAlertedBreachIdsRef = useRef(new Set());
 
   const safeOrders = Array.isArray(orders) ? orders : localOrders;
@@ -165,8 +201,17 @@ export default function KitchenMode({
   }, [slaConfig]);
 
   useEffect(() => {
-    writeLocalJSON('pos_kds_checked_items', checkedSubItems);
-  }, [checkedSubItems]);
+    writeLocalJSON(SELECTED_KEY, selected);
+  }, [selected]);
+
+  // Eski (tartib raqami bo'yicha) belgilar endi ishlatilmaydi
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem('pos_kds_checked_items');
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     writeLocalJSON('pos_kds_sla_history', slaHistory);
@@ -221,21 +266,21 @@ export default function KitchenMode({
     return nowMs;
   }, [orderStartTimes, nowMs]);
 
-  // Oshxonaga tegishli faol buyurtmalar ('Yangi' va 'Tayyorlanmoqda')
+  // Oshxonaga tegishli faol buyurtmalar: 'Yangi', 'Tayyorlanmoqda' va oshxona tugatmasdan to'langan
+  // cheklar (oldin kassa chekni yopishi bilan u oshxona ekranidan yo'qolib, taom tayyorlanmay qolardi)
   const kitchenActiveOrders = useMemo(() => {
-    return safeOrders.filter(
-      o => o && (o.status === ORDER_STATUS.NEW || o.status === ORDER_STATUS.COOKING)
-    );
+    const now = Date.now();
+    return safeOrders.filter(o => o && isKitchenVisible(o, now));
   }, [safeOrders]);
 
   // Yangi tushgan buyurtmalarga boshlang'ich vaqt muhrini qo'yish va ovoz chalish
   useEffect(() => {
     let updatedMap = null;
-    const currentIds = new Set();
+    const pendingById = new Map();
 
     kitchenActiveOrders.forEach(o => {
       const key = String(o.id);
-      currentIds.add(key);
+      pendingById.set(key, kitchenSummary(o).pending);
       if (!orderStartTimes[key]) {
         if (!updatedMap) updatedMap = { ...orderStartTimes };
         updatedMap[key] = getOrderStartMs(o);
@@ -247,21 +292,31 @@ export default function KitchenMode({
       writeLocalJSON('pos_kds_start_times', updatedMap);
     }
 
-    // Yangi buyurtma qo'shilganini tekshirish va "Ding-Dong" chalish
-    if (prevOrderIdsRef.current !== null) {
-      const hasBrandNew = kitchenActiveOrders.some(
-        o => !prevOrderIdsRef.current.has(String(o.id))
-      );
-      if (hasBrandNew && slaConfig.soundEnabled) {
+    // Yangi chek YOKI oshxonadagi chekka qo'shimcha porsiya tushsa "Ding-Dong"
+    // (oldin faqat yangi chekda chalinardi: oshxonadagi chekka dozakaz jim tushardi)
+    if (prevPendingRef.current !== null) {
+      const prev = prevPendingRef.current;
+      const grew = [...pendingById].some(([id, p]) => p > (prev.get(id) || 0));
+      if (grew && slaConfig.soundEnabled) {
         playKitchenSound('new_order');
       }
     }
-    prevOrderIdsRef.current = currentIds;
+    prevPendingRef.current = pendingById;
   }, [kitchenActiveOrders, orderStartTimes, getOrderStartMs, slaConfig.soundEnabled]);
 
   // =========================================================
   // 4. HAR BIR BUYURTMA UCHUN SLA HOLATINI HISOBLASH
   // =========================================================
+  // Sex (kategoriya) filtri: taom shu sexnikimi
+  const stationMatches = useCallback((it) => {
+    if (stationCategory === 'Barchasi') return true;
+    if (it?.category === stationCategory) return true;
+    const foundMenu = safeMenuItems.find(
+      m => m && (String(m.id) === String(it?.id) || m.name === it?.baseName || m.name === it?.name)
+    );
+    return foundMenu?.category === stationCategory;
+  }, [stationCategory, safeMenuItems]);
+
   const enrichedOrders = useMemo(() => {
     const warnSec = (Number(slaConfig.warningMinutes) || 10) * 60;
     const critSec = (Number(slaConfig.criticalMinutes) || 20) * 60;
@@ -282,24 +337,33 @@ export default function KitchenMode({
 
       const slaProgressPct = Math.min(100, Math.round((elapsedSeconds / critSec) * 100));
 
-      // Faqat hali tayyorlanmagan porsiyalar (dozakazda eski taomlar qayta chiqmaydi, B3)
-      const items = (Array.isArray(order.items) ? order.items : [])
-        .map(it => {
-          if (!it) return null;
-          const qty = Number(it.quantity ?? it.qty ?? 1) || 0;
-          const pending = Math.max(0, qty - (Number(it.kitchenDoneQty) || 0));
-          return pending > 0 ? { ...it, quantity: pending, qty: pending } : null;
+      // To'langan (oshxona tugatmagan) chek oshxonada "tayyorlanmoqda" bosqichida ko'rinadi
+      const isPaidOrder = isClosedStatus(String(order.status || ''));
+      const kitchenStatus = isPaidOrder ? ORDER_STATUS.COOKING : order.status;
+
+      // Faqat hali tayyorlanmagan porsiyalar (dozakazda eski taomlar qayta chiqmaydi, B3).
+      // Har qatorning doimiy kaliti (lineId): tanlov va amallar shu kalit bo'yicha (B20)
+      const lines = orderLines(order);
+      const pendingLines = lines
+        .map(({ item, lineId }) => {
+          const pending = pendingQtyOf(item, order);
+          if (pending <= 0) return null;
+          return {
+            ...item,
+            lineId,
+            pending,
+            // Oshxonadagi chekka keyin qo'shilgan taom (dozakaz)
+            isAddition: Number(item.kitchenSentAt) > startMs + 60000
+          };
         })
         .filter(Boolean);
-      const filteredItemsByStation = stationCategory === 'Barchasi'
-        ? items
-        : items.filter(it => {
-            if (it?.category === stationCategory) return true;
-            const foundMenu = safeMenuItems.find(
-              m => m && (String(m.id) === String(it?.id) || m.name === it?.baseName || m.name === it?.name)
-            );
-            return foundMenu?.category === stationCategory;
-          });
+      const displayItems = pendingLines.filter(stationMatches);
+      // Shu bosqichda tayyor bo'lganlar (oshpazga ma'lumot: qolganini tayyorlash kerak)
+      const readyNow = lines
+        .filter(({ item }) =>
+          isKitchenItem(item) && Number(item.kitchenReadyAt) >= startMs &&
+          doneQtyOf(item, order) > 0 && stationMatches(item))
+        .map(({ item, lineId }) => ({ lineId, name: item.name, qty: doneQtyOf(item, order) }));
 
       return {
         ...order,
@@ -307,10 +371,15 @@ export default function KitchenMode({
         formattedTimer,
         slaLevel,
         slaProgressPct,
-        displayItems: filteredItemsByStation
+        isPaidOrder,
+        kitchenStatus,
+        displayItems,
+        readyNow,
+        totalPending: pendingLines.reduce((sum, l) => sum + l.pending, 0),
+        visiblePending: displayItems.reduce((sum, l) => sum + l.pending, 0)
       };
     }).filter(o => o.displayItems.length > 0);
-  }, [kitchenActiveOrders, getOrderStartMs, nowMs, slaConfig, stationCategory, safeMenuItems]);
+  }, [kitchenActiveOrders, getOrderStartMs, nowMs, slaConfig, stationMatches]);
 
   // Kechikish chegarasiga (Critical) o'tgan buyurtmalar uchun ovozli trevoga chalish
   useEffect(() => {
@@ -338,8 +407,8 @@ export default function KitchenMode({
   const visibleOrders = useMemo(() => {
     const filtered = enrichedOrders.filter(o => {
       if (statusFilter === 'delayed') return o.slaLevel === 'critical' || o.slaLevel === 'warning';
-      if (statusFilter === 'new') return o.status === ORDER_STATUS.NEW;
-      if (statusFilter === 'cooking') return o.status === ORDER_STATUS.COOKING;
+      if (statusFilter === 'new') return o.kitchenStatus === ORDER_STATUS.NEW;
+      if (statusFilter === 'cooking') return o.kitchenStatus === ORDER_STATUS.COOKING;
       return true;
     });
 
@@ -357,14 +426,10 @@ export default function KitchenMode({
   const batchSummary = useMemo(() => {
     const map = {};
     enrichedOrders.forEach(order => {
-      order.displayItems.forEach((item, idx) => {
+      order.displayItems.forEach(item => {
         if (!item?.name) return;
-        const subKey = `${order.id}_${idx}`;
-        // Agar oshpaz bu porsiyani allaqachon "pishdi" deb belgilagan bo'lsa, qozon hisobidan kamaytiramiz
-        if (checkedSubItems[subKey]) return;
-
         const name = String(item.name).trim();
-        const qty = Number(item.quantity ?? item.qty ?? 1) || 0;
+        const qty = Number(item.pending) || 0;
         if (!map[name]) {
           map[name] = { count: 0, tables: new Set(), hasUrgent: false };
         }
@@ -377,23 +442,24 @@ export default function KitchenMode({
     });
 
     return Object.entries(map).sort((a, b) => b[1].count - a[1].count);
-  }, [enrichedOrders, checkedSubItems]);
+  }, [enrichedOrders]);
 
   const kitchenKpi = useMemo(() => {
     const totalActive = enrichedOrders.length;
     const criticalCount = enrichedOrders.filter(o => o.slaLevel === 'critical').length;
     const warningCount = enrichedOrders.filter(o => o.slaLevel === 'warning').length;
-    const newCount = enrichedOrders.filter(o => o.status === ORDER_STATUS.NEW).length;
+    const newCount = enrichedOrders.filter(o => o.kitchenStatus === ORDER_STATUS.NEW).length;
 
-    const totalCompletedToday = (slaHistory.onTimeCount || 0) + (slaHistory.delayedCount || 0);
+    const todaySla = slaHistory && slaHistory.day === dayKeyOf(nowMs) ? slaHistory : EMPTY_SLA;
+    const totalCompletedToday = (todaySla.onTimeCount || 0) + (todaySla.delayedCount || 0);
     const avgCookSeconds = totalCompletedToday > 0
-      ? Math.round((slaHistory.totalCookSeconds || 0) / totalCompletedToday)
+      ? Math.round((todaySla.totalCookSeconds || 0) / totalCompletedToday)
       : 0;
     const avgCookMins = Math.floor(avgCookSeconds / 60);
     const avgCookSecs = avgCookSeconds % 60;
 
     const slaComplianceRate = totalCompletedToday > 0
-      ? Math.round((slaHistory.onTimeCount / totalCompletedToday) * 100)
+      ? Math.round(((todaySla.onTimeCount || 0) / totalCompletedToday) * 100)
       : 100;
 
     return {
@@ -405,72 +471,179 @@ export default function KitchenMode({
       avgCookFormatted: `${avgCookMins}d ${avgCookSecs}s`,
       slaComplianceRate
     };
-  }, [enrichedOrders, slaHistory]);
+  }, [enrichedOrders, slaHistory, nowMs]);
 
   // =========================================================
   // 6. OSHPAZ HARAKATLARI (STATUS O'ZGARTIRISH VA SUB-ITEM)
   // =========================================================
-  const handleToggleSubItem = (orderId, itemIndex) => {
-    const key = `${orderId}_${itemIndex}`;
-    setCheckedSubItems(prev => ({
-      ...prev,
-      [key]: !prev[key]
+  const actorName = currentUser?.name || 'Oshpaz';
+
+  // Chekni ENG SO'NGGI holatidan o'zgartiradi (boshqa qurilmadagi o'zgarish o'chib ketmaydi).
+  // fn(order) -> { order, ... } ; natija qaytariladi (audit va xabar uchun)
+  const applyToOrder = useCallback((orderId, fn) => {
+    let result = null;
+    updateOrdersState(prev => (Array.isArray(prev) ? prev : []).map(o => {
+      if (!o || String(o.id) !== String(orderId)) return o;
+      result = fn(o);
+      return result && result.order ? result.order : o;
     }));
+    return result;
+  }, [updateOrdersState]);
+
+  const handleToggleLine = (orderId, lineId) => {
+    const key = selKey(orderId, lineId);
+    setSelected(prev => {
+      const next = { ...(prev || {}) };
+      if (next[key]) delete next[key];
+      else next[key] = true;
+      return next;
+    });
   };
 
-  const handleAdvanceOrderStatus = (order) => {
-    if (!order) return;
-    const currentStatus = order.status;
-    const nextStatus = currentStatus === ORDER_STATUS.NEW ? ORDER_STATUS.COOKING : ORDER_STATUS.READY;
-    const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const clearSelectionFor = useCallback((orderId, lineIds = null) => {
+    const prefix = `${orderId}|`;
+    setSelected(prev => {
+      const next = {};
+      let changed = false;
+      Object.keys(prev || {}).forEach(k => {
+        const drop = k.startsWith(prefix) && (!lineIds || lineIds.includes(k.slice(prefix.length)));
+        if (drop) changed = true;
+        else next[k] = prev[k];
+      });
+      return changed ? next : prev;
+    });
+  }, []);
 
-    // Agar taom 'Tayyor' bo'layotgan bo'lsa, SLA statistikasiga yozamiz
-    if (nextStatus === ORDER_STATUS.READY) {
+  // Tanlov eskirmasin: ekrandan ketgan (tayyor, rad etilgan, boshqa sex) taom tanlovdan chiqadi
+  useEffect(() => {
+    const alive = new Set();
+    enrichedOrders.forEach(o => o.displayItems.forEach(l => alive.add(selKey(o.id, l.lineId))));
+    setSelected(prev => {
+      const keys = Object.keys(prev || {});
+      if (keys.every(k => alive.has(k))) return prev;
+      const next = {};
+      keys.forEach(k => {
+        if (alive.has(k)) next[k] = true;
+      });
+      return next;
+    });
+  }, [enrichedOrders]);
+
+  const handleStartCooking = (order) => {
+    applyToOrder(order.id, o => ({ order: startCooking(o, Date.now()) }));
+    if (typeof addAuditLog === 'function') {
+      addAuditLog('Oshxona: Pishirish boshlandi', `${order.table} (${order.formattedTimer} kutdi)`);
+    }
+  };
+
+  // FAQAT berilgan taomlar tayyor bo'ladi (belgilanganlar yoki ekrandagi hammasi).
+  // Oldin har doim butun chek "Tayyor" bo'lardi: belgilanmagan taomlar ham oshxonadan yo'qolardi (B19)
+  const handleMarkReady = (order, lines) => {
+    const list = Array.isArray(lines) ? lines : [];
+    const ids = list.map(l => l.lineId);
+    if (ids.length === 0) return;
+    const now = Date.now();
+    const result = applyToOrder(order.id, o => {
+      const r = markLinesReady(o, ids, now);
+      if (r.completed && !isClosedStatus(String(r.order.status || ''))) {
+        r.order = { ...r.order, cookDurationSeconds: order.elapsedSeconds };
+      }
+      return r;
+    });
+    if (!result || result.marked === 0) {
+      notify("⚠️ Bu taomlar allaqachon tayyor yoki chek boshqa qurilmada o'zgargan");
+      return;
+    }
+    clearSelectionFor(order.id, ids);
+
+    // SLA statistikasi: chek to'liq tayyor bo'lganda bir marta
+    if (result.completed) {
       const critSec = (Number(slaConfig.criticalMinutes) || 20) * 60;
       const isDelayed = (order.elapsedSeconds || 0) >= critSec;
-
-      setSlaHistory(prev => ({
-        onTimeCount: (prev.onTimeCount || 0) + (isDelayed ? 0 : 1),
-        delayedCount: (prev.delayedCount || 0) + (isDelayed ? 1 : 0),
-        totalCookSeconds: (prev.totalCookSeconds || 0) + (order.elapsedSeconds || 0)
-      }));
-    }
-
-    updateOrdersState(prev =>
-      (Array.isArray(prev) ? prev : []).map(o => {
-        if (!o || String(o.id) !== String(order.id)) return o;
+      const today = dayKeyOf(now);
+      setSlaHistory(prev => {
+        const base = prev && prev.day === today ? prev : { ...EMPTY_SLA, day: today };
         return {
-          ...o,
-          status: nextStatus,
-          // Tayyor bo'lganda barcha porsiyalar "pishgan" deb belgilanadi
-          items: nextStatus === ORDER_STATUS.READY && Array.isArray(o.items)
-            ? o.items.map(it => (it ? { ...it, kitchenDoneQty: Number(it.quantity ?? it.qty ?? 1) || 0 } : it))
-            : o.items,
-          cookingStartedAt: nextStatus === ORDER_STATUS.COOKING ? nowTimeStr : o.cookingStartedAt,
-          readyTime: nextStatus === ORDER_STATUS.READY ? nowTimeStr : o.readyTime,
-          cookDurationSeconds: nextStatus === ORDER_STATUS.READY ? order.elapsedSeconds : o.cookDurationSeconds
+          day: today,
+          onTimeCount: (base.onTimeCount || 0) + (isDelayed ? 0 : 1),
+          delayedCount: (base.delayedCount || 0) + (isDelayed ? 1 : 0),
+          totalCookSeconds: (base.totalCookSeconds || 0) + (order.elapsedSeconds || 0)
         };
-      })
-    );
-
-    // Tayyor bo'lgan buyurtmaning "✓" belgilarini tozalash (dozakazda eski belgi qolmasin)
-    if (nextStatus === ORDER_STATUS.READY) {
-      const prefix = `${order.id}_`;
-      setCheckedSubItems(prev => {
-        const next = {};
-        Object.keys(prev || {}).forEach(k => {
-          if (!k.startsWith(prefix)) next[k] = prev[k];
-        });
-        return next;
       });
     }
 
     if (typeof addAuditLog === 'function') {
       addAuditLog(
-        nextStatus === ORDER_STATUS.COOKING ? "Oshxona: Pishirish boshlandi" : "Oshxona: Taom tayyor bo'ldi",
-        `${order.table} (${order.formattedTimer} ichida -> ${nextStatus})`
+        result.completed ? "Oshxona: Taom tayyor bo'ldi" : 'Oshxona: Taomning bir qismi tayyor',
+        `${order.table}: ${linesText(list.map(l => ({ qty: l.pending, name: l.name })))} (${order.formattedTimer} ichida)${
+          result.completed ? '' : ' • qolgani oshxonada'
+        }`
       );
     }
+  };
+
+  // Rad etish oynasidan: porsiyalar chekdan olinadi, ofitsiant va kassirga xabar boradi
+  const handleConfirmReject = ({ requests, reason, addToStopList }) => {
+    const target = rejectTarget
+      ? enrichedOrders.find(o => String(o.id) === String(rejectTarget.orderId))
+      : null;
+    setRejectTarget(null);
+    if (!target) return;
+    const now = Date.now();
+    const result = applyToOrder(target.id, o => rejectLines(o, requests, { reason, by: actorName, now }));
+    if (!result || result.rejected === 0) {
+      notify("⚠️ Rad etib bo'lmadi: taom allaqachon tayyor bo'lgan yoki chek boshqa qurilmada o'zgargan");
+      return;
+    }
+    clearSelectionFor(target.id);
+    const what = linesText(result.records);
+
+    if (addToStopList) {
+      updateMenuState(prev => (Array.isArray(prev) ? prev : []).map(m => {
+        if (!m || m.is_available === false) return m;
+        const hit = requests.some(r =>
+          (r.menuId !== undefined && r.menuId !== null && String(m.id) === String(r.menuId)) ||
+          (r.baseName && m.name === r.baseName));
+        return hit ? { ...m, is_available: false } : m;
+      }));
+    }
+
+    if (typeof addAuditLog === 'function') {
+      addAuditLog(
+        'Oshxona: taom rad etildi',
+        `${target.table}: ${what} • Sabab: ${reason}${
+          result.refundDue > 0 ? ` • To'langan chek: ${result.refundDue.toLocaleString()} so'm qaytariladi` : ''
+        }${result.cancelled ? ' • chekda taom qolmadi (bekor qilindi)' : ''}${addToStopList ? ' • stop-listga olindi' : ''}`
+      );
+    }
+    sendTelegramLines([
+      '❌ <b>OSHXONA TAOMNI RAD ETDI</b>',
+      `🪑 <b>Joy:</b> ${escapeHtml(target.table)}`,
+      `🍽 <b>Taom:</b> ${escapeHtml(what)}`,
+      `📝 <b>Sabab:</b> ${escapeHtml(reason)}`,
+      `👨‍🍳 <b>Oshpaz:</b> ${escapeHtml(actorName)}`,
+      result.refundDue > 0 ? `💸 <b>To'langan chek, qaytarish:</b> ${result.refundDue.toLocaleString()} so'm` : null,
+      result.cancelled ? '🛑 Chekda taom qolmadi: chek bekor qilindi' : null
+    ], 'security');
+    notify(`❌ ${target.table}: ${what} rad etildi. Ofitsiantga xabar ketdi.`);
+  };
+
+  // Xodim bekor qilgan, oshxonada turgan taomlar (oshpaz bekorga tayyorlamasin)
+  const kitchenCancelNotices = useMemo(
+    () => collectKitchenCancellations(safeOrders, Date.now()),
+    [safeOrders]
+  );
+
+  useEffect(() => {
+    const n = kitchenCancelNotices.length;
+    if (prevCancelCountRef.current !== null && n > prevCancelCountRef.current && slaConfig.soundEnabled) {
+      playKitchenSound('sla_breach');
+    }
+    prevCancelCountRef.current = n;
+  }, [kitchenCancelNotices.length, slaConfig.soundEnabled]);
+
+  const handleAckCancellations = (orderId) => {
+    applyToOrder(orderId, o => ({ order: ackNotices(o, 'cancellations', actorName, Date.now()) }));
   };
 
   const handleMuteOrderAlarm = (orderId) => {
@@ -670,6 +843,37 @@ export default function KitchenMode({
           ======================================================= */}
       {activeTab === 'orders' && (
         <>
+          {/* XODIM BEKOR QILGAN TAOMLAR: oshpaz bekorga tayyorlamasin */}
+          {kitchenCancelNotices.length > 0 && (
+            <div className="space-y-2" data-testid="kitchen-cancel-notices">
+              {kitchenCancelNotices.map(n => (
+                <div
+                  key={n.orderId}
+                  className="p-3 sm:p-4 rounded-2xl bg-red-600 text-white shadow-lg shadow-red-600/30 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-sm sm:text-base break-words">
+                      🚫 {n.table}: BEKOR QILINDI — {linesText(n.lines)}
+                    </p>
+                    <p className="text-xs font-bold text-red-100 break-words">
+                      {new Date(n.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {n.by ? ` • ${n.by}` : ''}
+                      {n.reasons.length > 0 ? ` • Sabab: ${n.reasons.join('; ')}` : ''}
+                      {' • tayyorlamang'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAckCancellations(n.orderId)}
+                    className="shrink-0 px-4 py-2.5 rounded-xl bg-white text-red-600 hover:bg-red-50 font-black text-sm transition active:scale-95"
+                  >
+                    ✓ Ko'rdim
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* UMUMIY QOZON HISOBI (BATCH SUMMARY) */}
           {batchSummary.length > 0 && (
             <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 dark:from-amber-900/20 dark:to-red-900/20 p-4 rounded-3xl border border-amber-200 dark:border-amber-800/50">
@@ -770,17 +974,18 @@ export default function KitchenMode({
                 const isWarning = order.slaLevel === 'warning';
                 const isMuted = mutedOrderIds.includes(String(order.id));
 
-                // Chek ichida nechta taom pishib bo'lganini hisoblash
-                const totalSubItems = order.displayItems.length;
-                const completedSubItems = order.displayItems.filter(
-                  (_, idx) => checkedSubItems[`${order.id}_${idx}`]
-                ).length;
+                const isNew = order.kitchenStatus === ORDER_STATUS.NEW;
+
+                // Oshpaz tanlagan taomlar: "Tayyor" faqat shularga tegadi (B19)
+                const selectedLines = order.displayItems.filter(l => selected[selKey(order.id, l.lineId)]);
+                const selectedPortions = selectedLines.reduce((sum, l) => sum + l.pending, 0);
+                const hiddenPending = Math.max(0, order.totalPending - order.visiblePending);
 
                 const cardBorderStyle = isCritical
                   ? 'border-red-500 dark:border-red-500 ring-4 ring-red-500/20'
                   : isWarning
                   ? 'border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/20'
-                  : order.status === ORDER_STATUS.NEW
+                  : isNew
                   ? 'border-indigo-400 dark:border-indigo-500'
                   : 'border-emerald-400 dark:border-emerald-600';
 
@@ -788,13 +993,14 @@ export default function KitchenMode({
                   ? 'bg-red-600 text-white'
                   : isWarning
                   ? 'bg-amber-500 text-white'
-                  : order.status === ORDER_STATUS.NEW
+                  : isNew
                   ? 'bg-indigo-600 text-white'
                   : 'bg-emerald-600 text-white';
 
                 return (
                   <div
                     key={order.id}
+                    data-testid="kitchen-order-card"
                     className={`bg-white dark:bg-gray-800 rounded-3xl border-2 shadow-md overflow-hidden flex flex-col justify-between transition-all ${cardBorderStyle}`}
                   >
                     <div>
@@ -815,6 +1021,11 @@ export default function KitchenMode({
                             <p className="text-xs font-bold opacity-90 mt-0.5">
                               👤 {order.waiterName || order.waiter || 'Ofitsiant'} • #{String(order.id).slice(-4)}
                             </p>
+                            {order.isPaidOrder && (
+                              <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-white/90 text-emerald-700 text-[10px] font-black uppercase">
+                                💳 To'langan: tayyor bo'lgach kassaga xabar boradi
+                              </span>
+                            )}
                           </div>
 
                           {/* KATTA JONLI SLA SEKUNDOMERI */}
@@ -862,90 +1073,138 @@ export default function KitchenMode({
                         </div>
                       )}
 
-                      {/* TAOMLAR RO'YXATI (USTIGA BOSIB ✅ BELGILASH MUMKIN) */}
+                      {/* TAOMLAR RO'YXATI: bosib tanlang -> "Tanlanganlar tayyor" yoki "Rad etish" */}
                       <div className="p-4 space-y-2.5">
-                        <div className="flex justify-between items-center text-[11px] font-black text-gray-400 uppercase">
-                          <span>Taomlar (Bosib belgilang)</span>
-                          <span>Tayyor: {completedSubItems}/{totalSubItems}</span>
+                        <div className="flex justify-between items-center gap-2 text-[11px] font-black text-gray-400 uppercase">
+                          <span>Taomlar (bosib tanlang)</span>
+                          <span className={selectedLines.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}>
+                            {selectedLines.length > 0
+                              ? `Tanlandi: ${selectedLines.length}/${order.displayItems.length}`
+                              : `${order.visiblePending} pors`}
+                          </span>
                         </div>
 
                         <div className="space-y-2">
-                          {order.displayItems.map((item, idx) => {
-                            const subKey = `${order.id}_${idx}`;
-                            const isSubDone = Boolean(checkedSubItems[subKey]);
-                            const qty = Number(item.quantity ?? item.qty ?? 1) || 1;
-
+                          {order.displayItems.map(item => {
+                            const isPicked = Boolean(selected[selKey(order.id, item.lineId)]);
                             return (
-                              <div
-                                key={item.cartItemId || idx}
-                                onClick={() => handleToggleSubItem(order.id, idx)}
-                                className={`p-3 rounded-2xl border cursor-pointer transition select-none flex justify-between items-start gap-3 ${
-                                  isSubDone
-                                    ? 'bg-emerald-50/70 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 opacity-65'
+                              <button
+                                type="button"
+                                key={item.lineId}
+                                data-testid="kitchen-line"
+                                aria-pressed={isPicked}
+                                onClick={() => handleToggleLine(order.id, item.lineId)}
+                                className={`w-full text-left p-3 rounded-2xl border cursor-pointer transition select-none flex justify-between items-start gap-3 ${
+                                  isPicked
+                                    ? 'bg-emerald-50 dark:bg-emerald-900/25 border-emerald-400 dark:border-emerald-600 ring-2 ring-emerald-400/30'
                                     : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200/80 dark:border-gray-700 hover:border-amber-400'
                                 }`}
                               >
-                                <div className="flex items-start gap-2.5 min-w-0">
+                                <span className="flex items-start gap-2.5 min-w-0">
                                   <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black shrink-0 mt-0.5 ${
-                                    isSubDone
+                                    isPicked
                                       ? 'bg-emerald-500 text-white'
                                       : 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-transparent'
                                   }`}>
                                     ✓
                                   </span>
-                                  <div className="min-w-0">
-                                    <p className={`font-black text-sm sm:text-base leading-snug ${
-                                      isSubDone
-                                        ? 'line-through text-gray-400 dark:text-gray-500'
-                                        : 'text-gray-900 dark:text-white'
-                                    }`}>
+                                  <span className="min-w-0">
+                                    <span className="block font-black text-sm sm:text-base leading-snug text-gray-900 dark:text-white break-words">
                                       {item.name}
-                                    </p>
-
+                                    </span>
+                                    {item.isAddition && (
+                                      <span className="inline-block mt-1 mr-1 px-2 py-0.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase">
+                                        🆕 Qo'shimcha
+                                      </span>
+                                    )}
                                     {/* Mijoz yoki Ofitsiant izohi */}
                                     {item.note && (
-                                      <span className="inline-block mt-1 px-2.5 py-0.5 rounded-lg bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-xs font-black">
+                                      <span className="inline-block mt-1 px-2.5 py-0.5 rounded-lg bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-xs font-black break-words">
                                         ⚠️ Izoh: {item.note}
                                       </span>
                                     )}
-                                  </div>
-                                </div>
+                                  </span>
+                                </span>
 
                                 <span className={`px-3 py-1 rounded-xl font-black text-sm shrink-0 ${
-                                  isSubDone
-                                    ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200'
+                                  isPicked
+                                    ? 'bg-emerald-500 text-white'
                                     : 'bg-amber-500 text-white shadow-xs'
                                 }`}>
-                                  x{qty}
+                                  x{item.pending}
                                 </span>
-                              </div>
+                              </button>
                             );
                           })}
                         </div>
+
+                        {/* Shu bosqichda tayyor bo'lganlar (ofitsiantga ketgan) */}
+                        {order.readyNow.length > 0 && (
+                          <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl px-3 py-2 break-words">
+                            ✅ Tayyor (ofitsiantga ketdi): {linesText(order.readyNow)}
+                          </p>
+                        )}
+                        {hiddenPending > 0 && (
+                          <p className="text-[11px] font-bold text-gray-400">
+                            👨‍🍳 Boshqa sexda yana {hiddenPending} porsiya bor
+                          </p>
+                        )}
                       </div>
                     </div>
 
-                    {/* PASTKI HARAKAT TUGMASI */}
-                    <div className="p-4 pt-0">
-                      <button
-                        type="button"
-                        onClick={() => handleAdvanceOrderStatus(order)}
-                        className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider text-white shadow-lg transition active:scale-95 flex items-center justify-center gap-2 ${
-                          order.status === ORDER_STATUS.NEW
-                            ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30'
-                            : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30'
-                        }`}
-                      >
-                        {order.status === ORDER_STATUS.NEW ? (
-                          <>
-                            <span>🔥</span> Pishirishni Boshlash
-                          </>
-                        ) : (
-                          <>
-                            <span>✅</span> Taom Tayyor (Ofitsiantni chaqirish)
-                          </>
-                        )}
-                      </button>
+                    {/* PASTKI HARAKAT TUGMALARI */}
+                    <div className="p-4 pt-0 space-y-2">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          data-testid="kitchen-reject-button"
+                          onClick={() => setRejectTarget({
+                            orderId: order.id,
+                            preselectedIds: selectedLines.map(l => l.lineId)
+                          })}
+                          className="shrink-0 px-4 py-3 min-h-[56px] rounded-2xl bg-red-50 dark:bg-red-900/25 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-300 border border-red-200 dark:border-red-800 font-black text-xs sm:text-sm transition active:scale-95"
+                          title="Taomni yoki butun chekni rad etish (sabab bilan)"
+                        >
+                          ❌ Rad etish
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="kitchen-primary-button"
+                          onClick={() => {
+                            if (selectedLines.length > 0) handleMarkReady(order, selectedLines);
+                            else if (isNew) handleStartCooking(order);
+                            else handleMarkReady(order, order.displayItems);
+                          }}
+                          className={`flex-1 min-w-0 py-3 px-3 min-h-[56px] rounded-2xl font-black text-sm text-white text-center leading-tight shadow-lg transition active:scale-95 flex items-center justify-center gap-2 ${
+                            selectedLines.length === 0 && isNew
+                              ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30'
+                              : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30'
+                          }`}
+                        >
+                          {selectedLines.length > 0 ? (
+                            <span>✅ Tanlanganlar tayyor ({selectedPortions} pors)</span>
+                          ) : isNew ? (
+                            <span>🔥 Pishirishni boshlash</span>
+                          ) : (
+                            <span>
+                              ✅ {hiddenPending > 0 ? 'Shu sexdagilar' : 'Hammasi'} tayyor ({order.visiblePending} pors)
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                      {selectedLines.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => clearSelectionFor(order.id)}
+                          className="w-full text-[11px] font-black text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        >
+                          Tanlovni tozalash
+                        </button>
+                      ) : (
+                        <p className="text-[10px] font-bold text-gray-400 text-center">
+                          Bir nechta taom tayyor bo'lsa, ularni bosib tanlang: faqat tanlanganlar ofitsiantga ketadi
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
@@ -1027,6 +1286,20 @@ export default function KitchenMode({
           </div>
         </div>
       )}
+
+      {rejectTarget && (() => {
+        const target = enrichedOrders.find(o => String(o.id) === String(rejectTarget.orderId));
+        if (!target) return null;
+        return (
+          <KitchenRejectModal
+            key={String(target.id)}
+            order={target}
+            preselectedIds={rejectTarget.preselectedIds}
+            onCancel={() => setRejectTarget(null)}
+            onConfirm={handleConfirmReject}
+          />
+        );
+      })()}
 
       {/* =======================================================
           MODAL: SLA TAYMER VA SIGNALIZATSIYA SOZLAMALARI

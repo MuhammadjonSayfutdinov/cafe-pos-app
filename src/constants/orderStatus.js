@@ -12,7 +12,10 @@ export const ORDER_STATUS = Object.freeze({
   DELIVERED: 'Yetkazildi',
   PAID: "To'langan",
   DEBT: 'Qarz',
-  ARCHIVED: 'Arxiv'
+  ARCHIVED: 'Arxiv',
+  // Butun chek bekor qilindi (oshxona hamma taomni rad etdi yoki xodim chekni bekor qildi).
+  // Yozuv o'chirilmaydi: oshxona va rahbar nima bekor bo'lganini ko'radi, statistika hisoblamaydi.
+  CANCELLED: 'Bekor qilindi'
 });
 
 export const ORDER_STATUS_LABEL = Object.freeze({
@@ -22,14 +25,16 @@ export const ORDER_STATUS_LABEL = Object.freeze({
   [ORDER_STATUS.DELIVERED]: 'Yetkazildi',
   [ORDER_STATUS.PAID]: "To'langan",
   [ORDER_STATUS.DEBT]: 'Qarz',
-  [ORDER_STATUS.ARCHIVED]: 'Arxiv'
+  [ORDER_STATUS.ARCHIVED]: 'Arxiv',
+  [ORDER_STATUS.CANCELLED]: 'Bekor qilindi'
 });
 
 /** Yopilgan buyurtmalar: stol bo'shaydi, oshxona va kassada ko'rinmaydi */
 export const CLOSED_ORDER_STATUSES = Object.freeze([
   ORDER_STATUS.PAID,
   ORDER_STATUS.DEBT,
-  ORDER_STATUS.ARCHIVED
+  ORDER_STATUS.ARCHIVED,
+  ORDER_STATUS.CANCELLED
 ]);
 
 /** Oshxona hali ishlayotgan statuslar */

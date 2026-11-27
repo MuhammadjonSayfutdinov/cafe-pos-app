@@ -8,7 +8,8 @@
     "typecheck": "tsc -p . && tsc -p server",
     "build": "tsc -p . && tsc -p server && vite build",
     "preview": "vite preview",
-    "hub": "node server/hub.mjs"
+    "hub": "node server/hub.mjs",
+    "test:kitchen": "node scripts/test-kitchen-flow.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

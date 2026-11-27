@@ -365,10 +365,10 @@ export default function AdminSettingsTab({
   const handleClearOrdersOnly = () => {
     const performClear = async () => {
       // Ochiq cheklar va qarzlar saqlanadi: faqat yopilgan (to'langan/arxiv) cheklar o'chiriladi
-      if (await confirmAsync("⚠️ To'langan va arxivdagi cheklar tarixi o'chiriladi. Ochiq cheklar va qarzlar saqlanadi. Tasdiqlaysizmi?")) {
+      if (await confirmAsync("⚠️ To'langan, arxivdagi va bekor qilingan cheklar tarixi o'chiriladi. Ochiq cheklar va qarzlar saqlanadi. Tasdiqlaysizmi?")) {
         if (typeof setOrders === 'function') {
           setOrders(prev => (Array.isArray(prev) ? prev : []).filter(
-            o => o && ![ORDER_STATUS.PAID, ORDER_STATUS.ARCHIVED].includes(o.status)
+            o => o && ![ORDER_STATUS.PAID, ORDER_STATUS.ARCHIVED, ORDER_STATUS.CANCELLED].includes(o.status)
           ));
         }
         if (typeof addAuditLog === 'function') {

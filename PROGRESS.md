@@ -43,6 +43,13 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 
 ## Joriy vazifa
 
+**Oshxona va buyurtma oqimi (7-bosqich, foydalanuvchi so'rovi, 2026-11-27):** oshpaz bir nechta taomni
+belgilab "Tayyor" bossa butun chek tayyor bo'lib ketardi (B19) - tuzatildi; oshxonaga "Rad etish" oynasi
+qo'shildi (B22); shunga o'xshash xatolar (B20-B33) tuzatildi. Reja va qolgan qadamlar: pastda
+"7-bosqich". Foydalanuvchi `supabase/qr.sql` ni Supabase'da yana bir marta ishga tushirishi kerak
+(bekor qilingan chekning stoli telefon QR uchun ham bo'shaydi). Navbatdagi ish: 7-bosqichning qolgan
+qadamlari yoki 6-bosqich (foydalanuvchi tanlaydi).
+
 **Kafe POS 2.0 (foydalanuvchi qarori, 2026-11-27):** foydalanuvchi "boshla" dedi. Reja va bosqichlar
 pastda: "6-bosqich. Kafe POS 2.0". Admin uchun ikki bosqichli kirish (PIN + Authenticator) tayyor.
 Navbatdagi ish: 1-qadamning qolgan qismi (yorug' rejim, chap menyu, buyurtma turi, promo-kod), keyin
@@ -82,6 +89,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 3 Sana va qarz (B4, B7, B8) | `AdminDashboard.jsx` (~52), `WaiterMode.jsx` (~688), `CashierMode.jsx`: `handlePaymentSubmit` (766), `handlePayOffDebt` (983) |
 | 4 Xavfsizlik (B5, B6) | `LockScreen.jsx`, `ManagerOverrideModal.jsx`, `AdminSettingsTab.jsx`: `handleExportBackup` (254), `handleImportBackup` (284), `handleClearOrdersOnly` (318) |
 | 5 Dozakaz va bo'lish (B3, B9) | `App.jsx`: `handleOrderSubmit`, `handleUpdateStatus` (366), `handleSplitOrder`. `KitchenMode.jsx`, `WaiterTableGrid.jsx` |
+| 7 Oshxona oqimi (B19-B33) | Mantiq: `src/utils/kitchenFlow.ts` (tekshiruv: `npm run test:kitchen`). Ekran: `KitchenMode.jsx`, `KitchenRejectModal.jsx`, `KitchenNoticesPanel.jsx`. Ofitsiant: `WaiterMode.jsx` (`applyToCurrentOrder`, `handleSubmitOrder`, `handleMarkAsDelivered`, `handleConfirmSplit`), `WaiterCart.jsx`, `WaiterTableGrid.jsx`. Kassa: `CashierMode.jsx` (`handlePaymentSubmit`, `handleDeleteOrder`) |
 
 ## Ma'lum xatolar
 
@@ -105,6 +113,21 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | B16 | Chek to'langach taom mijoz "Buyurtmalarim" da sariq "tayyorlanmoqda" bo'lib qolardi: telefon chek holatini bilmasdi; mijoz ekranida ro'yxat bo'shasa lokal nusxa qayta chiqardi | `CustomerQRView.jsx`, `PublicQrApp.jsx`, `App.jsx` (`handleQrRequest`), `qr.sql` (`qr_request_status`) | pilot | [x] |
 | B17 | Mijoz ekranida (kirish oynasi → "Mijoz uchun QR-Menyu") band stolni tanlab, boshqa mijozning chekiga buyurtma berish mumkin edi | `LockScreen.jsx`, `App.jsx` | pilot | [x] |
 | B18 | QR havolani qo'lda yozib (stolda o'tirmasdan, uzoqdan) istalgan stolga buyurtma va chaqiruv yuborish mumkin edi | `qr.sql` (`qr_access`), `src/qr/tableKey.js`, `QrSecuritySection.jsx`, `PublicQrApp.jsx` | pilot | [x] |
+| B19 | Oshpaz chekdagi bir nechta taomni belgilab "Tayyor" bossa, chekdagi HAMMA taom tayyor bo'lib ketardi (belgilanmaganlari ham oshxonadan yo'qolardi) | `KitchenMode.jsx` (`handleAdvanceOrderStatus`) | 7 | [x] |
+| B20 | Oshxonadagi belgilar ekrandagi tartib raqami bo'yicha va faqat shu qurilmada saqlanardi: sex filtri yoki dozakazdan keyin boshqa taom belgilangan bo'lib qolardi, ikkinchi oshxona ekrani ko'rmasdi | `KitchenMode.jsx` (`checkedSubItems`) | 7 | [x] |
+| B21 | Sex (kategoriya) filtrida "Tayyor" bosilsa, boshqa sexning taomlari ham tayyor bo'lib ketardi | `KitchenMode.jsx` | 7 | [x] |
+| B22 | Oshxonada taomni yoki chekni rad etish (otkaz) imkoni yo'q edi: mahsulot tugasa ofitsiantga og'zaki aytilib, chekdan admin PIN bilan olinardi | yangi: `KitchenRejectModal.jsx`, `KitchenNoticesPanel.jsx`, `kitchenFlow.ts` | 7 | [x] |
+| B23 | Ofitsiant savatchasi chekni eski nusxadan butunlay qayta yozardi: oshxona "tayyor" belgilari nolga tushib eski taomlar oshxonaga qayta chiqardi, boshqa qurilmada qo'shilgan taom (QR-buyurtma) o'chardi, rad etilgan taom chekka qaytardi; chek boshqa qurilmada yopilsa, eski taomlar yangi chek bo'lib ochilardi | `WaiterMode.jsx` (`handleSubmitOrder`, `syncOrderInDatabase`) | 7 | [x] |
+| B24 | Chekning bir qismi tayyor bo'lganini ofitsiant bilmasdi (signal faqat butun chek tayyor bo'lganda), "Yetkazildi" esa butun chekni yopardi | `WaiterMode.jsx`, `WaiterCart.jsx`, `WaiterTableGrid.jsx` | 7 | [x] |
+| B25 | Kassada to'langan, lekin oshxona hali tayyorlayotgan chek ("Olib ketish"da oldindan to'lov) oshxona ekranidan darhol yo'qolardi: taom tayyorlanmay qolardi | `CashierMode.jsx`, `KitchenMode.jsx` | 7 | [x] |
+| B26 | Chek yoki oshxonadagi taom bekor qilinsa (ofitsiant PIN bilan, kassa "o'chirish"), oshxonaga xabar bormasdi va chek jim o'chirilardi: oshpaz bekorga tayyorlardi | `WaiterMode.jsx`, `CashierMode.jsx`, `KitchenMode.jsx` | 7 | [x] |
+| B27 | Oshxonadagi chekka dozakaz tushsa ovoz chiqmasdi va qaysi taom yangi qo'shilgani ko'rinmasdi | `KitchenMode.jsx` | 7 | [x] |
+| B28 | Oshxonaning "Bugun: N ta chek" SLA hisobi hech qachon nolga tushmasdi (butun vaqt yig'indisi) | `KitchenMode.jsx` | 7 | [x] |
+| B29 | Ofitsiant menyusidan qo'shilgan taom chek qatoriga taom rasmlari va tavsifini ko'chirardi (har qator 5-50 KB): qurilma xotirasi va bulut sinxroni tez to'lardi | `WaiterMode.jsx` (`handleAddToCart`) | 7 | [x] |
+| B30 | Bir stolda ikki ochiq chek paydo bo'lishi mumkin edi (shu orada boshqa qurilma chek ochganda yangi chek yuborish yoki stolni ko'chirish), biri ekranlarda ko'rinmay qolardi; chekni bo'lish ro'yxat tartibi bo'yicha va eski nusxadan edi | `WaiterMode.jsx` (`handleSubmitOrder`, `handleConfirmTransfer`, `handleConfirmSplit`), `WaiterActionModals.jsx` | 7 | [x] |
+| B31 | Admin bosh sahifasidagi "Hozir zalda faol" smena yopilgach arxivdagi cheklarni ham sanardi (stollar soni va summa noto'g'ri) | `AdminDashboard.jsx` | 7 | [x] |
+| B32 | Ofitsiant menyusida bitta porsiyali taomning savatchadagi soni ikki barobar ("✓ 2 ta") ko'rinardi | `WaiterMenu.jsx` | 7 | [x] |
+| B33 | Ofitsiant savatchasida xizmat haqi joriy sozlamadan hisoblanardi (chekda saqlangan foiz emas): sozlama o'zgarsa ofitsiant va kassa jami summasi farq qilardi | `WaiterMode.jsx` -> `WaiterCart.jsx` | 7 | [x] |
 
 ## Bosqichlar
 
@@ -153,6 +176,37 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 - [x] Xodim qo'shishda lavozim nomi qo'lda yoziladi (`user.title`), rollar bitta joyda (`src/constants/roles.js`)
 - [x] Stollar uchun QR stikerlar: A4 varaq (3 o'lcham, stollarni tanlash, nusxa soni), QR kod qurilmada chiziladi
   (`QrStickerSheet.jsx`, `src/qr/qrEncode.js`, `src/qr/tableQrUrl.js`); ofitsiantning bitta stol QR oynasi ham shunga o'tdi
+
+### 7-bosqich. Oshxona va buyurtma oqimi (foydalanuvchi so'rovi, 2026-11-27)
+Manba: foydalanuvchi xabari (oshxonada belgilanganlar emas, hamma taom tayyor bo'lib ketadi; oshxona uchun
+rad etish oynasi) va namunalar (RestroBit POS, iiko, Dribbble POS). Tamoyil: holat BUTUN CHEK emas, TAOM
+(chek qatori) darajasida; chek har doim eng so'nggi holatidan o'zgartiriladi; hech narsa jim o'chmaydi.
+1. Oshxona to'g'ri ishlashi (bajarildi)
+   - [x] Faqat belgilangan taomlar "tayyor" (B19, B21), belgilar qator kaliti bo'yicha (B20), chek statusi
+     taomlardan hisoblanadi (`kitchenFlow.ts`: `markLinesReady`, `deriveStatus`); `npm run test:kitchen`
+   - [x] "❌ Rad etish" oynasi: taom va porsiya soni, sabab (masalliq tugadi, taom qolmadi, uskuna, uzoq
+     kutiladi, noto'g'ri buyurtma, boshqa + izoh), ixtiyoriy stop-list; audit va Telegram (B22)
+   - [x] Dozakaz ovozi va "🆕 Qo'shimcha" belgisi (B27), kunlik SLA hisobi (B28)
+2. Ofitsiant va kassa (bajarildi)
+   - [x] Savatcha chekni eski nusxadan yozmaydi (B23): `applyWaiterCart`, `rebaseCart`, `reduceLine`
+   - [x] Qisman tayyor: stol kartasida "🔔 N tayyor", savatchada "Oshxonada / Tayyor / Berildi",
+     "✅ Mijozga berildi (N porsiya)" (B24)
+   - [x] Ofitsiant/kassa/admin ekranida oshxona xabarlari: rad etilgan taom (chek to'langan bo'lsa qaytariladigan
+     pul bilan), oldindan to'langan chek tayyor (B22, B25). Oshxonada "🚫 Bekor qilindi" xabari (B26)
+   - [x] To'langan, lekin tayyorlanmagan chek oshxonada qoladi (B25); bekor qilingan chek o'chirilmaydi,
+     "Bekor qilindi" statusi (B26); bir stolda ikki ochiq chek bo'lmaydi (B30)
+   - [x] Rasm chekka ko'chmaydi (B29), admin bosh sahifasi (B31), menyu soni (B32), xizmat haqi (B33)
+3. Keyingi qadamlar (foydalanuvchi tanlaydi)
+   - [ ] Mijoz telefonida (QR) rad etilgan taomni alohida ko'rsatish: `qr_request_status` chek qatorlarini
+     ham qaytarsin (`supabase/qr.sql`, `PublicQrApp.jsx`; SQL ni qayta ishga tushirish kerak)
+   - [ ] Statistika: "Rad etilgan va bekor qilingan taomlar" hisoboti (sabab, oshpaz, ofitsiant, summa) va
+     Telegramga kunlik xulosa
+   - [ ] Ikki qurilma bir chekni bir soniyada o'zgartirsa, hozir oxirgi yozuv g'olib (yozuv darajasida):
+     oshxona belgilari alohida yozuvga (`pos_kds_marks`) yoki serverda birlashtirish
+   - [ ] Har taom uchun alohida taymer (dozakaz o'z vaqtidan), sex ekranlari (bar, issiq sex), KOT chop etish
+   - [ ] To'langan chekdan rad etilgan taom: kassada "Qaytarish" amali (pul va ombor yozuvi bilan)
+   - [ ] "Olib ketish" uchun ofitsiant ekranida bir vaqtda bir nechta ochiq chek
+   - [ ] Vitest (yangi kutubxona: ruxsat kerak); hozircha `scripts/test-kitchen-flow.mjs` (kutubxonasiz)
 
 ### 6-bosqich. Kafe POS 2.0 (foydalanuvchi qarori, 2026-11-27)
 Manba: foydalanuvchi bilan kelishilgan taklif (Dribbble'dagi RestroBit POS tahlili + uch eshik).
@@ -210,6 +264,10 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 |--------|-------|-------|
 | Ombor qachon ayiriladi | To'lovda (`CashierMode.deductOrderIngredientsFromStock`). Sabab: ofitsiant buyurtmasi `App.jsx` dan o'tmaydi, kassadagi kod birlik va porsiyani hisoblaydi, bekor qilingan chekni qaytarish shart emas | qabul qilindi |
 | Taom statusi | Taomda `kitchenDoneQty`; dozakazda oshxona faqat qolgan porsiyani ko'radi | qabul qilindi |
+| Oshxona holati taom darajasida (7-bosqich) | Qatorda `kitchenDoneQty` (oshxona tayyor degan), `servedQty` (mijozga berilgan), `kitchenSentAt`, `kitchenReadyAt`; eski yozuvda yo'q bo'lsa statusdan taxmin qilinadi va birinchi yozishda qotiriladi. Ochiq chek statusi qatorlardan: oshxonada porsiya bor - 'Yangi'/'Tayyorlanmoqda', hammasi tayyor - 'Tayyor', hammasi berilgan - 'Yetkazildi'. Chekni faqat `src/utils/kitchenFlow.ts` funksiyalari bilan va `setOrders(prev => ...)` ichida (eng so'nggi holatdan) o'zgartirish. Oshpazning tanlovi faqat shu qurilmada (`pos_kds_selected`), holat chekka yoziladi | qabul qilindi |
+| Oshxona rad etishi (otkaz) | Faqat hali tayyor bo'lmagan porsiya. Rad etilgan porsiya qatordan ayiriladi (summa, ombor, statistika o'zgarishsiz to'g'ri), yozuv `order.kitchenRejections` da (sabab, oshpaz, vaqt, ko'rildi). PIN so'ralmaydi (oshpaz tez ishlashi kerak), lekin audit + Telegram (xavfsizlik). Chekda taom qolmasa - 'Bekor qilindi'. To'langan chekda summa o'zgarmaydi, `refundDue` (qaytariladigan pul) xabarda chiqadi | qabul qilindi |
+| Bekor qilingan chek | Yangi status 'Bekor qilindi' (`ORDER_STATUS.CANCELLED`, yopilganlar ro'yxatida): ofitsiantning "Chekni o'chirish", oxirgi taomni o'chirish va kassadagi "bekor qilish" endi chekni O'CHIRMAYDI. Oshxonada turgan porsiyalar `order.kitchenCancellations` ga yoziladi (oshxonada qizil xabar). Statistika hisoblamaydi, "Cheklar tarixini tozalash" o'chiradi. `qr.sql`: stol bo'sh hisoblanadi, telefonda "❌ Bekor qilindi" ko'rinadi | qabul qilindi |
+| Oldindan to'langan chek | Kassa oshxonadagi chekni to'lasa ogohlantiradi, chek `kitchenOpen: true` bilan oshxonada qoladi (24 soatgacha). Tayyor bo'lgach `readyNotice` - ofitsiant/kassa/admin ekranida "🔔 buyurtma tayyor, mijozga bering" | qabul qilindi |
 | Backend | Supabase (pilot). Haqiqiy ishga o'tishda shaxsiy ma'lumotlar qonuni sababli mahalliy serverga ko'chish (`supabaseTransport.js` almashtiriladi) | qabul qilindi |
 | Id lar | `src/utils/ids.ts` (`newId`): bir nechta qurilmada `Date.now()` to'qnashardi | qabul qilindi |
 | Telegram jonli jurnali | Har bir audit yozuvi Telegramga boradi (`src/utils/telegramFeed.js`, `useSticky` orqali). Faqat amal bajarilgan qurilma yuboradi (bulutdan kelgan yozuv yuborilmaydi), amallar 2,5 soniyada bitta xabarga yig'iladi, oflayn navbat qurilmada saqlanadi | qabul qilindi |
@@ -257,6 +315,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | 19 | PIN xeshi, xavfsizlik sarlavhalari, sekin/oflayn internet, TypeScript boshlandi | "xavfsizlik: PIN xeshi..." commiti | [x] |
 | 20 | Kafe mahalliy serveri (internetsiz ishlash) | "4: kafe mahalliy serveri..." commiti | [x] |
 | 21 | Admin uchun ikki bosqichli kirish: PIN + Authenticator (6-bosqich, 2-qadam) | "6: admin uchun ikki bosqichli kirish..." commiti | [x] |
+| 22 | Oshxona: faqat belgilangan taom tayyor, rad etish oynasi, taom darajasidagi holat va o'xshash xatolar (B19-B33) | "7: oshxona - taom darajasida tayyor, rad etish..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

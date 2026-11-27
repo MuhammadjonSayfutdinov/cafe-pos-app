@@ -1,6 +1,7 @@
 import React from 'react';
 import PrintReceiptModal from './PrintReceiptModal';
 import { TableQrModal } from './Modals';
+import { lineIdOf } from '../utils/kitchenFlow';
 
 export default function WaiterActionModals({
   // 1. Admin PIN Security Modal props
@@ -109,7 +110,7 @@ export default function WaiterActionModals({
               </div>
 
               <div className="bg-amber-50 dark:bg-gray-900/70 p-2.5 rounded-xl border border-amber-200 dark:border-gray-700 text-[11px] font-bold text-amber-800 dark:text-amber-300">
-                ℹ️ Tasdiqlangach, taom darhol <b>Oshxona</b> va <b>Kassa</b> ekranlaridan o'chiriladi hamda <b>Audit Tarixga</b> yoziladi.
+                ℹ️ Tasdiqlangach, taom darhol chekdan olinadi (<b>Kassa</b> ham ko'radi), hali tayyorlanayotgan bo'lsa <b>Oshxonaga</b> "bekor qilindi" xabari boradi va <b>Audit Tarixga</b> yoziladi.
               </div>
 
               <div className="flex gap-2.5 pt-1">
@@ -214,11 +215,14 @@ export default function WaiterActionModals({
 
               <div className="space-y-2">
                 {(splitOrder.items || []).map((it, idx) => {
+                  if (!it) return null;
+                  // Qator kaliti (tartib raqami emas): oyna ochiq turganda chek o'zgarsa ham to'g'ri taom
+                  const lineId = lineIdOf(it, idx, splitOrder.id);
                   const maxQ = Number(it.quantity ?? it.qty ?? 1) || 1;
-                  const chosenQ = Number(splitQuantities[idx]) || 0;
+                  const chosenQ = Number(splitQuantities[lineId]) || 0;
                   return (
                     <div
-                      key={idx}
+                      key={lineId}
                       className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 flex justify-between items-center"
                     >
                       <div>
@@ -231,7 +235,7 @@ export default function WaiterActionModals({
                           onClick={() =>
                             setSplitQuantities(prev => ({
                               ...prev,
-                              [idx]: Math.max(0, chosenQ - 1)
+                              [lineId]: Math.max(0, chosenQ - 1)
                             }))
                           }
                           className="w-7 h-7 rounded-lg bg-gray-200 dark:bg-gray-700 font-black text-gray-800 dark:text-white"
@@ -246,7 +250,7 @@ export default function WaiterActionModals({
                           onClick={() =>
                             setSplitQuantities(prev => ({
                               ...prev,
-                              [idx]: Math.min(maxQ, chosenQ + 1)
+                              [lineId]: Math.min(maxQ, chosenQ + 1)
                             }))
                           }
                           className="w-7 h-7 rounded-lg bg-brand-600 text-white font-black"
