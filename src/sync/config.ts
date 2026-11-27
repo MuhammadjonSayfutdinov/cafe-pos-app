@@ -30,7 +30,9 @@ export const KV_KEYS: readonly string[] = Object.freeze([
   'pos_service_fee',
   'pos_tables',
   'pos_categories',
-  'pos_override_enabled',
+  'pos_override_enabled', // eski umumiy PIN himoyasi tugmasi (eski versiyadagi qurilmalar uchun)
+  'pos_pin_rules', // PIN himoyasi har amal uchun alohida (src/utils/pinRules.ts)
+  'pos_owner', // Ega (kafe egasi): { id, at, by } (src/utils/adminRights.ts)
   'pos_telegram_config',
   'pos_reservations',
   'pos_table_timers',

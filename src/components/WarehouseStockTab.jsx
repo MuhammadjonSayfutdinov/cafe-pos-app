@@ -111,6 +111,8 @@ export default function WarehouseStockTab({
   setInventory, 
   setInventoryLogs, 
   currentUser,
+  // Rahbar tasdig'i (Admin -> PIN himoyasi: "Ombor" bo'limi)
+  requireAdminOverride,
   addAuditLog,
   displayUnitMode = 'all'
 }) {
@@ -299,14 +301,21 @@ export default function WarehouseStockTab({
     setIsItemModalOpen(false);
   };
 
-  const handleDeleteInventory = async (id, name) => {
-    if (await confirmAsync(`Rostdan ham "${name}" mahsulotini ombordan butunlay o'chirilsinmi?`)) {
-      if (typeof setInventory === 'function') {
-        setInventory(prev => prev.filter(i => i.id !== id));
+  const handleDeleteInventory = (id, name) => {
+    const performDelete = async () => {
+      if (await confirmAsync(`Rostdan ham "${name}" mahsulotini ombordan butunlay o'chirilsinmi?`)) {
+        if (typeof setInventory === 'function') {
+          setInventory(prev => prev.filter(i => i.id !== id));
+        }
+        if (typeof addAuditLog === 'function') {
+          addAuditLog("Ombordan mahsulot o'chirildi", `"${name}" ombor ro'yxatidan o'chirildi`);
+        }
       }
-      if (typeof addAuditLog === 'function') {
-        addAuditLog("Ombordan mahsulot o'chirildi", `"${name}" ombor ro'yxatidan o'chirildi`);
-      }
+    };
+    if (typeof requireAdminOverride === 'function') {
+      requireAdminOverride(`"${name}" mahsulotini ombordan o'chirish`, performDelete, 'warehouseDeleteItem');
+    } else {
+      performDelete();
     }
   };
 
@@ -390,61 +399,81 @@ export default function WarehouseStockTab({
       diffInBase = Number((newQtyInBase - currentStockQty).toFixed(6));
     }
 
-    if (typeof setInventory === 'function') {
-      setInventory(prev => prev.map(i => 
-        i.id === selectedStockItem.id 
-          ? { 
-              ...i, 
-              quantity: newQtyInBase, 
-              qty: newQtyInBase,
-              costPrice: nextCostPriceInBase,
-              lastUpdated: new Date().toLocaleString() 
-            } 
-          : i
-      ));
-    }
+    // Kiritilgan qiymatlar shu paytdagisi bilan olinadi (PIN oynasi ochiq turganda forma o'zgarsa ham)
+    const stockItem = selectedStockItem;
+    const opType = updateType;
+    const opNote = updateNote;
+    const opInputUnit = updateInputUnit;
 
-    if (typeof setInventoryLogs === 'function' && diffInBase !== 0) {
-      const enteredLabel = updateInputUnit !== itemBaseUnit 
-        ? ` (Kiritildi: ${rawEnteredAmount} ${updateInputUnit})` 
-        : '';
-      const priceLabel = updateType === 'kirim' && nextCostPriceInBase > 0
-        ? ` • Xarid narxi: ${nextCostPriceInBase.toLocaleString()} s/${itemBaseUnit}`
-        : '';
+    const applyUpdate = () => {
+      if (typeof setInventory === 'function') {
+        setInventory(prev => prev.map(i => 
+          i.id === stockItem.id 
+            ? { 
+                ...i, 
+                quantity: newQtyInBase, 
+                qty: newQtyInBase,
+                costPrice: nextCostPriceInBase,
+                lastUpdated: new Date().toLocaleString() 
+              } 
+            : i
+        ));
+      }
 
-      const logTypeLabel = 
-        updateType === 'kirim' ? 'Kirim' : 
-        updateType === 'chiqim' ? 'Chiqim' : 'Reviziya';
+      if (typeof setInventoryLogs === 'function' && diffInBase !== 0) {
+        const enteredLabel = opInputUnit !== itemBaseUnit 
+          ? ` (Kiritildi: ${rawEnteredAmount} ${opInputUnit})` 
+          : '';
+        const priceLabel = opType === 'kirim' && nextCostPriceInBase > 0
+          ? ` • Xarid narxi: ${nextCostPriceInBase.toLocaleString()} s/${itemBaseUnit}`
+          : '';
 
-      const defaultNote = 
-        updateType === 'kirim' ? `Ombor kirimi${enteredLabel}${priceLabel}` : 
-        updateType === 'chiqim' ? `Ombor chiqimi / Spisaniya${enteredLabel}` : 
-        `Qoldiq reviziya qilindi${enteredLabel}`;
+        const logTypeLabel = 
+          opType === 'kirim' ? 'Kirim' : 
+          opType === 'chiqim' ? 'Chiqim' : 'Reviziya';
 
-      const logEntry = {
-        id: `${Date.now()}_${Math.random()}`,
-        date: new Date().toLocaleString(),
-        type: logTypeLabel,
-        itemName: selectedStockItem.name,
-        productName: selectedStockItem.name,
-        diffAmount: diffInBase > 0 ? `+${diffInBase}` : `${diffInBase}`,
-        amount: Math.abs(diffInBase),
-        unit: itemBaseUnit,
-        note: updateNote ? `${updateNote}${enteredLabel}${priceLabel}` : defaultNote,
-        reason: updateNote ? `${updateNote}${enteredLabel}${priceLabel}` : defaultNote,
-        user: currentUser?.name || 'Omborchi'
-      };
-      setInventoryLogs(prev => [logEntry, ...(Array.isArray(prev) ? prev : [])]);
-    }
+        const defaultNote = 
+          opType === 'kirim' ? `Ombor kirimi${enteredLabel}${priceLabel}` : 
+          opType === 'chiqim' ? `Ombor chiqimi / Spisaniya${enteredLabel}` : 
+          `Qoldiq reviziya qilindi${enteredLabel}`;
 
-    if (typeof addAuditLog === 'function' && diffInBase !== 0) {
-      addAuditLog(
-        `Ombor: ${updateType.toUpperCase()}`,
-        `${selectedStockItem.name}: ${diffInBase > 0 ? `+${diffInBase}` : diffInBase} ${itemBaseUnit} (Yangi qoldiq: ${newQtyInBase} ${itemBaseUnit})`
+        const logEntry = {
+          id: `${Date.now()}_${Math.random()}`,
+          date: new Date().toLocaleString(),
+          type: logTypeLabel,
+          itemName: stockItem.name,
+          productName: stockItem.name,
+          diffAmount: diffInBase > 0 ? `+${diffInBase}` : `${diffInBase}`,
+          amount: Math.abs(diffInBase),
+          unit: itemBaseUnit,
+          note: opNote ? `${opNote}${enteredLabel}${priceLabel}` : defaultNote,
+          reason: opNote ? `${opNote}${enteredLabel}${priceLabel}` : defaultNote,
+          user: currentUser?.name || 'Omborchi'
+        };
+        setInventoryLogs(prev => [logEntry, ...(Array.isArray(prev) ? prev : [])]);
+      }
+
+      if (typeof addAuditLog === 'function' && diffInBase !== 0) {
+        addAuditLog(
+          `Ombor: ${opType.toUpperCase()}`,
+          `${stockItem.name}: ${diffInBase > 0 ? `+${diffInBase}` : diffInBase} ${itemBaseUnit} (Yangi qoldiq: ${newQtyInBase} ${itemBaseUnit})`
+        );
+      }
+
+      setIsUpdateModalOpen(false);
+    };
+
+    // Qoldiqni kamaytirish (chiqim/spisanie yoki kamaytiruvchi reviziya): Admin -> PIN himoyasida
+    // "Ombor: chiqim" yoqilgan bo'lsa rahbar tasdig'i so'raladi. Oyna tasdiqlanguncha ochiq qoladi
+    if (diffInBase < 0 && typeof requireAdminOverride === 'function') {
+      requireAdminOverride(
+        `${stockItem.name}: ${diffInBase} ${itemBaseUnit} (${opType === 'chiqim' ? 'chiqim / spisanie' : 'reviziya'})`,
+        applyUpdate,
+        'warehouseWriteOff'
       );
+      return;
     }
-
-    setIsUpdateModalOpen(false);
+    applyUpdate();
   };
 
   // ==========================================

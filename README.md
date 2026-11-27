@@ -26,9 +26,13 @@ statistika, admin paneli va mijozlar uchun QR-menyu. Interfeys o'zbek tilida.
   ofitsiant menyusida "N porsiyaga yetadi / yetarli emas" belgisi, yetmasa kamomad yozuvi
 - **Statistika:** tushum, tannarx, sof foyda, ofitsiantlar maoshi, Z-hisobot (Telegram'ga yuborish)
 - **Admin:** menyu, kategoriyalar, xodimlar va PIN kodlar (lavozim nomini o'zingiz yozasiz, masalan "Barmen"), audit jurnali, zaxira nusxa, Telegram sozlamalari
+- **Ega va admin huquqlari (Telegram guruhidagi kabi):** 👑 Ega - kafe egasi, uni hech kim tahrirlay yoki o'chira
+  olmaydi. Ega admin va xodimlarni tayinlaydi, har bir adminga qaysi bo'limlar ochiq ekanini tugmalar bilan
+  belgilaydi ("🛡️ Huquqlar"). Egalikni boshqa adminga topshirish mumkin (Ega PIN'i bilan)
 - **Telegram:** har bir amal (kirish-chiqish, buyurtma, dozakaz, oshxona, to'lov, ombor, xodim, menyu) rahbar
   Telegramiga jonli jurnal bo'lib boradi; Z-hisobot, qarz, chegirma, ombor ogohlantirishlari alohida xabar
-- **Xavfsizlik:** xavfli amallar admin PIN bilan tasdiqlanadi, 5 ta xato PIN'dan keyin vaqtincha bloklash;
+- **Xavfsizlik:** xavfli amallar admin PIN bilan tasdiqlanadi - qaysi amalda so'ralishi har biri uchun alohida
+  (Boshqaruv → "🔐 PIN himoyasi": ofitsiant, kassa, oshxona, ombor bo'yicha tugmalar), 5 ta xato PIN'dan keyin vaqtincha bloklash;
   PIN kodlar ochiq matnda emas, xesh (tuzli SHA-256) ko'rinishida saqlanadi; saytda xavfsizlik sarlavhalari (CSP)
 - **Planshetga o'rnatish (PWA):** bosh ekranga qo'shiladi, internet uzilib sahifa yangilansa ham ochiladi
 - **Oflayn va sekin internet:** internet uzilsa ham ish davom etadi (o'zgarishlar qurilmada navbatda turadi va
@@ -81,6 +85,12 @@ Oshxona mantig'ini (taom darajasida tayyor, rad etish, dozakaz, to'langan chek) 
 
 ```bash
 npm run test:kitchen
+```
+
+Ega, admin huquqlari va PIN himoyasi qoidalarini tekshirish:
+
+```bash
+npm run test:access
 ```
 
 ## Birinchi kirish

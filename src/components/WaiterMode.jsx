@@ -24,6 +24,8 @@ import { newId } from '../utils/ids';
 import { reservedByOpenOrders, stockStatus } from '../utils/inventoryCalc';
 import { findUserByPin } from '../utils/pinHash';
 import { hasTwoFactor } from '../utils/twoFactor';
+import { OWNER_KEY, canApproveOverride, resolveOwnerId } from '../utils/adminRights';
+import { LEGACY_OVERRIDE_KEY, PIN_RULES_KEY, isPinRuleOn, resolvePinRules } from '../utils/pinRules';
 import TwoFactorCodeModal from './TwoFactorCodeModal';
 import {
   applyWaiterCart,
@@ -98,7 +100,11 @@ export default function WaiterMode({
   const [stickyMenu] = useSticky('pos_menu', []);
   const [stickyCategories] = useSticky('pos_categories', ['Asosiy', 'Ichimlik', 'Shirinlik']);
   const [stickyUsers] = useSticky('pos_users', []);
-  const [stickyOverrideEnabled] = useSticky('pos_override_enabled', true);
+  // Admin PIN himoyasi har amal uchun alohida (src/utils/pinRules.ts) va kim tasdiqlay oladi (Ega va
+  // "tasdiqlash" huquqi bor admin: src/utils/adminRights.ts)
+  const [stickyOverrideEnabled] = useSticky(LEGACY_OVERRIDE_KEY, true);
+  const [stickyPinRules] = useSticky(PIN_RULES_KEY, null);
+  const [stickyOwner] = useSticky(OWNER_KEY, null);
   const [stickyCafeName] = useSticky('pos_cafe_name', 'Premium Cafe');
   const [, setStickyAuditLogs] = useSticky('pos_audit_logs', []);
 
@@ -274,8 +280,14 @@ export default function WaiterMode({
   // =========================================================
   // 4. 🔒 ADMIN PIN TEKSHIRUV MOTORI
   // =========================================================
-  const requestSecurityApproval = useCallback((actionTitle, onApprovedCallback) => {
-    if (stickyOverrideEnabled === false) {
+  const pinRules = useMemo(
+    () => resolvePinRules(stickyPinRules, stickyOverrideEnabled),
+    [stickyPinRules, stickyOverrideEnabled]
+  );
+
+  const requestSecurityApproval = useCallback((actionTitle, onApprovedCallback, ruleKey) => {
+    // Shu amal uchun PIN himoyasi o'chiq (Admin -> PIN himoyasi): xodim o'zi bajaradi
+    if (!isPinRuleOn(pinRules, ruleKey)) {
       onApprovedCallback('Erkin rejimda bajarildi');
       return;
     }
@@ -287,7 +299,7 @@ export default function WaiterMode({
       title: actionTitle,
       onConfirm: onApprovedCallback
     });
-  }, [stickyOverrideEnabled]);
+  }, [pinRules]);
 
   const handleConfirmSecurityPin = (e) => {
     e.preventDefault();
@@ -299,9 +311,10 @@ export default function WaiterMode({
       setPinError(`⛔️ Bloklangan: ${Math.ceil(lockLeftMs / 1000)} soniya kuting.`);
       return;
     }
-    const adminUsers = (Array.isArray(stickyUsers) ? stickyUsers : []).filter(
-      u => u && String(u.role || '').toLowerCase() === 'admin'
-    );
+    // Faqat tasdiqlash huquqi bor admin (va Ega) PIN'i qabul qilinadi
+    const safeStickyUsers = Array.isArray(stickyUsers) ? stickyUsers : [];
+    const ownerId = resolveOwnerId(safeStickyUsers, stickyOwner);
+    const adminUsers = safeStickyUsers.filter(u => u && canApproveOverride(u, ownerId));
 
     const matchedAdmin = cleanPin
       ? findUserByPin(adminUsers, cleanPin)
@@ -558,7 +571,8 @@ export default function WaiterMode({
             `📝 <b>Sababi:</b> ${escapeHtml(reason)}`,
             result?.cancelledPending > 0 ? `👨‍🍳 Oshxonaga xabar ketdi: ${result.cancelledPending} porsiya tayyorlanmaydi` : null
           ]);
-        }
+        },
+        'waiterReduceItem'
       );
       return;
     }
@@ -638,7 +652,8 @@ export default function WaiterMode({
             `📝 <b>Sababi:</b> ${escapeHtml(reason)}`,
             result?.cancelledPending > 0 ? `👨‍🍳 Oshxonaga xabar ketdi: ${result.cancelledPending} porsiya tayyorlanmaydi` : null
           ]);
-        }
+        },
+        'waiterReduceItem'
       );
       return;
     }
@@ -683,7 +698,8 @@ export default function WaiterMode({
           `👤 <b>Ofitsiant:</b> ${escapeHtml(currentUser?.name || 'Ofitsiant')}`,
           `📝 <b>Sababi:</b> ${escapeHtml(reason)}`
         ]);
-      }
+      },
+      'waiterCancelOrder'
     );
   }, [currentTableOrder, selectedTable, currentUser?.name, resolvedCafeName, requestSecurityApproval, applyToCurrentOrder, recordAuditLog]);
 
@@ -1366,6 +1382,7 @@ export default function WaiterMode({
                 markAsServed={handleMarkAsDelivered}
                 onLockPreCheck={handleLockAndPrintPreCheck}
                 onCancelEntireOrder={handleCancelEntireOrder}
+                reduceNeedsPin={isPinRuleOn(pinRules, 'waiterReduceItem')}
                 onBack={closeSelectedTable}
               />
             </div>

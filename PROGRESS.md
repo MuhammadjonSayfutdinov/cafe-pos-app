@@ -43,6 +43,14 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 
 ## Joriy vazifa
 
+**Ega va admin huquqlari (foydalanuvchi so'rovi, 2026-11-27, 7-bosqich rejasidan oldin):** admin tayinlagan ikkinchi
+admin asosiy adminni o'chira olardi (B34). Endi Telegram guruhidagi kabi 👑 Ega: uni hech kim o'zgartira olmaydi, Ega
+admin va xodimlarni tayinlaydi, har bir adminga bo'limlarni tugmalar bilan ochadi/yopadi ("🛡️ Huquqlar"). Admin PIN
+himoyasi endi har amal uchun alohida tugma (Boshqaruv → "🔐 PIN himoyasi"), uni Ega yoki u ruxsat bergan admin
+o'zgartiradi (B35-B40). Batafsil: pastda "Ega va admin huquqlari". Hozirgi ma'lumotda Ega - eng birinchi qo'shilgan
+(o'chirilmagan) admin; boshqasi bo'lishi kerak bo'lsa, Ega uning kartasida "👑 Egalikni topshirish" ni bosadi.
+Navbatdagi ish: 7-bosqichning "Keyingi qadamlar" ro'yxati (7 ta) tartib bilan.
+
 **Oshxona va buyurtma oqimi (7-bosqich, foydalanuvchi so'rovi, 2026-11-27):** oshpaz bir nechta taomni
 belgilab "Tayyor" bossa butun chek tayyor bo'lib ketardi (B19) - tuzatildi; oshxonaga "Rad etish" oynasi
 qo'shildi (B22); shunga o'xshash xatolar (B20-B33) tuzatildi. Reja va qolgan qadamlar: pastda
@@ -89,6 +97,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 3 Sana va qarz (B4, B7, B8) | `AdminDashboard.jsx` (~52), `WaiterMode.jsx` (~688), `CashierMode.jsx`: `handlePaymentSubmit` (766), `handlePayOffDebt` (983) |
 | 4 Xavfsizlik (B5, B6) | `LockScreen.jsx`, `ManagerOverrideModal.jsx`, `AdminSettingsTab.jsx`: `handleExportBackup` (254), `handleImportBackup` (284), `handleClearOrdersOnly` (318) |
 | 5 Dozakaz va bo'lish (B3, B9) | `App.jsx`: `handleOrderSubmit`, `handleUpdateStatus` (366), `handleSplitOrder`. `KitchenMode.jsx`, `WaiterTableGrid.jsx` |
+| Ega va huquqlar (B34-B40) | Mantiq: `src/utils/adminRights.ts`, `src/utils/pinRules.ts` (tekshiruv: `npm run test:access`). `App.jsx` (`requireAdminOverride`, `requireOwnerConfirm`, `handleChangePinRules`, menyu va ekranlar), `AdminUsersTab.jsx`, `AdminRightsModal.jsx`, `PinRulesPanel.jsx`, `ManagerOverrideModal.jsx`. PIN qoidasi kalitlari: `WaiterMode`, `CashierMode`, `KitchenMode`, `WarehouseStockTab`, `WarehouseHistoryTab`, `AdminSettingsTab` |
 | 7 Oshxona oqimi (B19-B33) | Mantiq: `src/utils/kitchenFlow.ts` (tekshiruv: `npm run test:kitchen`). Ekran: `KitchenMode.jsx`, `KitchenRejectModal.jsx`, `KitchenNoticesPanel.jsx`. Ofitsiant: `WaiterMode.jsx` (`applyToCurrentOrder`, `handleSubmitOrder`, `handleMarkAsDelivered`, `handleConfirmSplit`), `WaiterCart.jsx`, `WaiterTableGrid.jsx`. Kassa: `CashierMode.jsx` (`handlePaymentSubmit`, `handleDeleteOrder`) |
 
 ## Ma'lum xatolar
@@ -128,6 +137,13 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | B31 | Admin bosh sahifasidagi "Hozir zalda faol" smena yopilgach arxivdagi cheklarni ham sanardi (stollar soni va summa noto'g'ri) | `AdminDashboard.jsx` | 7 | [x] |
 | B32 | Ofitsiant menyusida bitta porsiyali taomning savatchadagi soni ikki barobar ("✓ 2 ta") ko'rinardi | `WaiterMenu.jsx` | 7 | [x] |
 | B33 | Ofitsiant savatchasida xizmat haqi joriy sozlamadan hisoblanardi (chekda saqlangan foiz emas): sozlama o'zgarsa ofitsiant va kassa jami summasi farq qilardi | `WaiterMode.jsx` -> `WaiterCart.jsx` | 7 | [x] |
+| B34 | Admin tayinlagan ikkinchi admin asosiy adminni o'chira (PIN'ini, ikki bosqichli kirishini o'zgartira) olardi: "Ega" tushunchasi yo'q, har qanday admin har qanday adminni boshqarardi | `AdminUsersTab.jsx`, yangi `adminRights.ts` | Ega | [x] |
+| B35 | Admin PIN himoyasi bitta umumiy tugma edi (yoqilsa hamma joyda, o'chirilsa hech qayerda) va uni istalgan admin chap menyudan bir bosishda o'chirardi | `AdminPanel.jsx`, `App.jsx`, yangi `pinRules.ts`, `PinRulesPanel.jsx` | Ega | [x] |
+| B36 | Har qanday admin barcha bo'limlarni ko'rardi: adminga bo'lim yopib bo'lmasdi; kassa/ombor admin uchun PIN'ni o'zi chetlab o'tardi (`role !== 'admin'`) | `App.jsx`, `AdminPanel.jsx`, `CashierMode.jsx`, `WarehouseHistoryTab.jsx` | Ega | [x] |
+| B37 | Xodim boshqa qurilmada o'chirilsa yoki roli o'zgarsa ham, tizimdan chiqmaguncha eski huquq bilan ishlayverardi | `App.jsx` | Ega | [x] |
+| B38 | Xodimga PIN berishda "bu PIN-kod X da bor" deyilardi va urinish cheklanmagan: admin PIN'larni terib, Ega PIN'ini bilib olishi mumkin edi | `AdminUsersTab.jsx` | Ega | [x] |
+| B39 | Audit jurnalini tozalash, zaxiradan tiklash (eski PIN'li fayl bilan adminlarni qaytarish), zavod holati, Telegram sozlamasi (Ega xabarlarini boshqa chatga burish) - istalgan adminda edi | `AdminAuditLogsTab.jsx`, `AdminSettingsTab.jsx` | Ega | [x] |
+| B40 | Ombordan mahsulot o'chirish, chiqim (spisanie), chekni qarzga yozish, oshxonada rad etishni PIN bilan himoyalab bo'lmasdi | `WarehouseStockTab.jsx`, `CashierMode.jsx`, `KitchenMode.jsx` | Ega | [x] |
 
 ## Bosqichlar
 
@@ -176,6 +192,25 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 - [x] Xodim qo'shishda lavozim nomi qo'lda yoziladi (`user.title`), rollar bitta joyda (`src/constants/roles.js`)
 - [x] Stollar uchun QR stikerlar: A4 varaq (3 o'lcham, stollarni tanlash, nusxa soni), QR kod qurilmada chiziladi
   (`QrStickerSheet.jsx`, `src/qr/qrEncode.js`, `src/qr/tableQrUrl.js`); ofitsiantning bitta stol QR oynasi ham shunga o'tdi
+
+### Ega va admin huquqlari (tuzatish, foydalanuvchi so'rovi, 2026-11-27)
+Manba: foydalanuvchi xabari (admin tayinlagan ikkinchi admin asosiy adminni o'chirib tashladi) va Telegram guruhining
+"Admin huquqlari" hamda "Ruxsatlar" oynalari (rasmlar). Tamoyil: Ega - Telegramdagi guruh egasi kabi; admin faqat Ega
+(yoki uni tayinlagan admin) ochib bergan bo'limlarni ko'radi; xavfli amal uchun PIN har biri alohida yoqiladi.
+- [x] 👑 Ega (`pos_owner`, yo'q bo'lsa eng birinchi qo'shilgan admin): tahrirlab, o'chirib, 2-bosqichini o'chirib bo'lmaydi;
+  o'z ismi va PIN'ini o'zi o'zgartiradi. Egalikni topshirish (Ega PIN'i bilan), oldingi Ega barcha huquqli admin bo'ladi (B34)
+- [x] Admin huquqlari (Telegram uslubidagi ro'yxat): 6 ta ekran, 5 ta Boshqaruv bo'limi, maxsus: "Xavfli amalni tasdiqlash",
+  "PIN himoyasini boshqarish", "Yangi admin tayinlash". Admin faqat o'zida bor huquqni bera oladi (qolgani 🔒) va faqat
+  o'zi tayinlagan adminni o'zgartiradi. Yopilgan bo'lim menyudan yo'qoladi, ochiq turgan ekran darhol yopiladi (B36)
+- [x] PIN himoyasi har amal uchun alohida (B35): Ofitsiant (taomni kamaytirish, chekni bekor qilish), Kassa (katta chegirma,
+  qarzga yozish, chekni bekor qilish, xarajatni o'chirish), Oshxona (rad etish), Ombor (chiqim, mahsulotni o'chirish,
+  tarixni tozalash), Boshqaruv (cheklar tarixini tozalash). Soha "n/m ˅" bilan ochiladi, soha tugmasi hammasini o'zgartiradi.
+  Faqat Ega yoki "PIN himoyasini boshqarish" huquqli admin o'zgartiradi; har o'zgarish audit va Telegramga boradi
+- [x] Faqat Ega (Ega PIN'i bilan): zaxiradan tiklash, zavod holati, audit jurnalini tozalash, Telegram sozlamasi (B39)
+- [x] O'chirilgan xodim boshqa qurilmada ham darhol chiqariladi, huquq o'zgarsa darhol kuchga kiradi (B37);
+  band PIN javobi kimniki ekanini aytmaydi va urinishlar cheklangan (B38)
+- [ ] Serverda tekshirish (RLS): hozir tekshiruv qurilmada - bazaga to'g'ridan-to'g'ri yoza oladigandan himoya
+  6-bosqich, 2-qadamda ("PIN serverda", rol bo'yicha RLS)
 
 ### 7-bosqich. Oshxona va buyurtma oqimi (foydalanuvchi so'rovi, 2026-11-27)
 Manba: foydalanuvchi xabari (oshxonada belgilanganlar emas, hamma taom tayyor bo'lib ketadi; oshxona uchun
@@ -285,6 +320,9 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | Admin ikki bosqichli kirish | PIN + Authenticator ilovasi kodi (TOTP: HMAC-SHA1, 6 raqam, 30 s, ±30 s soat farqi; kutubxonasiz, http da ham ishlaydi). Yozuv: `user.twoFactor = {type:'totp', secret, enabledAt, backupCodes}`; 10 ta zaxira kod (10 raqam, bir martalik) faqat xeshi bilan. Kod kirish oynasida, avto-qulfda, rahbar tasdig'ida (ManagerOverrideModal, ofitsiant ekranidagi admin PIN) so'raladi. Faqat xodimning o'zi yoqadi (o'z telefoni), o'zi o'chirishda kod so'raladi; boshqa admin faqat o'chira oladi (telefon yo'qolsa). 5 xato kod - blok (pinGuard) va audit (Telegramga ham boradi). Ishlatilgan kod shu qurilmada qayta qabul qilinmaydi. Zaxira faylga sir yozilmaydi, tiklashda fayldagisi olinmaydi. Tekshiruv hozircha qurilmada (oflayn kirish): PIN'ni bilgan xodimdan himoya qiladi, bazani o'qiy olgandan emas - serverda tekshirish 2-qadamning "PIN serverda" ishi bilan | qabul qilindi |
 | Mijoz telefonini tasdiqlash | Kafening o'z Telegram boti, "Raqamimni yuborish" tugmasi: bepul (Bot API pulsiz), kod yozish shart emas, raqam Telegram tomonidan tasdiqlangan. Oddiy SMS pullik (shartnoma, matn tasdig'i), Telegram Gateway ~0,01 $/kod. Telegram'siz mijozni ofitsiant tasdiqlaydi | qabul qilindi (6-bosqich, 3-qadamda) |
 | Kiosk "Kassada to'layman" | Admin sozlamasi: oshxonaga "To'lovdan keyin" (standart, hazil buyurtmadan himoya) yoki "Darhol" | qabul qilindi (6-bosqich, 4-qadamda) |
+| Ega (kafe egasi) | Telegram guruhidagi Ega kabi. Saqlash: KV `pos_owner = {id, at, by}` (bulut orqali). Ega - shu yozuvdagi admin, bo'lmasa (yoki u admin bo'lmasa) eng birinchi qo'shilgan admin: id dan (1, 2... yoki "user_<vaqt>"), ro'yxat tartibidan emas - barcha qurilmada bir xil, ilova ochilganda hech narsa yozilmaydi (qurilmalar bir-birini bosib ketmaydi). Asosiy admin eski versiyadagi qurilmada o'chirilgan bo'lsa ham Ega o'zi keyingi eng eski adminga o'tadi. Egani hech kim tahrirlay/o'chira olmaydi, o'z rolini o'zi ham o'zgartirmaydi (avval egalikni topshiradi) | qabul qilindi |
+| Admin huquqlari | `user.adminRights` (14 ta boolean) va `user.appointedBy`. Yangi admin: Telegram kabi ko'pi ochiq, "Yangi admin tayinlash" va "PIN himoyasini boshqarish" yopiq. Huquqi yozilmagan eski admin: avvalgidek barcha bo'limlar + tasdiqlash (yangilanishda hech kim ishsiz qolmasin). Admin o'zida yo'q huquqni bera olmaydi, faqat o'zi tayinlagan adminni o'zgartiradi. "Boshqaruv" ekrani har adminga ochiq: u yerda o'z PIN'i, ikki bosqichli kirishi va PIN himoyasi ro'yxati (o'qish) | qabul qilindi |
+| PIN himoyasi har amal uchun | KV `pos_pin_rules` (11 ta amal). Yozilmagan amal: avval umumiy tugma bilan himoyalangan bo'lsa - eski `pos_override_enabled` qiymati, yangi amal (qarz, rad etish, ombor chiqimi, mahsulotni o'chirish) - o'chiq: yangilanishdan keyin ish o'zgarmaydi. `pos_override_enabled` eski versiyadagi qurilmalar uchun "kamida bitta amal himoyalangan" deb yoziladi. Tasdiqlaydi: Ega va "tasdiqlash" huquqli admin (o'zlari bajarganda PIN so'ralmaydi). Faqat Ega amallari Ega PIN'i (+ Authenticator) bilan | qabul qilindi |
 | TypeScript | Bosqichma-bosqich: `allowJs`, faqat `.ts` fayllar strict tekshiriladi. Yangi util/modul `.ts` da. Komponentlar keyinroq (`@types/react` kerak bo'ladi) | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
@@ -316,6 +354,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | 20 | Kafe mahalliy serveri (internetsiz ishlash) | "4: kafe mahalliy serveri..." commiti | [x] |
 | 21 | Admin uchun ikki bosqichli kirish: PIN + Authenticator (6-bosqich, 2-qadam) | "6: admin uchun ikki bosqichli kirish..." commiti | [x] |
 | 22 | Oshxona: faqat belgilangan taom tayyor, rad etish oynasi, taom darajasidagi holat va o'xshash xatolar (B19-B33) | "7: oshxona - taom darajasida tayyor, rad etish..." commiti | [x] |
+| 23 | Ega va admin huquqlari, PIN himoyasi har amal uchun (B34-B40) | "tuzatish: Ega va admin huquqlari..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

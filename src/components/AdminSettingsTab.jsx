@@ -9,6 +9,7 @@ import QrSecuritySection from './QrSecuritySection';
 import { VALID_ROLES } from '../constants/roles';
 import { copyPinFrom, migrateUserPins, stripPin } from '../utils/pinHash';
 import { keepTwoFactorFrom, stripTwoFactor } from '../utils/twoFactor';
+import { userIdOf } from '../utils/adminRights';
 
 // Telegram sozlamalari: yagona joy - src/utils/telegramNotifier.js (B12)
 const readTelegramConfig = getTelegramConfig;
@@ -85,7 +86,11 @@ export default function AdminSettingsTab({
   auditLogs = [],
   setAuditLogs,
   currentUser,
+  // Ega (src/utils/adminRights.ts): zaxiradan tiklash, zavod holati va Telegram sozlamasi - faqat Ega
+  isOwner = false,
+  ownerId = null,
   requireAdminOverride,
+  requireOwnerConfirm,
   addAuditLog 
 }) {
   const [tempCafeName, setTempCafeName] = useState(cafeName || '');
@@ -149,7 +154,12 @@ export default function AdminSettingsTab({
   // ==========================================
   // TELEGRAM ICHKI FUNKSIYALARI
   // ==========================================
+  // Telegram - Eganing nazorat kanali: boshqa admin xabarlarni o'ziga burib qo'ya olmasin
   const updateTgField = (field, value) => {
+    if (!isOwner) {
+      notify("🔒 Telegram sozlamalarini faqat Ega o'zgartiradi.");
+      return;
+    }
     setTelegramConfig(prev => ({
       ...DEFAULT_TELEGRAM_CONFIG,
       ...(prev || {}),
@@ -287,6 +297,11 @@ export default function AdminSettingsTab({
   const handleImportBackup = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!isOwner) {
+      e.target.value = '';
+      notify("⛔️ Zaxiradan tiklashni faqat Ega bajaradi.");
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -310,25 +325,32 @@ export default function AdminSettingsTab({
           if (Array.isArray(parsed.menuItems) && typeof setMenuItems === 'function') setMenuItems(parsed.menuItems);
           if (Array.isArray(parsed.users) && typeof setUsers === 'function') {
             const fileHasPins = parsed.users.some(u => u && u.pin !== undefined);
+            // Ega (tiklayotgan odam) har doim qoladi: fayldagi ro'yxatda bo'lmasa ham, admin bo'lib
+            const keepOwner = (list, prev) => {
+              const owner = (Array.isArray(prev) ? prev : []).find(c => c && ownerId && userIdOf(c) === ownerId);
+              if (!owner) return list;
+              const rest = list.filter(u => !(u && userIdOf(u) === ownerId));
+              return [...rest, owner];
+            };
             // Ikki bosqichli kirish fayldan hech qachon olinmaydi: qurilmadagi hozirgisi saqlanadi
             const findCurrent = (list, u) =>
               (Array.isArray(list) ? list : []).find(c => c && u && String(c.id) === String(u.id));
             if (fileHasPins) {
               // Eski formatdagi fayl: ochiq PIN'lar darhol xeshga o'tkaziladi
-              setUsers(prev => migrateUserPins(parsed.users).map(u =>
+              setUsers(prev => keepOwner(migrateUserPins(parsed.users).map(u =>
                 u && typeof u === 'object' ? keepTwoFactorFrom(u, findCurrent(prev, u)) : u
-              ));
+              ), prev));
             } else {
               // Yangi formatda PIN yo'q: hozirgi PIN kodlar saqlanadi, PIN-siz yangi xodim qo'shilmaydi
               setUsers(prev => {
                 const current = Array.isArray(prev) ? prev : [];
-                return parsed.users
+                return keepOwner(parsed.users
                   .map(u => {
                     const existing = findCurrent(current, u);
                     return existing ? keepTwoFactorFrom(copyPinFrom(u, existing), existing) : null;
                   })
                   .filter(Boolean)
-                  .concat(current.filter(c => c && !parsed.users.some(u => String(u.id) === String(c.id))));
+                  .concat(current.filter(c => c && !parsed.users.some(u => String(u.id) === String(c.id)))), current);
               });
             }
           }
@@ -349,10 +371,10 @@ export default function AdminSettingsTab({
           notify("✅ Zaxira nusxa muvaffaqiyatli tiklandi!");
         };
 
-        if (typeof requireAdminOverride === 'function') {
-          requireAdminOverride('Zaxira nusxadan bazani tiklash', applyRestore);
+        if (typeof requireOwnerConfirm === 'function') {
+          requireOwnerConfirm('Zaxira nusxadan bazani tiklash', applyRestore);
         } else {
-          applyRestore();
+          notify("⛔️ Zaxiradan tiklashni faqat Ega bajaradi.");
         }
       } catch {
         notify("❌ Xatolik! Tanlangan fayl yaroqsiz yoki buzilgan.");
@@ -379,13 +401,17 @@ export default function AdminSettingsTab({
     };
 
     if (typeof requireAdminOverride === 'function') {
-      requireAdminOverride("Barcha cheklar tarixini o'chirish", performClear);
+      requireAdminOverride("Barcha cheklar tarixini o'chirish", performClear, 'adminClearOrders');
     } else {
       performClear();
     }
   };
 
   const handleFactoryReset = () => {
+    if (!isOwner) {
+      notify("⛔️ Tizimni zavod holatiga faqat Ega qaytaradi.");
+      return;
+    }
     const performReset = async () => {
       if (await confirmAsync("🛑 Barcha ma'lumotlar o'chirilib, dastur zavod holatiga qaytadi. Davom etamizmi?")) {
         window.localStorage.clear();
@@ -393,10 +419,10 @@ export default function AdminSettingsTab({
       }
     };
 
-    if (typeof requireAdminOverride === 'function') {
-      requireAdminOverride("Tizimni zavod holatiga qaytarish", performReset);
+    if (typeof requireOwnerConfirm === 'function') {
+      requireOwnerConfirm("Tizimni zavod holatiga qaytarish", performReset);
     } else {
-      performReset();
+      notify("⛔️ Tizimni zavod holatiga faqat Ega qaytaradi.");
     }
   };
 
@@ -495,6 +521,11 @@ export default function AdminSettingsTab({
               <p className="text-xs font-bold text-gray-500 mt-0.5">
                 Har bir amal, Z-Otchyot, nasiya qarzlar, chegirmalar va ombor qoldig'i haqida rahbar Telegramiga jonli hisobot
               </p>
+              {!isOwner && (
+                <p className="text-[11px] font-black text-amber-600 dark:text-amber-400 mt-1">
+                  🔒 Faqat Ega o'zgartiradi (bu - Eganing nazorat kanali). Siz faqat ko'rasiz.
+                </p>
+              )}
             </div>
           </div>
 
@@ -518,19 +549,22 @@ export default function AdminSettingsTab({
             </label>
             <div className="relative">
               <input
-                type={showBotToken ? 'text' : 'password'}
-                value={telegramConfig?.botToken || ''}
+                type={showBotToken && isOwner ? 'text' : 'password'}
+                value={isOwner ? (telegramConfig?.botToken || '') : (telegramConfig?.botToken ? '••••••••••••' : '')}
                 onChange={e => updateTgField('botToken', e.target.value)}
+                readOnly={!isOwner}
                 placeholder="Masalan: 7123456789:AAH..."
-                className="w-full pl-4 pr-11 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs sm:text-sm text-gray-900 dark:text-white outline-hidden focus:border-sky-500"
+                className="w-full pl-4 pr-11 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs sm:text-sm text-gray-900 dark:text-white outline-hidden focus:border-sky-500 read-only:opacity-70"
               />
-              <button
-                type="button"
-                onClick={() => setShowBotToken(prev => !prev)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-white text-sm"
-              >
-                {showBotToken ? '🙈' : '👁'}
-              </button>
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() => setShowBotToken(prev => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-white text-sm"
+                >
+                  {showBotToken ? '🙈' : '👁'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -543,13 +577,14 @@ export default function AdminSettingsTab({
                 type="text"
                 value={telegramConfig?.chatId || ''}
                 onChange={e => updateTgField('chatId', e.target.value)}
+                readOnly={!isOwner}
                 placeholder="Masalan: 123456789"
                 className="flex-1 min-w-0 p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs sm:text-sm text-gray-900 dark:text-white outline-hidden focus:border-sky-500"
               />
               <button
                 type="button"
                 onClick={handleAutoDetectChatId}
-                disabled={tgStatus.loading}
+                disabled={tgStatus.loading || !isOwner}
                 className="px-4 py-3.5 rounded-xl bg-sky-100 dark:bg-sky-900/40 hover:bg-sky-200 text-sky-700 dark:text-sky-300 font-black text-xs whitespace-nowrap transition active:scale-95 disabled:opacity-50"
               >
                 🔍 ID ni topish
@@ -725,11 +760,17 @@ export default function AdminSettingsTab({
             <span>Zaxira Nusxa Yuklab Olish (.json)</span>
           </button>
 
-          <label className="p-4 rounded-2xl bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 border-2 border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 font-black text-sm flex items-center justify-center gap-3 cursor-pointer transition active:scale-95">
-            <span className="text-2xl">📤</span>
-            <span>Zaxiradan Tiklash (.json)</span>
-            <input type="file" accept=".json" onChange={handleImportBackup} className="hidden" />
-          </label>
+          {isOwner ? (
+            <label className="p-4 rounded-2xl bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 border-2 border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 font-black text-sm flex items-center justify-center gap-3 cursor-pointer transition active:scale-95">
+              <span className="text-2xl">📤</span>
+              <span>Zaxiradan Tiklash (.json)</span>
+              <input type="file" accept=".json" onChange={handleImportBackup} className="hidden" />
+            </label>
+          ) : (
+            <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/40 border-2 border-dashed border-gray-200 dark:border-gray-700 text-gray-400 font-black text-xs flex items-center justify-center gap-2 text-center">
+              🔒 Zaxiradan tiklash - faqat Ega
+            </div>
+          )}
         </div>
       </div>
 
@@ -750,9 +791,11 @@ export default function AdminSettingsTab({
           <button
             type="button"
             onClick={handleFactoryReset}
-            className="flex-1 py-3.5 px-5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-red-600/20 transition active:scale-95"
+            disabled={!isOwner}
+            title={isOwner ? undefined : 'Faqat Ega'}
+            className="flex-1 py-3.5 px-5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-red-600/20 transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            🧨 Tizimni Zavod Holatiga Qaytarish
+            {isOwner ? '🧨 Tizimni Zavod Holatiga Qaytarish' : '🔒 Zavod holati - faqat Ega'}
           </button>
         </div>
       </div>

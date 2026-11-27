@@ -4,7 +4,11 @@ import { newId } from '../utils/ids';
 
 export default function AdminAuditLogsTab({ 
   auditLogs = [],
-  setAuditLogs
+  setAuditLogs,
+  currentUser,
+  // Jurnalni faqat Ega tozalaydi (Ega PIN'i bilan): boshqa admin o'z izini o'chira olmasin
+  isOwner = false,
+  requireOwnerConfirm
 }) {
   // ==========================================
   // 1. STATE'LAR VA XAVFSIZ RO'YXAT
@@ -149,18 +153,24 @@ export default function AdminAuditLogsTab({
 
   const handleClearLogs = async () => {
     if (typeof setAuditLogs !== 'function' || safeLogs.length === 0) return;
+    if (!isOwner || typeof requireOwnerConfirm !== 'function') {
+      notify("⛔️ Tarixni faqat Ega tozalaydi.");
+      return;
+    }
 
     if (await confirmAsync("DIQQAT! Barcha harakatlar tarixini (Audit Logs) o'chirib tozalamoqchimisiz?")) {
-      setAuditLogs([
-        {
-          id: newId('log_'),
-          date: new Date().toLocaleString(),
-          action: "Tarix tozalandi",
-          details: "Admin tomonidan eski audit yozuvlari tozalandi",
-          userName: "Admin",
-          role: "admin"
-        }
-      ]);
+      requireOwnerConfirm("Audit jurnalini (tarixni) tozalash", () => {
+        setAuditLogs([
+          {
+            id: newId('log_'),
+            date: new Date().toLocaleString(),
+            action: "Tarix tozalandi",
+            details: `${safeLogs.length} ta eski yozuv tozalandi`,
+            userName: currentUser?.name || 'Ega',
+            role: "admin"
+          }
+        ]);
+      });
     }
   };
 
@@ -191,7 +201,7 @@ export default function AdminAuditLogsTab({
             📥 Yuklab olish (.txt)
           </button>
 
-          {typeof setAuditLogs === 'function' && safeLogs.length > 0 && (
+          {typeof setAuditLogs === 'function' && safeLogs.length > 0 && isOwner && (
             <button
               type="button"
               onClick={handleClearLogs}

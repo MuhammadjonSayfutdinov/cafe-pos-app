@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 // MAXSUS HOOK
 import useSticky from './hooks/useSticky';
@@ -31,6 +31,12 @@ import { newId } from './utils/ids';
 import { getUpdateResume, setUpdateSession } from './pwa/update';
 import { checkPin, migrateUserPins, pinLengthOf } from './utils/pinHash';
 import { isNetworkError } from './sync/timeouts';
+import {
+  OWNER_KEY, canApproveOverride, canOpenAdminView, hasRight, isOwnerUser, resolveOwnerId, userIdOf
+} from './utils/adminRights';
+import {
+  LEGACY_OVERRIDE_KEY, PIN_RULES, PIN_RULES_KEY, isPinRuleOn, resolvePinRules, withPinRules
+} from './utils/pinRules';
 
 const initialMenuItems = [
   { 
@@ -103,7 +109,14 @@ export default function App() {
   
   // Xavfsizlik va Nazorat Statelari
   const [auditLogs, setAuditLogs] = useSticky('pos_audit_logs', []);
-  const [isOverrideEnabled, setIsOverrideEnabled] = useSticky('pos_override_enabled', true);
+  // Eski umumiy "Admin PIN himoyasi" tugmasi: endi har amal alohida (pos_pin_rules), bu kalit eski
+  // versiyadagi qurilmalar uchun yangilanib turadi (src/utils/pinRules.ts)
+  const [isOverrideEnabled, setIsOverrideEnabled] = useSticky(LEGACY_OVERRIDE_KEY, true);
+  const [storedPinRules, setStoredPinRules] = useSticky(PIN_RULES_KEY, null);
+  const pinRules = useMemo(() => resolvePinRules(storedPinRules, isOverrideEnabled), [storedPinRules, isOverrideEnabled]);
+  // Ega (kafe egasi): uni hech kim o'zgartira olmaydi, adminlarga bo'limlarni u ochadi (src/utils/adminRights.ts)
+  const [ownerRecord, setOwnerRecord] = useSticky(OWNER_KEY, null);
+  const ownerId = useMemo(() => resolveOwnerId(users, ownerRecord), [users, ownerRecord]);
 
   // Routing va Sessiya Statelari
   // Dastur yangilangach (sahifa o'zi qayta yuklanganda) xodim o'sha ekranga PIN'siz qaytadi: src/pwa/update.js
@@ -125,6 +138,20 @@ export default function App() {
     return () => clearTimeout(t);
   }, [isAdminSession, users]);
   const [receiptToPrint, setReceiptToPrint] = useState(null);
+
+  // Kirgan xodimning bazadagi eng so'nggi yozuvi: Ega boshqa qurilmada huquqini, rolini o'zgartirsa
+  // yoki o'chirsa, shu ekranda darhol kuchga kiradi (oldin xodim chiqib ketguncha eski huquq qolardi)
+  const liveUser = useMemo(() => {
+    if (!currentUser) return null;
+    const id = userIdOf(currentUser);
+    return (Array.isArray(users) ? users : []).find(u => u && userIdOf(u) === id) || null;
+  }, [users, currentUser]);
+  const sessionUser = liveUser || currentUser;
+  // Rahbar tasdig'ini bera oladiganlar: Ega va "tasdiqlash" huquqi bor adminlar
+  const approverUsers = useMemo(
+    () => (Array.isArray(users) ? users : []).filter(u => u && canApproveOverride(u, ownerId)),
+    [users, ownerId]
+  );
 
   // ==========================================
   // 2. AVTOMATIK XOTIRANI TUZATISH (SELF-HEALING)
@@ -193,35 +220,85 @@ export default function App() {
     });
   }, [currentUser, setAuditLogs]);
 
-  const requireAdminOverride = (actionName, onSuccessCallback) => {
-    const normalizedAction = typeof actionName === 'function' ? 'Tasdiqlangan amal' : actionName;
-    const normalizedCallback = typeof actionName === 'function' ? actionName : onSuccessCallback;
+  // Rahbar (admin) tasdig'i. ruleKey - qaysi amal (src/utils/pinRules.ts): shu amal uchun PIN himoyasi
+  // o'chiq bo'lsa so'ralmaydi. Bir amalda bir nechta sabab bo'lsa (chegirma + qarz) birinchi argument
+  // [{ key, text }] ro'yxati. Tasdiqlash huquqi bor admin (va Ega) o'zi bajarganda PIN so'ralmaydi.
+  const requireAdminOverride = (actionName, onSuccessCallback, ruleKey) => {
+    const isFnFirst = typeof actionName === 'function';
+    const callback = isFnFirst ? actionName : onSuccessCallback;
+    const run = () => {
+      if (typeof callback === 'function') callback();
+    };
+    const reasons = Array.isArray(actionName)
+      ? actionName.filter(r => r && r.text).map(r => ({ key: r.key, text: String(r.text) }))
+      : [{ key: ruleKey, text: isFnFirst ? 'Tasdiqlangan amal' : String(actionName || 'Tasdiqlangan amal') }];
+    const active = reasons.filter(r => isPinRuleOn(pinRules, r.key));
 
-    if (!isOverrideEnabled || currentUser?.role === 'admin') {
-      if (!isOverrideEnabled) {
-        addAuditLog("Avtomat Ruxsat (Himoya O'chiq)", normalizedAction);
-      } else {
-        addAuditLog("Admin Ruxsati Avtomat", normalizedAction);
-      }
-      if (typeof normalizedCallback === 'function') {
-        normalizedCallback();
-      }
-    } else {
-      setOverrideRequest({
-        actionName: normalizedAction,
-        onSuccess: (adminUser) => {
-          addAuditLog(
-            "Admin Ruxsat Berdi", 
-            `${normalizedAction} (Ruxsat beruvchi: ${adminUser?.name || 'Admin'})`, 
-            adminUser
-          );
-          setOverrideRequest(null);
-          if (typeof normalizedCallback === 'function') {
-            normalizedCallback();
-          }
-        }
-      });
+    if (active.length === 0) {
+      // Avval umumiy tugma bilan himoyalangan amal: jurnalda qoladi (yangi amallar o'z yozuvini qiladi)
+      const wasProtected = reasons.some(r => PIN_RULES.find(rule => rule.key === r.key)?.legacy ?? true);
+      if (wasProtected) addAuditLog("Avtomat Ruxsat (Himoya O'chiq)", reasons.map(r => r.text).join(' • '));
+      run();
+      return;
     }
+
+    const label = active.map(r => r.text).join(' • ');
+    if (canApproveOverride(sessionUser, ownerId)) {
+      addAuditLog("Admin Ruxsati Avtomat", label);
+      run();
+      return;
+    }
+
+    setOverrideRequest({
+      actionName: label,
+      onSuccess: (adminUser) => {
+        addAuditLog(
+          "Admin Ruxsat Berdi",
+          `${label} (Ruxsat beruvchi: ${adminUser?.name || 'Admin'})`,
+          adminUser
+        );
+        setOverrideRequest(null);
+        run();
+      }
+    });
+  };
+
+  // Faqat Ega bajaradigan amal (egalikni topshirish, zaxiradan tiklash, zavod holati, jurnalni tozalash):
+  // kirgan xodim Ega bo'lishi va Ega PIN'ini (2-bosqich yoqilgan bo'lsa kodni ham) qayta kiritishi kerak
+  const requireOwnerConfirm = (actionName, onSuccessCallback) => {
+    const label = String(actionName || "Ega tasdig'i");
+    if (!isOwnerUser(sessionUser, ownerId)) {
+      notify('⛔️ Bu amalni faqat Ega bajara oladi.', 'error');
+      return;
+    }
+    setOverrideRequest({
+      actionName: label,
+      ownerOnly: true,
+      onSuccess: (confirmedUser) => {
+        setOverrideRequest(null);
+        if (!isOwnerUser(confirmedUser, ownerId)) return;
+        addAuditLog('Ega tasdiqladi', label, confirmedUser);
+        if (typeof onSuccessCallback === 'function') onSuccessCallback();
+      }
+    });
+  };
+
+  // PIN himoyasi qoidalarini o'zgartirish: faqat Ega yoki "PIN himoyasini boshqarish" huquqi bor admin
+  const handleChangePinRules = (changes) => {
+    if (!hasRight(sessionUser, ownerId, 'pinRules')) {
+      notify("⛔️ PIN himoyasini faqat Ega yoki u ruxsat bergan admin o'zgartiradi.", 'error');
+      return;
+    }
+    const next = withPinRules(pinRules, changes || {});
+    const changed = PIN_RULES.filter(r => next[r.key] !== pinRules[r.key]);
+    if (changed.length === 0) return;
+    setStoredPinRules(next);
+    // Eski versiyadagi qurilmalar umumiy tugmani o'qiydi: kamida bitta amal himoyalangan bo'lsa - yoqiq
+    setIsOverrideEnabled(PIN_RULES.some(r => next[r.key]));
+    addAuditLog(
+      "PIN himoyasi o'zgardi",
+      changed.map(r => `${r.label}: ${next[r.key] ? "PIN so'raladi" : "PIN so'ralmaydi"}`).join(' • ')
+    );
   };
 
   // ==========================================
@@ -243,6 +320,33 @@ export default function App() {
     setCurrentUser(null);
     setView('login');
   };
+
+  // Xodim boshqa qurilmada o'chirilsa - shu ekrandan ham chiqadi (oldin chiqib ketguncha ishlayverardi);
+  // roli, ismi yoki huquqlari o'zgarsa - darhol yangisi bilan ishlaydi
+  useEffect(() => {
+    if (view !== 'app' || !currentUser) return undefined;
+    if (liveUser) {
+      if (liveUser !== currentUser && JSON.stringify(liveUser) !== JSON.stringify(currentUser)) {
+        setCurrentUser(liveUser);
+      }
+      return undefined;
+    }
+    if (!Array.isArray(users) || users.length === 0) return undefined;
+    const t = setTimeout(() => {
+      addAuditLog('Tizimdan chiqarildi', `${currentUser.name || 'Xodim'}: profili o'chirilgan`, currentUser);
+      notify("⛔️ Profilingiz o'chirildi: tizimdan chiqdingiz.", 'error');
+      setCurrentUser(null);
+      setView('login');
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [view, currentUser, liveUser, users, addAuditLog]);
+
+  // Ega admindan bo'limni yopsa, u o'sha ekranda qolmaydi
+  useEffect(() => {
+    if (view === 'app' && currentUser?.role === 'admin' && !canOpenAdminView(sessionUser, ownerId, adminActiveView)) {
+      setAdminActiveView('admin');
+    }
+  }, [view, currentUser, sessionUser, ownerId, adminActiveView]);
 
   // Stolda to'lanmagan chek bormi (stol band). "Olib ketish" band bo'lmaydi: har buyurtma alohida chek
   const findOpenTableOrder = (tableName) =>
@@ -513,8 +617,17 @@ export default function App() {
   }
 
   // C) ASOSIY ISHCHI DASTUR REJIMI
-  const currentActiveView = currentUser.role === 'admin' ? adminActiveView : currentUser.role;
-  const staffWithSamplePin = currentUser.role === 'admin' ? samplePinStaff : [];
+  // Admin faqat Ega ochib bergan ekranlarni ko'radi (Boshqaruv doim ochiq: u yerda o'z profili bor)
+  const isAdmin = currentUser.role === 'admin';
+  const isOwner = isOwnerUser(sessionUser, ownerId);
+  const currentActiveView = isAdmin
+    ? (canOpenAdminView(sessionUser, ownerId, adminActiveView) ? adminActiveView : 'admin')
+    : currentUser.role;
+  const staffWithSamplePin = isAdmin && hasRight(sessionUser, ownerId, 'staff') ? samplePinStaff : [];
+  // Mijoz chaqiruvi, oshxona xabari, QR-so'rov: ofitsiant, kassir va shu ekranlari ochiq admin
+  const showFloorPanels = isAdmin
+    ? hasRight(sessionUser, ownerId, 'waiter') || hasRight(sessionUser, ownerId, 'cashier')
+    : ['waiter', 'cashier'].includes(currentUser.role);
   // Kuryer biriktirilmagan yetkazish buyurtmalari (admin menyusidagi belgi)
   const unassignedDeliveries = (Array.isArray(orders) ? orders : []).filter(
     o => o && isDeliveryOrder(o) && !CLOSED_ORDER_STATUSES.includes(o.status) &&
@@ -537,13 +650,17 @@ export default function App() {
               {cafeName}
             </h1>
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-              {currentUser.name} • <span className="uppercase font-bold tracking-wide text-brand-600 dark:text-brand-500">{getRoleMeta(currentUser.role).icon} {getUserTitle(currentUser)}</span>
+              {currentUser.name} • <span className="uppercase font-bold tracking-wide text-brand-600 dark:text-brand-500">
+                {isOwner
+                  ? `👑 ${String(currentUser.title || '').trim() || 'Ega'}`
+                  : `${getRoleMeta(currentUser.role).icon} ${getUserTitle(currentUser)}`}
+              </span>
             </p>
           </div>
         </div>
 
-        {/* Admin uchun barcha ekranlarni ko'rish va boshqarish tablari */}
-        {currentUser.role === 'admin' && (
+        {/* Admin uchun ekranlar: faqat Ega ochib bergan bo'limlar (src/utils/adminRights.ts) */}
+        {isAdmin && (
           <nav className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700/70 p-1 rounded-full overflow-x-auto hide-scrollbar">
             {[
               { id: 'admin', label: '⚙️ Boshqaruv' },
@@ -553,7 +670,7 @@ export default function App() {
               { id: 'cashier', label: '💰 Kassa' },
               { id: 'kitchen', label: '👨‍🍳 Oshxona' },
               { id: 'courier', label: `🛵 Kuryer ${unassignedDeliveries > 0 ? `(${unassignedDeliveries})` : ''}` }
-            ].map(tab => (
+            ].filter(tab => canOpenAdminView(sessionUser, ownerId, tab.id)).map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setAdminActiveView(tab.id)}
@@ -603,7 +720,7 @@ export default function App() {
       <main className="p-3 md:p-5 max-w-[1600px] mx-auto">
 
         {/* Mijoz chaqiruvlari va telefondan kelgan QR-buyurtmalar (ofitsiant, kassir, admin) */}
-        {['admin', 'waiter', 'cashier'].includes(currentUser.role) && (
+        {showFloorPanels && (
           <>
             <WaiterCallsPanel
               waiterCalls={waiterCalls}
@@ -687,6 +804,7 @@ export default function App() {
             setMenuItems={setMenuItems}
             menuCategories={menuCategories}
             currentUser={currentUser}
+            requireAdminOverride={requireAdminOverride}
             addAuditLog={addAuditLog}
           />
         )}
@@ -759,10 +877,13 @@ export default function App() {
             setInventoryLogs={setInventoryLogs}
             auditLogs={auditLogs}
             setAuditLogs={setAuditLogs}
-            isOverrideEnabled={isOverrideEnabled}
-            setIsOverrideEnabled={setIsOverrideEnabled}
-            currentUser={currentUser}
+            pinRules={pinRules}
+            onChangePinRules={handleChangePinRules}
+            ownerId={ownerId}
+            setOwnerRecord={setOwnerRecord}
+            currentUser={sessionUser}
             requireAdminOverride={requireAdminOverride}
+            requireOwnerConfirm={requireOwnerConfirm}
             addAuditLog={addAuditLog}
           />
         )}
@@ -792,6 +913,10 @@ export default function App() {
           request={overrideRequest}
           actionName={overrideRequest.actionName}
           users={users}
+          approvers={overrideRequest.ownerOnly
+            ? (Array.isArray(users) ? users : []).filter(u => u && userIdOf(u) === ownerId)
+            : approverUsers}
+          ownerOnly={Boolean(overrideRequest.ownerOnly)}
           onSuccess={overrideRequest.onSuccess}
           onCancel={() => setOverrideRequest(null)}
           onClose={() => setOverrideRequest(null)}

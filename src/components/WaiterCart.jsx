@@ -43,7 +43,9 @@ export default function WaiterCart({
   onMarkAsDelivered,
   markAsServed,
   onLockPreCheck,
-  onCancelEntireOrder
+  onCancelEntireOrder,
+  // Admin -> PIN himoyasi: oshxonaga ketgan taomni kamaytirish uchun PIN so'raladimi (🔒 belgisi)
+  reduceNeedsPin = true
 }) {
   const [expandedNoteId, setExpandedNoteId] = useState(null);
 
@@ -284,8 +286,8 @@ export default function WaiterCart({
             const lineTotal = price * qty;
             const isNoteOpen = expandedNoteId === itemKey;
 
-            const isReductionProtected = isPreCheckLocked || (sentQty > 0 && qty <= sentQty);
-            const isDeleteProtected = isPreCheckLocked || sentQty > 0;
+            const isReductionProtected = reduceNeedsPin && (isPreCheckLocked || (sentQty > 0 && qty <= sentQty));
+            const isDeleteProtected = reduceNeedsPin && (isPreCheckLocked || sentQty > 0);
             // Chekdagi (yuborilgan) qism uchun oshxona holati
             const sentPart = { ...item, quantity: sentQty };
             const isKitchenLine = isKitchenItem(item);

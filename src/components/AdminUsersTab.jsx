@@ -6,13 +6,27 @@ import { findPinOwner, hasPin, pinLengthOf, withPin } from '../utils/pinHash';
 import { BACKUP_CODE_COUNT, backupCodesLeft, hasTwoFactor, stripTwoFactor, withTwoFactor } from '../utils/twoFactor';
 import TwoFactorSetupModal from './TwoFactorSetupModal';
 import TwoFactorCodeModal from './TwoFactorCodeModal';
+import AdminRightsModal, { AdminRightsEditor } from './AdminRightsModal';
+import {
+  ALL_RIGHTS, canAddAdmins, canManageUser, clampRights, countRights, defaultAdminRights,
+  describeRightsChange, getUserRights, grantableRights, hasRight, isAdminUser, isOwnerUser,
+  makeOwnerRecord, userIdOf
+} from '../utils/adminRights';
+import { getPinLockRemainingMs, registerPinFailure } from '../utils/pinGuard';
 
 const EMPTY_FORM = { name: '', title: '', role: 'waiter', pin: '', canSeeSales: true };
+// Band PIN haqidagi javob: kimniki ekani aytilmaydi va urinishlar cheklanadi (aks holda admin
+// PIN'larni birma-bir sinab, Ega PIN'ini bilib olishi mumkin edi)
+const PIN_ASSIGN_SCOPE = 'pin_assign';
 
 export default function AdminUsersTab({ 
   users = [], 
   setUsers,
   currentUser,
+  // Ega (src/utils/adminRights.ts): uni hech kim o'zgartira olmaydi, adminlarga huquqni u beradi
+  ownerId = null,
+  setOwnerRecord,
+  requireOwnerConfirm,
   cafeName = 'Kafe POS',
   addAuditLog
 }) {
@@ -21,13 +35,25 @@ export default function AdminUsersTab({
   // ==========================================
   const safeUsers = Array.isArray(users) ? users : [];
 
+  // Kim amal qilyapti va nima qila oladi (bazadagi eng so'nggi yozuvdan)
+  const actor = (currentUser && safeUsers.find(u => u && userIdOf(u) === userIdOf(currentUser))) || currentUser || null;
+  const actorId = userIdOf(actor);
+  const actorIsOwner = isOwnerUser(actor, ownerId);
+  const canStaff = hasRight(actor, ownerId, 'staff');
+  const canAdmins = canAddAdmins(actor, ownerId);
+  const blankForm = () => ({ ...EMPTY_FORM, role: !canStaff && canAdmins ? 'admin' : 'waiter' });
+
   const [editingId, setEditingId] = useState(null);
   const [filterGroup, setFilterGroup] = useState('all'); // 'all' | 'management' | 'staff'
   const [searchQuery, setSearchQuery] = useState('');
   
   // Yangi yoki tahrirlanayotgan xodim ma'lumotlari.
   // title - lavozim nomi (admin o'zi yozadi), role - qaysi bo'limga kira oladi
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [formData, setFormData] = useState(blankForm);
+  // Formadagi admin huquqlari (null - standart: Telegram kabi ko'pi ochiq, admin tayinlash yopiq)
+  const [formRights, setFormRights] = useState(null);
+  // "🛡️ Huquqlar" oynasi ochilgan admin
+  const [rightsTarget, setRightsTarget] = useState(null);
 
   // Ikki bosqichli kirish (src/utils/twoFactor.ts): yoqish oynasi va o'z hisobidan o'chirish tasdig'i
   const [twoFactorSetupUser, setTwoFactorSetupUser] = useState(null);
@@ -38,6 +64,12 @@ export default function AdminUsersTab({
   const editingUser = editingId ? safeUsers.find(u => u && u.id === editingId) : null;
   const canKeepPin = Boolean(editingUser) && hasPin(editingUser) &&
     pinLengthOf(editingUser, getRequiredPinLength(editingUser.role)) === getRequiredPinLength(formData.role);
+  // O'zini tahrirlash: faqat ism, lavozim nomi va PIN (o'z rolini va huquqini o'zgartira olmaydi)
+  const isSelfEdit = Boolean(editingUser) && userIdOf(editingUser) === actorId;
+  const showForm = canStaff || canAdmins || isSelfEdit;
+  // Formadagi admin huquqlari (bera olmaydigani - qulf)
+  const formGrantable = grantableRights(actor, ownerId);
+  const effectiveFormRights = formRights || clampRights(defaultAdminRights(), actor, ownerId);
 
   // Tizimdagi mavjud rollar va ularning PIN talablari (yagona joy: src/constants/roles.js)
   const roleOptions = ROLE_OPTIONS.map(r => ({
@@ -49,6 +81,12 @@ export default function AdminUsersTab({
     icon: r.icon,
     badgeName: r.label
   }));
+
+  // Formada tanlash mumkin rollar: admin - "Yangi admin tayinlash" huquqi bilan, qolganlari - "Xodimlar"
+  // huquqi bilan. O'zini tahrirlayotganda rol qotirilgan
+  const formRoleOptions = isSelfEdit
+    ? roleOptions.filter(r => r.value === editingUser.role)
+    : roleOptions.filter(r => (r.value === 'admin' ? canAdmins : canStaff) || r.value === formData.role);
 
   const getRoleMeta = (role) => {
     return roleOptions.find(r => r.value === role) || {
@@ -123,19 +161,37 @@ export default function AdminUsersTab({
     const cleanName = (formData.name || '').trim();
     const cleanTitle = (formData.title || '').trim();
     const cleanPin = String(formData.pin || '').trim();
+    const target = editingUser;
+    // O'z rolini hech kim o'zgartira olmaydi (Ega ham: avval egalikni topshiradi)
+    const nextRole = isSelfEdit ? target.role : formData.role;
+
+    // 0. Huquq: Egani hech kim o'zgartira olmaydi; adminni - Ega yoki uni tayinlagan admin;
+    // oddiy xodimni - "Xodimlar" huquqi bor admin
+    if (target && !isSelfEdit && !canManageUser(actor, target, ownerId)) {
+      notify(isOwnerUser(target, ownerId)
+        ? "⛔️ Ega ma'lumotlarini hech kim o'zgartira olmaydi."
+        : "⛔️ Bu xodimni o'zgartirishga huquqingiz yo'q.");
+      return;
+    }
+    if (!isSelfEdit && (nextRole === 'admin' ? !canAdmins : !canStaff)) {
+      notify(nextRole === 'admin'
+        ? "⛔️ Admin tayinlash huquqingiz yo'q (faqat Ega yoki u ruxsat bergan admin)."
+        : "⛔️ Xodim qo'shish yoki o'zgartirish huquqingiz yo'q.");
+      return;
+    }
 
     // 1. Validatsiya: Bo'sh maydonlarni tekshirish
     if (!cleanName || (!cleanPin && !canKeepPin)) {
-      notify(editingUser && hasPin(editingUser)
+      notify(target && hasPin(target)
         ? "Lavozim o'zgargani uchun PIN uzunligi ham o'zgaradi: yangi PIN-kod kiriting!"
         : "Iltimos, xodim ismini va PIN-kodni to'liq kiriting!");
       return;
     }
 
     // 2. Validatsiya: PIN uzunligini qat'iy tekshirish
-    const requiredLength = getRequiredPinLength(formData.role);
+    const requiredLength = getRequiredPinLength(nextRole);
     if (cleanPin && cleanPin.length !== requiredLength) {
-      notify(`Xato! "${getRoleMeta(formData.role).badgeName}" lavozimi uchun PIN-kod aynan ${requiredLength} xonali raqam bo'lishi shart!`);
+      notify(`Xato! "${getRoleMeta(nextRole).badgeName}" lavozimi uchun PIN-kod aynan ${requiredLength} xonali raqam bo'lishi shart!`);
       return;
     }
 
@@ -148,12 +204,31 @@ export default function AdminUsersTab({
       return;
     }
 
-    // 4. Validatsiya: Bir xil PIN-kod boshqa xodimda bor-yo'qligini tekshirish (LockScreen uchun juda muhim!)
-    const duplicatePinUser = cleanPin ? findPinOwner(safeUsers, cleanPin, editingId) : null;
-    if (duplicatePinUser) {
-      notify(`⛔️ Ushbu PIN-kod boshqa xodimga (${duplicatePinUser.name}) biriktirilgan! Tizimga kirishda to'qnashuv bo'lmasligi uchun boshqa PIN-kod kiriting.`);
-      return;
+    // 4. Validatsiya: Bir xil PIN-kod boshqa xodimda bor-yo'qligini tekshirish (LockScreen uchun juda muhim!).
+    // Kimniki ekani aytilmaydi va ketma-ket urinishlar cheklanadi (PIN'larni terib topishdan himoya)
+    if (cleanPin) {
+      const lockLeftMs = getPinLockRemainingMs(PIN_ASSIGN_SCOPE);
+      if (lockLeftMs > 0) {
+        notify(`⛔️ Juda ko'p urinish: ${Math.ceil(lockLeftMs / 1000)} soniya kuting.`);
+        return;
+      }
+      if (findPinOwner(safeUsers, cleanPin, editingId)) {
+        registerPinFailure(PIN_ASSIGN_SCOPE);
+        notify("⛔️ Bu PIN-kod band (boshqa xodimda bor). Boshqa PIN kiriting yoki \"🎲 Avto-PIN\" ni bosing.");
+        return;
+      }
     }
+
+    // 5. Admin huquqlari: bera olmaydigan huquq o'zgarmaydi, yangi admin - kim tayinlagani bilan
+    const wasAdmin = Boolean(target) && isAdminUser(target);
+    const rightsBefore = wasAdmin && !isSelfEdit ? getUserRights(target, ownerId) : null;
+    const nextRights = nextRole === 'admin' && !isSelfEdit
+      ? clampRights(effectiveFormRights, actor, ownerId, rightsBefore)
+      : null;
+    const rightsNote = nextRights
+      ? ` • Huquqlar: ${countRights(nextRights).on}/${countRights(nextRights).total}${
+        rightsBefore ? ` (${describeRightsChange(rightsBefore, nextRights)})` : ''}`
+      : '';
 
     if (editingId) {
       // TAHRIRLASH REJIMI
@@ -164,14 +239,22 @@ export default function AdminUsersTab({
             ...user,
             name: cleanName,
             title: cleanTitle,
-            role: formData.role,
-            canSeeSales: formData.role === 'waiter' ? Boolean(formData.canSeeSales) : (formData.role === 'admin')
+            role: nextRole,
+            canSeeSales: nextRole === 'waiter' ? Boolean(formData.canSeeSales) : (nextRole === 'admin')
           };
+          if (nextRole !== 'admin') {
+            // Admindan oddiy xodimga: admin huquqlari o'chadi
+            delete updated.adminRights;
+            delete updated.appointedBy;
+          } else if (nextRights) {
+            updated.adminRights = nextRights;
+            if (!wasAdmin) updated.appointedBy = actorId;
+          }
           return cleanPin ? withPin(updated, cleanPin) : updated;
         }));
       }
       if (typeof addAuditLog === 'function') {
-        addAuditLog("Xodim tahrirlandi", `${cleanName} (${cleanTitle || getRoleMeta(formData.role).badgeName}) ma'lumotlari yangilandi`);
+        addAuditLog("Xodim tahrirlandi", `${cleanName} (${cleanTitle || getRoleMeta(nextRole).badgeName}) ma'lumotlari yangilandi${rightsNote}`);
       }
       setEditingId(null);
     } else {
@@ -180,22 +263,34 @@ export default function AdminUsersTab({
         id: newId('user_'),
         name: cleanName,
         title: cleanTitle,
-        role: formData.role,
-        canSeeSales: formData.role === 'waiter' ? Boolean(formData.canSeeSales) : (formData.role === 'admin')
+        role: nextRole,
+        canSeeSales: nextRole === 'waiter' ? Boolean(formData.canSeeSales) : (nextRole === 'admin'),
+        ...(nextRights ? { adminRights: nextRights, appointedBy: actorId } : {})
       }, cleanPin);
       if (typeof setUsers === 'function') {
         setUsers(prev => [...prev, newUser]);
       }
       if (typeof addAuditLog === 'function') {
-        addAuditLog("Yangi xodim qo'shildi", `${cleanName} (${cleanTitle || getRoleMeta(formData.role).badgeName}) tizimga qo'shildi`);
+        addAuditLog(
+          nextRole === 'admin' ? 'Yangi admin tayinlandi' : "Yangi xodim qo'shildi",
+          `${cleanName} (${cleanTitle || getRoleMeta(nextRole).badgeName}) tizimga qo'shildi${rightsNote}`
+        );
       }
     }
 
     // Formani tozalash
-    setFormData(EMPTY_FORM);
+    setFormData(blankForm());
+    setFormRights(null);
   };
 
   const handleEdit = (user) => {
+    const isSelf = userIdOf(user) === actorId;
+    if (!isSelf && !canManageUser(actor, user, ownerId)) {
+      notify(isOwnerUser(user, ownerId)
+        ? "🔒 Ega ma'lumotlarini hech kim o'zgartira olmaydi."
+        : "🔒 Bu xodimni o'zgartirishga huquqingiz yo'q.");
+      return;
+    }
     setEditingId(user.id);
     setFormData({
       name: user.name || '',
@@ -204,12 +299,17 @@ export default function AdminUsersTab({
       pin: '',
       canSeeSales: user.canSeeSales !== undefined ? Boolean(user.canSeeSales) : true
     });
+    setFormRights(isAdminUser(user) && !isSelf ? getUserRights(user, ownerId) : null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Ofitsiantning savdoni ko'rish ruxsatini kartochkaning o'zidan 1-bosishda o'zgartirish
   const handleToggleWaiterSalesPermission = (user) => {
     if (typeof setUsers !== 'function') return;
+    if (!canManageUser(actor, user, ownerId)) {
+      notify("🔒 Bu xodimni o'zgartirishga huquqingiz yo'q.");
+      return;
+    }
     const nextVal = !user.canSeeSales;
 
     setUsers(prev => prev.map(u => 
@@ -225,9 +325,23 @@ export default function AdminUsersTab({
   };
 
   const handleDelete = async (user) => {
+    // 0. Egani hech kim o'chira olmaydi (Telegram guruhidagi kabi)
+    if (isOwnerUser(user, ownerId)) {
+      notify("⛔️ Ega hisobini hech kim o'chira olmaydi. Ega boshqa adminga egalikni topshirgandan keyin o'chirish mumkin.");
+      return;
+    }
+
     // 1. O'zining aktiv profilini o'chirishdan himoya
     if (currentUser && user.id === currentUser.id) {
       notify("⛔️ Siz hozir ushbu Admin profili orqali tizimda o'tiribsiz! O'zingizning profilingizni o'chira olmaysiz.");
+      return;
+    }
+
+    // 1.1 Huquq: adminni - Ega yoki uni tayinlagan admin, oddiy xodimni - "Xodimlar" huquqi bor admin
+    if (!canManageUser(actor, user, ownerId)) {
+      notify(isAdminUser(user)
+        ? "⛔️ Bu adminni faqat Ega (yoki uni tayinlagan admin) o'chira oladi."
+        : "⛔️ Xodimni o'chirishga huquqingiz yo'q.");
       return;
     }
 
@@ -255,7 +369,54 @@ export default function AdminUsersTab({
 
   const handleCancel = () => {
     setEditingId(null);
-    setFormData(EMPTY_FORM);
+    setFormData(blankForm());
+    setFormRights(null);
+  };
+
+  // ==========================================
+  // 3.0 EGA: ADMIN HUQUQLARI VA EGALIKNI TOPSHIRISH
+  // ==========================================
+  const handleSaveRights = (rights, before) => {
+    const target = rightsTarget;
+    setRightsTarget(null);
+    if (!target || typeof setUsers !== 'function') return;
+    if (!canManageUser(actor, target, ownerId)) {
+      notify("⛔️ Bu adminning huquqlarini o'zgartira olmaysiz.");
+      return;
+    }
+    setUsers(prev => prev.map(u => (u && userIdOf(u) === userIdOf(target) ? { ...u, adminRights: rights } : u)));
+    if (typeof addAuditLog === 'function') {
+      addAuditLog("Admin huquqlari o'zgardi", `${target.name}: ${describeRightsChange(before, rights)}`);
+    }
+    notify(`✅ ${target.name}: huquqlar saqlandi`);
+  };
+
+  // Telegram kabi: Ega egalikni boshqa adminga beradi, o'zi barcha huquqli admin bo'lib qoladi.
+  // Ega PIN'i (va yoqilgan bo'lsa Authenticator kodi) bilan tasdiqlanadi
+  const handleTransferOwnership = async (user) => {
+    if (!actorIsOwner || !isAdminUser(user) || userIdOf(user) === actorId || typeof setOwnerRecord !== 'function') return;
+    const ok = await confirmAsync(
+      `👑 Egalikni "${user.name}" ga topshirasizmi?\n\nU Ega bo'ladi: barcha huquqlar, uni hech kim o'zgartira olmaydi. Siz barcha huquqli admin bo'lib qolasiz, egalikni faqat u qaytara oladi.`,
+      { confirmText: 'Ha, topshirish', danger: true }
+    );
+    if (!ok) return;
+    const transfer = () => {
+      setOwnerRecord(makeOwnerRecord(user.id, actor?.name));
+      if (typeof setUsers === 'function') {
+        setUsers(prev => prev.map(u => (u && userIdOf(u) === actorId
+          ? { ...u, adminRights: { ...ALL_RIGHTS }, appointedBy: userIdOf(user) }
+          : u)));
+      }
+      if (typeof addAuditLog === 'function') {
+        addAuditLog('Egalik topshirildi', `${actor?.name || 'Ega'} → ${user.name}`);
+      }
+      notify(`👑 Endi Ega: ${user.name}`);
+    };
+    if (typeof requireOwnerConfirm === 'function') {
+      requireOwnerConfirm(`Egalikni "${user.name}" ga topshirish`, transfer);
+    } else {
+      transfer();
+    }
   };
 
   // ==========================================
@@ -290,6 +451,12 @@ export default function AdminUsersTab({
   };
 
   const handleResetOtherTwoFactor = async (user) => {
+    if (!canManageUser(actor, user, ownerId)) {
+      notify(isOwnerUser(user, ownerId)
+        ? "⛔️ Ega hisobidagi ikki bosqichli kirishni faqat Eganing o'zi o'chiradi."
+        : "⛔️ Bu xodimni o'zgartirishga huquqingiz yo'q.");
+      return;
+    }
     if (!await confirmAsync(`"${user.name}" hisobidagi ikki bosqichli kirish o'chirilsinmi?\n\nTelefoni va zaxira kodlari yo'qolgan bo'lsa shunday qiling: u PIN bilan kirib, yangi telefon bilan qayta yoqadi.`)) {
       return;
     }
@@ -353,6 +520,28 @@ export default function AdminUsersTab({
         />
       )}
 
+      {rightsTarget && (
+        <AdminRightsModal
+          target={rightsTarget}
+          actor={actor}
+          ownerId={ownerId}
+          users={safeUsers}
+          onSave={handleSaveRights}
+          onCancel={() => setRightsTarget(null)}
+        />
+      )}
+
+      {/* Ega haqida qisqa tushuntirish (Telegram guruhidagi "Ega" kabi) */}
+      <div className="flex items-start gap-3 p-4 rounded-3xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/10">
+        <span className="text-2xl shrink-0">👑</span>
+        <p className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-200 leading-relaxed">
+          Ega: <b>{String(safeUsers.find(u => u && userIdOf(u) === ownerId)?.name || '—')}</b>{actorIsOwner ? ' (siz)' : ''}.
+          Egani hech kim tahrirlay yoki o'chira olmaydi. Ega admin va xodimlarni tayinlaydi, har bir adminga
+          qaysi bo'limlar ochiqligini "🛡️ Huquqlar" tugmasi bilan belgilaydi.
+          {actorIsOwner ? ' Egalikni boshqa adminga uning kartasidagi "👑 Egalikni topshirish" bilan berasiz.' : ''}
+        </p>
+      </div>
+
       {suggestTwoFactor && (
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-3xl border border-brand-500/30 bg-brand-50 dark:bg-brand-500/10">
           <span className="text-2xl">🔐</span>
@@ -370,14 +559,32 @@ export default function AdminUsersTab({
         </div>
       )}
       
-      {/* 1. XODIM QO'SHISH YOKI TAHRIRLASH FORMASI */}
+      {/* 1. XODIM QO'SHISH YOKI TAHRIRLASH FORMASI (huquqi yo'q admin - faqat o'z profili) */}
+      {!showForm && actor && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white dark:bg-gray-800 p-5 md:p-6 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700">
+          <div className="flex-1">
+            <h2 className="text-lg font-black text-gray-900 dark:text-white">👤 Mening profilim</h2>
+            <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">
+              Xodim qo'shish huquqi sizga ochilmagan. O'z ismingiz va PIN-kodingizni o'zgartira olasiz.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleEdit(actor)}
+            className="shrink-0 px-5 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-black transition active:scale-95"
+          >
+            ✏️ PIN va ismni o'zgartirish
+          </button>
+        </div>
+      )}
+      {showForm && (
       <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700">
         
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div>
             <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
               <span>{editingId ? '✏️' : '➕'}</span> 
-              {editingId ? "Xodim ma'lumotlarini tahrirlash" : "Yangi Xodim Qo'shish"}
+              {isSelfEdit ? "Mening ma'lumotlarim" : editingId ? "Xodim ma'lumotlarini tahrirlash" : "Yangi Xodim Qo'shish"}
             </h2>
             <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">
               Boshqaruv (Admin/Omborchi) uchun 6 xonali, qolgan xodimlar uchun 4 xonali noyob PIN-kod beriladi.
@@ -446,12 +653,18 @@ export default function AdminUsersTab({
                 name="role"
                 value={formData.role} 
                 onChange={handleInputChange}
-                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-brand-500 text-gray-900 dark:text-white font-bold transition cursor-pointer"
+                disabled={isSelfEdit}
+                className="w-full p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 outline-hidden focus:border-brand-500 text-gray-900 dark:text-white font-bold transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {roleOptions.map(opt => (
+                {formRoleOptions.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
+              {isSelfEdit && (
+                <p className="text-[11px] font-bold text-gray-400 mt-1.5">
+                  🔒 O'z bo'limingiz va huquqingizni o'zgartira olmaysiz{actorIsOwner ? ' (Ega: avval egalikni topshiring)' : ''}.
+                </p>
+              )}
             </div>
             
             {/* PIN-kod + Avto-generatsiya tugmasi */}
@@ -482,6 +695,22 @@ export default function AdminUsersTab({
             </div>
 
           </div>
+
+          {/* Admin huquqlari (Telegram uslubida): qaysi bo'limlar shu adminga ochiq */}
+          {formData.role === 'admin' && !isSelfEdit && (
+            <div className="space-y-2">
+              <AdminRightsEditor
+                value={effectiveFormRights}
+                onChange={setFormRights}
+                grantable={formGrantable}
+              />
+              {!actorIsOwner && (
+                <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                  🔒 Qulf belgisi: bu huquq sizda yo'q, uni faqat Ega beradi.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Ofitsiant uchun qo'shimcha ruxsat (canSeeSales) va Tugmalar */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
@@ -516,13 +745,14 @@ export default function AdminUsersTab({
                 type="submit" 
                 className="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-700 text-white px-8 py-3.5 rounded-xl font-black shadow-lg shadow-brand-600/30 transition active:scale-95 whitespace-nowrap"
               >
-                {editingId ? 'Saqlash 💾' : "Xodimni Qo'shish ➕"}
+                {editingId ? 'Saqlash 💾' : formData.role === 'admin' ? 'Admin tayinlash 👑' : "Xodimni Qo'shish ➕"}
               </button>
             </div>
           </div>
 
         </form>
       </div>
+      )}
 
       {/* 2. MAVJUD XODIMLAR RO'YXATI */}
       <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 space-y-6">
@@ -582,6 +812,15 @@ export default function AdminUsersTab({
               const roleMeta = getRoleMeta(user.role);
               const safeName = String(user.name || 'Xodim');
               const isCurrentUser = currentUser && user.id === currentUser.id;
+              // Ega va admin huquqlari (src/utils/adminRights.ts)
+              const isOwnerCard = isOwnerUser(user, ownerId);
+              const isAdminCard = isAdminUser(user) && !isOwnerCard;
+              const canManageCard = canManageUser(actor, user, ownerId);
+              const cardRights = isAdminCard ? getUserRights(user, ownerId) : null;
+              const cardRightsCount = cardRights ? countRights(cardRights) : null;
+              const appointer = isAdminCard && user.appointedBy !== undefined
+                ? safeUsers.find(u => u && userIdOf(u) === String(user.appointedBy))
+                : null;
               
               return (
                 <div 
@@ -599,6 +838,11 @@ export default function AdminUsersTab({
                       </div>
 
                       <div className="flex flex-col items-end gap-1">
+                        {isOwnerCard && (
+                          <span className="text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-amber-400 text-amber-950 shadow-sm shadow-amber-500/30">
+                            👑 Ega
+                          </span>
+                        )}
                         <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full ${
                           user.role === 'admin' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
                           user.role === 'warehouse' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
@@ -641,6 +885,34 @@ export default function AdminUsersTab({
                       )}
                     </div>
 
+                    {/* Ega: barcha huquqlar. Admin: qaysi bo'limlar ochiq va kim tayinlagan */}
+                    {isOwnerCard && (
+                      <p className="mt-3 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                        👑 Barcha huquqlar • hech kim o'zgartira olmaydi
+                      </p>
+                    )}
+                    {isAdminCard && cardRights && (
+                      <div className="mt-3 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] font-black text-gray-600 dark:text-gray-300">
+                            🛡️ Ochiq: {cardRightsCount.on}/{cardRightsCount.total}
+                          </span>
+                          {cardRights.addAdmins && (
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">👑 admin tayinlaydi</span>
+                          )}
+                          {cardRights.pinRules && (
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">🔐 PIN himoyasi</span>
+                          )}
+                          {!cardRights.approve && (
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300">✅ tasdiqlay olmaydi</span>
+                          )}
+                        </div>
+                        {appointer && (
+                          <p className="text-[10px] font-bold text-gray-400">Tayinlagan: {String(appointer.name || '')}</p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Ikki bosqichli kirish (admin uchun) */}
                     {(user.role === 'admin' || hasTwoFactor(user)) && (
                       <div className="mt-3">
@@ -652,13 +924,15 @@ export default function AdminUsersTab({
                             <span className={`text-[10px] font-bold ${backupCodesLeft(user) <= 2 ? 'text-red-500' : 'text-gray-400'}`}>
                               zaxira kod: {backupCodesLeft(user)}/{BACKUP_CODE_COUNT}
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => (isCurrentUser ? setTwoFactorDisableUser(user) : handleResetOtherTwoFactor(user))}
-                              className="ml-auto text-[10px] font-black text-red-500 hover:text-red-600 underline underline-offset-2"
-                            >
-                              {isCurrentUser ? "O'chirish" : "O'chirish (tiklash)"}
-                            </button>
+                            {(isCurrentUser || canManageCard) && (
+                              <button
+                                type="button"
+                                onClick={() => (isCurrentUser ? setTwoFactorDisableUser(user) : handleResetOtherTwoFactor(user))}
+                                className="ml-auto text-[10px] font-black text-red-500 hover:text-red-600 underline underline-offset-2"
+                              >
+                                {isCurrentUser ? "O'chirish" : "O'chirish (tiklash)"}
+                              </button>
+                            )}
                           </div>
                         ) : isCurrentUser ? (
                           <button
@@ -682,7 +956,8 @@ export default function AdminUsersTab({
                         <button
                           type="button"
                           onClick={() => handleToggleWaiterSalesPermission(user)}
-                          className={`text-[11px] font-black px-3 py-1.5 rounded-xl border transition ${
+                          disabled={!canManageCard}
+                          className={`text-[11px] font-black px-3 py-1.5 rounded-xl border transition disabled:cursor-not-allowed ${
                             user.canSeeSales
                               ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50'
                               : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700'
@@ -694,21 +969,59 @@ export default function AdminUsersTab({
                     )}
                   </div>
 
-                  <div className="flex gap-2 mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button 
-                      type="button"
-                      onClick={() => handleEdit(user)}
-                      className="flex-1 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 py-2.5 rounded-xl text-xs font-black border border-gray-200 dark:border-gray-600 transition active:scale-95"
-                    >
-                      ✏️ Tahrirlash
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => handleDelete(user)}
-                      className="flex-1 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 py-2.5 rounded-xl text-xs font-black transition active:scale-95"
-                    >
-                      🗑 O'chirish
-                    </button>
+                  <div className="flex flex-wrap gap-2 mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    {canManageCard ? (
+                      <>
+                        {isAdminCard && (
+                          <button
+                            type="button"
+                            onClick={() => setRightsTarget(user)}
+                            className="w-full bg-brand-50 dark:bg-brand-500/10 hover:bg-brand-100 dark:hover:bg-brand-500/20 text-brand-700 dark:text-brand-400 py-2.5 rounded-xl text-xs font-black border border-brand-500/30 transition active:scale-95"
+                          >
+                            🛡️ Huquqlar (bo'limlarni ochish / yopish)
+                          </button>
+                        )}
+                        <button 
+                          type="button"
+                          onClick={() => handleEdit(user)}
+                          className="flex-1 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 py-2.5 rounded-xl text-xs font-black border border-gray-200 dark:border-gray-600 transition active:scale-95"
+                        >
+                          ✏️ Tahrirlash
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleDelete(user)}
+                          className="flex-1 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 py-2.5 rounded-xl text-xs font-black transition active:scale-95"
+                        >
+                          🗑 O'chirish
+                        </button>
+                        {actorIsOwner && isAdminCard && (
+                          <button
+                            type="button"
+                            onClick={() => handleTransferOwnership(user)}
+                            className="w-full bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 py-2 rounded-xl text-[11px] font-black border border-amber-300/60 dark:border-amber-500/30 transition active:scale-95"
+                          >
+                            👑 Egalikni topshirish
+                          </button>
+                        )}
+                      </>
+                    ) : isCurrentUser ? (
+                      <button 
+                        type="button"
+                        onClick={() => handleEdit(user)}
+                        className="flex-1 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 py-2.5 rounded-xl text-xs font-black border border-gray-200 dark:border-gray-600 transition active:scale-95"
+                      >
+                        ✏️ Ism va PIN'ni o'zgartirish
+                      </button>
+                    ) : (
+                      <p className="flex-1 text-center text-[11px] font-bold text-gray-400 py-2">
+                        {isOwnerCard
+                          ? "🔒 Egani hech kim o'zgartira olmaydi"
+                          : isAdminCard
+                            ? "🔒 Faqat Ega (yoki tayinlagan admin) o'zgartiradi"
+                            : "🔒 Xodimlarni o'zgartirish huquqingiz yo'q"}
+                      </p>
+                    )}
                   </div>
                 </div>
               );

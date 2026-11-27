@@ -5,6 +5,12 @@ import AdminCategoriesTab from './AdminCategoriesTab';
 import AdminUsersTab from './AdminUsersTab';
 import AdminAuditLogsTab from './AdminAuditLogsTab';
 import AdminSettingsTab from './AdminSettingsTab';
+import PinRulesPanel from './PinRulesPanel';
+import { OWNER_KEY, hasRight, isOwnerUser, resolveOwnerId, userIdOf } from '../utils/adminRights';
+import { LEGACY_OVERRIDE_KEY, PIN_RULES_KEY, countPinRules, resolvePinRules } from '../utils/pinRules';
+
+// Boshqaruv bo'limi -> kerakli huquq (null - har bir adminga ochiq: o'z profili va PIN himoyasini ko'rish)
+const TAB_RIGHT = { menu: 'menu', categories: 'categories', users: null, pin: null, logs: 'logs', settings: 'settings' };
 
 export default function AdminPanel({ 
   menuItems, 
@@ -23,17 +29,21 @@ export default function AdminPanel({
   setInventoryLogs,
   auditLogs,
   setAuditLogs,
-  isOverrideEnabled,
-  setIsOverrideEnabled,
+  // Admin PIN himoyasi (har amal alohida) va Ega: App.jsx dan (src/utils/pinRules.ts, adminRights.ts)
+  pinRules,
+  onChangePinRules,
+  ownerId,
+  setOwnerRecord,
   cafeName,
   setCafeName,
   serviceFee,
   setServiceFee,
   currentUser,
   requireAdminOverride,
+  requireOwnerConfirm,
   addAuditLog
 }) {
-  // Boshlang'ich oyna sifatida 'Taomlar' bo'limi ochiladi
+  // Boshlang'ich oyna sifatida 'Taomlar' bo'limi ochiladi (yopiq bo'lsa - birinchi ochiq bo'lim)
   const [activeTab, setActiveTab] = useState('menu');
 
   // ==========================================
@@ -49,7 +59,9 @@ export default function AdminPanel({
   const [stickyAuditLogs, setStickyAuditLogs] = useSticky('pos_audit_logs', []);
   const [stickyCafeName, setStickyCafeName] = useSticky('pos_cafe_name', 'Premium Cafe');
   const [stickyServiceFee, setStickyServiceFee] = useSticky('pos_service_fee', 10);
-  const [stickyOverride, setStickyOverride] = useSticky('pos_override_enabled', true);
+  const [stickyOverride] = useSticky(LEGACY_OVERRIDE_KEY, true);
+  const [stickyPinRules] = useSticky(PIN_RULES_KEY, null);
+  const [stickyOwner, setStickyOwner] = useSticky(OWNER_KEY, null);
 
   // Xavfsiz massivlar va funksiyalar
   const safeMenuItems = Array.isArray(menuItems) ? menuItems : (Array.isArray(stickyMenu) ? stickyMenu : []);
@@ -65,7 +77,14 @@ export default function AdminPanel({
 
   const resolvedCafeName = cafeName !== undefined ? cafeName : stickyCafeName;
   const resolvedServiceFee = serviceFee !== undefined ? serviceFee : stickyServiceFee;
-  const resolvedOverride = isOverrideEnabled !== undefined ? isOverrideEnabled : stickyOverride;
+  const resolvedPinRules = pinRules || resolvePinRules(stickyPinRules, stickyOverride);
+  const resolvedOwnerId = ownerId !== undefined ? ownerId : resolveOwnerId(safeUsers, stickyOwner);
+  const updateOwnerRecord = typeof setOwnerRecord === 'function' ? setOwnerRecord : setStickyOwner;
+  // Huquqlar bazadagi eng so'nggi yozuvdan (Ega boshqa qurilmada o'zgartirgan bo'lishi mumkin)
+  const actor = (currentUser && safeUsers.find(u => u && userIdOf(u) === userIdOf(currentUser))) || currentUser;
+  const isOwner = isOwnerUser(actor, resolvedOwnerId);
+  const ownerUser = safeUsers.find(u => u && userIdOf(u) === resolvedOwnerId) || null;
+  const pinCount = countPinRules(resolvedPinRules);
 
   const updateMenuItems = typeof setMenuItems === 'function' ? setMenuItems : setStickyMenu;
   const updateCategories = typeof setMenuCategories === 'function' ? setMenuCategories : setStickyCategories;
@@ -77,7 +96,6 @@ export default function AdminPanel({
   const updateAuditLogs = typeof setAuditLogs === 'function' ? setAuditLogs : setStickyAuditLogs;
   const updateCafeName = typeof setCafeName === 'function' ? setCafeName : setStickyCafeName;
   const updateServiceFee = typeof setServiceFee === 'function' ? setServiceFee : setStickyServiceFee;
-  const updateOverride = typeof setIsOverrideEnabled === 'function' ? setIsOverrideEnabled : setStickyOverride;
 
   const handleAddAuditLog = (action, details) => {
     if (typeof addAuditLog === 'function') {
@@ -119,7 +137,10 @@ export default function AdminPanel({
     },
     { 
       id: 'users', 
-      label: 'Xodimlar va Parollar', 
+      // Xodim qo'shish huquqi yo'q admin bu yerda faqat o'z PIN'i va ikki bosqichli kirishini o'zgartiradi
+      label: hasRight(actor, resolvedOwnerId, 'staff') || hasRight(actor, resolvedOwnerId, 'addAdmins')
+        ? 'Xodimlar va Parollar'
+        : 'Mening profilim',
       icon: '👥',
       badge: safeUsers.length
     },
@@ -129,13 +150,21 @@ export default function AdminPanel({
       icon: '🕵️‍♂️',
       badge: safeAuditLogs.length
     },
+    {
+      id: 'pin',
+      label: 'PIN himoyasi',
+      icon: '🔐',
+      badge: `${pinCount.on}/${pinCount.total}`
+    },
     { 
       id: 'settings', 
       label: 'Tizim Sozlamalari', 
-      icon: '⚙️',
-      badge: resolvedOverride ? '🔒' : '🔓'
+      icon: '⚙️'
     }
-  ];
+  ].filter(tab => !TAB_RIGHT[tab.id] || hasRight(actor, resolvedOwnerId, TAB_RIGHT[tab.id]));
+
+  // Ega bo'limni yopsa (yoki bu admin uchun 'Taomlar' yopiq bo'lsa) - birinchi ochiq bo'lim
+  const currentTab = tabs.some(t => t.id === activeTab) ? activeTab : (tabs[0]?.id || 'users');
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700 min-h-[calc(100vh-140px)] flex flex-col md:flex-row overflow-hidden animate-fade-in">
@@ -165,7 +194,7 @@ export default function AdminPanel({
           
           <div className="flex md:flex-col gap-2 md:gap-2.5 pr-2 md:pr-0">
             {tabs.map(tab => {
-              const isActive = activeTab === tab.id;
+              const isActive = currentTab === tab.id;
               return (
                 <button
                   key={tab.id}
@@ -208,26 +237,35 @@ export default function AdminPanel({
           </div>
         </div>
 
-        {/* Pastki qism: Tizim va Xavfsizlik holati */}
+        {/* Pastki qism: Ega va PIN himoyasi holati (bosilsa - PIN himoyasi ro'yxati) */}
         <div className="hidden md:block mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-          <div 
-            onClick={() => updateOverride(!resolvedOverride)}
-            className={`p-3.5 rounded-2xl border cursor-pointer transition active:scale-95 ${
-              resolvedOverride 
-                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50' 
+          <div className="p-3.5 rounded-2xl border bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30">
+            <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              👑 Ega
+            </p>
+            <p className="text-xs font-black mt-1 text-amber-700 dark:text-amber-300 truncate">
+              {ownerUser ? String(ownerUser.name || 'Admin') : '—'}{isOwner ? ' (siz)' : ''}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('pin')}
+            className={`w-full text-left p-3.5 rounded-2xl border transition active:scale-95 ${
+              pinCount.on > 0
+                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
                 : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50'
             }`}
-            title="Bosib yoqish / o'chirish mumkin"
+            title="Qaysi amalda PIN so'ralishini ko'rish"
           >
             <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Admin PIN-Ruxsat Tizimi
             </p>
             <p className={`text-xs font-black mt-1 ${
-              resolvedOverride ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+              pinCount.on > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
             }`}>
-              {resolvedOverride ? '🔒 Yoqilgan (Xavfsiz rejim)' : "🔓 O'chirilgan (Erkin rejim)"}
+              {pinCount.on > 0 ? `🔒 ${pinCount.on}/${pinCount.total} amal himoyalangan` : "🔓 Himoya o'chiq"}
             </p>
-          </div>
+          </button>
         </div>
 
       </div>
@@ -239,7 +277,7 @@ export default function AdminPanel({
       <div className="flex-1 min-w-0 p-3 md:p-6 bg-white dark:bg-gray-800 overflow-y-auto">
         
         {/* 1. TAOMLAR (MENU) BO'LIMI */}
-        {activeTab === 'menu' && (
+        {currentTab === 'menu' && (
           <AdminMenuTab 
             menuItems={safeMenuItems} 
             setMenuItems={updateMenuItems} 
@@ -250,7 +288,7 @@ export default function AdminPanel({
         )}
         
         {/* 2. KATEGORIYALAR BO'LIMI */}
-        {activeTab === 'categories' && (
+        {currentTab === 'categories' && (
           <AdminCategoriesTab 
             menuCategories={safeCategories}
             setMenuCategories={updateCategories}
@@ -261,37 +299,50 @@ export default function AdminPanel({
         )}
         
         {/* 3. XODIMLAR BO'LIMI */}
-        {activeTab === 'users' && (
+        {currentTab === 'users' && (
           <AdminUsersTab 
             users={safeUsers} 
             setUsers={updateUsers}
             orders={safeOrders}
-            currentUser={currentUser}
+            currentUser={actor}
+            ownerId={resolvedOwnerId}
+            setOwnerRecord={updateOwnerRecord}
+            requireOwnerConfirm={requireOwnerConfirm}
             cafeName={resolvedCafeName}
             addAuditLog={handleAddAuditLog}
           />
         )}
 
+        {/* 3.1 ADMIN PIN HIMOYASI (har amal alohida, Telegram uslubidagi ro'yxat) */}
+        {currentTab === 'pin' && (
+          <PinRulesPanel
+            rules={resolvedPinRules}
+            canEdit={hasRight(actor, resolvedOwnerId, 'pinRules') && typeof onChangePinRules === 'function'}
+            ownerName={ownerUser ? String(ownerUser.name || '') : ''}
+            onChange={onChangePinRules}
+          />
+        )}
+
         {/* 4. TARIX (AUDIT LOGS) BO'LIMI */}
-        {activeTab === 'logs' && (
+        {currentTab === 'logs' && (
           <AdminAuditLogsTab 
             auditLogs={safeAuditLogs}
             setAuditLogs={updateAuditLogs}
-            currentUser={currentUser}
+            currentUser={actor}
+            isOwner={isOwner}
+            requireOwnerConfirm={requireOwnerConfirm}
             requireAdminOverride={requireAdminOverride}
             addAuditLog={handleAddAuditLog}
           />
         )}
 
         {/* 5. SOZLAMALAR BO'LIMI */}
-        {activeTab === 'settings' && (
+        {currentTab === 'settings' && (
           <AdminSettingsTab 
             cafeName={resolvedCafeName}
             setCafeName={updateCafeName}
             serviceFee={resolvedServiceFee}
             setServiceFee={updateServiceFee}
-            isOverrideEnabled={resolvedOverride} 
-            setIsOverrideEnabled={updateOverride}
             tables={safeTables}
             setTables={updateTables}
             orders={safeOrders}
@@ -308,8 +359,11 @@ export default function AdminPanel({
             setInventoryLogs={updateInventoryLogs}
             auditLogs={safeAuditLogs}
             setAuditLogs={updateAuditLogs}
-            currentUser={currentUser}
+            currentUser={actor}
+            isOwner={isOwner}
+            ownerId={resolvedOwnerId}
             requireAdminOverride={requireAdminOverride}
+            requireOwnerConfirm={requireOwnerConfirm}
             addAuditLog={handleAddAuditLog}
           />
         )}

@@ -598,8 +598,9 @@ export default function CashierMode({
       updateExpenses(prev => (Array.isArray(prev) ? prev : []).filter(e => e && String(e.id) !== String(expItem.id)));
     };
 
-    if (typeof requireAdminOverride === 'function' && currentUser?.role !== 'admin') {
-      requireAdminOverride(`Kassa xarajatini o'chirish`, performDelete);
+    // PIN kerakmi va kim tasdiqlaydi - App hal qiladi (Admin -> PIN himoyasi)
+    if (typeof requireAdminOverride === 'function') {
+      requireAdminOverride(`Kassa xarajatini o'chirish`, performDelete, 'cashierDeleteExpense');
     } else {
       performDelete();
     }
@@ -899,23 +900,31 @@ export default function CashierMode({
       resetPaymentControls();
     };
 
-    // 🔒 PRE-CHEK QULFI: Agar Pre-chek chiqarilgan chekka chegirma kiritilsa YOKI chegirma >= 20% bo'lsa — Admin PIN so'raladi!
+    // 🔒 PRE-CHEK QULFI: Agar Pre-chek chiqarilgan chekka chegirma kiritilsa YOKI chegirma >= 20% bo'lsa,
+    // yoki chek qarzga yozilsa - Admin PIN (har biri Admin -> PIN himoyasida alohida yoqiladi)
     const isDiscountAfterPreCheck = Boolean(selectedOrder.isPreCheckPrinted && totals.discountAmount > 0);
     const isHighDiscount =
       totals.discountAmount > 0 &&
       totals.subTotal > 0 &&
       totals.discountAmount / (totals.subTotal + totals.serviceFeeAmount) >= 0.2;
+    const reasons = [];
+    if (isDiscountAfterPreCheck || isHighDiscount) {
+      reasons.push({
+        key: 'cashierDiscount',
+        text: isDiscountAfterPreCheck
+          ? `🔒 Pre-chek chiqarilgan ${selectedOrder.table} ga chegirma (-${totals.discountAmount.toLocaleString()} s) kiritish`
+          : `${selectedOrder.table} uchun katta chegirma (-${totals.discountAmount.toLocaleString()} s)`
+      });
+    }
+    if (paymentMethod === PAYMENT_METHOD.DEBT) {
+      reasons.push({
+        key: 'cashierDebt',
+        text: `${selectedOrder.table}: ${totals.finalTotal.toLocaleString()} so'm qarzga (${cleanDebtor})`
+      });
+    }
 
-    if (
-      (isDiscountAfterPreCheck || isHighDiscount) &&
-      currentUser?.role !== 'admin' &&
-      typeof requireAdminOverride === 'function'
-    ) {
-      const reasonText = isDiscountAfterPreCheck
-        ? `🔒 Pre-chek chiqarilgan ${selectedOrder.table} ga chegirma (-${totals.discountAmount.toLocaleString()} s) kiritish`
-        : `${selectedOrder.table} uchun katta chegirma (-${totals.discountAmount.toLocaleString()} s)`;
-
-      requireAdminOverride(reasonText, executeCloseOrder);
+    if (reasons.length > 0 && typeof requireAdminOverride === 'function') {
+      requireAdminOverride(reasons, executeCloseOrder);
     } else {
       executeCloseOrder();
     }
@@ -1005,8 +1014,8 @@ export default function CashierMode({
       }
     };
 
-    if (typeof requireAdminOverride === 'function' && currentUser?.role !== 'admin') {
-      requireAdminOverride(`${tableName} chekini o'chirish`, performDelete);
+    if (typeof requireAdminOverride === 'function') {
+      requireAdminOverride(`${tableName} chekini o'chirish`, performDelete, 'cashierCancelOrder');
     } else {
       performDelete();
     }

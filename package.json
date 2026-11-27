@@ -9,7 +9,8 @@
     "build": "tsc -p . && tsc -p server && vite build",
     "preview": "vite preview",
     "hub": "node server/hub.mjs",
-    "test:kitchen": "node scripts/test-kitchen-flow.mjs"
+    "test:kitchen": "node scripts/test-kitchen-flow.mjs",
+    "test:access": "node scripts/test-access.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

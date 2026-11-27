@@ -7,6 +7,10 @@ export default function ManagerOverrideModal({
   request,
   actionName, 
   users = [], 
+  // Tasdiqlay oladiganlar (App: Ega va "tasdiqlash" huquqi bor adminlar; Ega amalida - faqat Ega).
+  // Berilmasa - eski usul: barcha adminlar
+  approvers,
+  ownerOnly = false,
   onSuccess, 
   onCancel,
   onClose,
@@ -21,6 +25,10 @@ export default function ManagerOverrideModal({
 
   // Agar users prop bo'sh kelsa, localStorage'dan zaxira sifatida o'qiymiz
   const adminUsers = useMemo(() => {
+    // Ro'yxat berilgan bo'lsa faqat shular (bo'sh bo'lsa ham: hech kim tasdiqlay olmaydi)
+    if (Array.isArray(approvers)) {
+      return approvers.filter(a => a && String(a.role || '').toLowerCase() === 'admin' && hasPin(a));
+    }
     let sourceUsers = Array.isArray(users) && users.length > 0 ? users : [];
     if (sourceUsers.length === 0) {
       try {
@@ -37,7 +45,7 @@ export default function ManagerOverrideModal({
 
     // Standart '777777' zaxirasi olib tashlandi (B6): faqat bazadagi haqiqiy adminlar
     return filteredAdmins.filter(a => hasPin(a));
-  }, [users]);
+  }, [users, approvers]);
 
   // ==========================================
   // 2. STATE'LAR (PIN, XATO VA BLOKIROVKA)
@@ -189,14 +197,16 @@ export default function ManagerOverrideModal({
         
         {/* Qalqon Ikonkasi */}
         <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-500 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-3 shadow-inner">
-          🛡️
+          {ownerOnly ? '👑' : '🛡️'}
         </div>
         
         <h2 className="text-xl font-black text-gray-900 dark:text-white">
-          Rahbar Tasdig'i Talab Qilinadi
+          {ownerOnly ? "👑 Ega Tasdig'i" : "Rahbar Tasdig'i Talab Qilinadi"}
         </h2>
         <p className="text-xs font-bold text-gray-400 mt-0.5 mb-4">
-          6 xonali Admin PIN-kodini kiriting
+          {ownerOnly
+            ? "Ega o'z 6 xonali PIN-kodini kiritadi"
+            : "Tasdiqlash huquqi bor admin 6 xonali PIN-kodini kiritadi"}
         </p>
         
         {/* Tasdiqlanayotgan amal nomi */}
@@ -314,7 +324,7 @@ export default function ManagerOverrideModal({
       {twoFactorAdmin && (
         <TwoFactorCodeModal
           user={twoFactorAdmin}
-          title="🛡️ Rahbar tasdig'i: 2-bosqich"
+          title={ownerOnly ? "👑 Ega tasdig'i: 2-bosqich" : "🛡️ Rahbar tasdig'i: 2-bosqich"}
           actionLabel={resolvedActionName}
           onVerified={(admin) => {
             setTwoFactorAdmin(null);

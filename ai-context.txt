@@ -82,6 +82,13 @@ haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
     (boshqa qurilma shu orada oshxona belgisini, rad etishni yoki QR-buyurtmani yozgan bo'lishi mumkin).
     Qatorni tartib raqami bilan emas, kaliti bilan toping: lineIdOf(item, idx, order.id).
     Chek o'chirilmaydi: bekor qilinsa ORDER_STATUS.CANCELLED. Tekshiruv: npm run test:kitchen.
+12h. Huquqlar (Ega va adminlar, Telegram guruhidagi kabi): src/utils/adminRights.ts. Ega - resolveOwnerId(users,
+    pos_owner): uni hech kim o'zgartira olmaydi. Admin ekranlari va Boshqaruv bo'limlari: hasRight(user, ownerId,
+    'cashier'|'stats'|...), canOpenAdminView; xodimni tahrirlash/o'chirish: canManageUser. Yangi joyda
+    "role === 'admin'" bilan cheklamang - huquq funksiyasini ishlating, huquqni bazadagi ENG SO'NGGI yozuvdan oling.
+    Xavfli amal (rahbar tasdig'i): requireAdminOverride(matn, fn, kalit) - kalit src/utils/pinRules.ts da
+    (yangi amal bo'lsa PIN_RULE_GROUPS ga qo'shing). PIN kerakmi va kim tasdiqlaydi - App hal qiladi (o'zingiz
+    role tekshirmang). Faqat Ega amali: requireOwnerConfirm(matn, fn). Tekshiruv: npm run test:access.
 13. Vazifa oxirida qisqa hisobot bering: o'zgargan fayllar, nima qilindi,
     qanday sinab ko'rish kerak.
 
@@ -104,7 +111,13 @@ src/utils/telegramNotifier.js  Telegram xabarlari (hozir ishlatilmaydi!)
 
 Avtorizatsiya va umumiy:
   LockScreen (408)            PIN orqali kirish
-  ManagerOverrideModal (306)  Xavfli amal uchun admin PIN
+  ManagerOverrideModal (306)  Xavfli amal uchun admin PIN (approvers: tasdiqlay oladiganlar; ownerOnly: Ega tasdig'i)
+  utils/adminRights.ts        Ega va admin huquqlari (bo'limlar, admin tayinlash, kim kimni o'zgartiradi)
+  utils/pinRules.ts           PIN himoyasi har amal uchun (ofitsiant, kassa, oshxona, ombor, boshqaruv)
+  AdminRightsModal            Admin huquqlari ro'yxati (Telegram uslubi) va AdminRightsEditor (xodim formasida ham)
+  PinRulesPanel               Boshqaruv -> "🔐 PIN himoyasi" (soha "n/m" bilan ochiladi, har amalga tugma)
+  ToggleSwitch                Telegram uslubidagi tugma (✓ yashil / ✕ qizil / 🔒)
+  scripts/test-access.mjs     Ega, huquqlar, PIN qoidalari tekshiruvi (npm run test:access)
   TwoFactorCodeModal          PIN'dan keyin Authenticator kodi yoki zaxira kod (ikkinchi bosqich)
   TwoFactorSetupModal         Ikki bosqichli kirishni yoqish: QR, tasdiq, 10 ta zaxira kod
   utils/totp.ts, twoFactor.ts TOTP (SHA-1, HMAC, base32) va xodim darajasidagi yordamchilar
@@ -171,7 +184,11 @@ pos_inventory     ombor           pos_inv_logs     ombor tarixi
 pos_customers     mijozlar (bonus) pos_expenses    xarajatlar
 pos_audit_logs    audit jurnali   pos_service_fee  xizmat foizi (10)
 pos_cafe_name     kafe nomi       pos_theme        dark/light (boolean)
-pos_override_enabled  admin PIN himoyasi yoqilganmi (boolean)
+pos_override_enabled  ESKI umumiy PIN himoyasi tugmasi (boolean): endi pos_pin_rules; eski versiyadagi
+                  qurilmalar uchun "kamida bitta amal himoyalangan" deb yangilanib turadi
+pos_pin_rules     { waiterCancelOrder: true, cashierDebt: false, ... } - qaysi amalda admin PIN so'raladi
+                  (src/utils/pinRules.ts; yozilmagan amal: avval himoyalangani - eski tugmadan, yangisi - o'chiq)
+pos_owner         { id, at, by } - Ega (kafe egasi). Yo'q bo'lsa yoki u admin emas - eng birinchi qo'shilgan admin
 pos_qr_base_url   stol QR kodi ochadigan sayt manzili ('' = joriy manzil)
 pos_qr_secret     stol QR kalitlari siri (src/qr/tableKey.js); mijozga ko'rinmaydi
 pos_qr_geofence   { enabled, lat, lng, radius }: QR buyurtma faqat kafe ichidan
@@ -219,10 +236,14 @@ pos_users (xodim): { id, name, title?, role, pin, canSeeSales? }
   twoFactor?: { type: 'totp', secret (base32), enabledAt, backupCodes: ["b1$tuz$xesh"] }
   (ikki bosqichli kirish; src/utils/twoFactor.ts). Shu qurilmada oxirgi ishlatilgan kod
   qadami: localStorage pos_2fa_last_step (bulutga chiqmaydi).
+  Admin uchun: adminRights?: { stats, warehouse, waiter, cashier, kitchen, courier, menu, categories, staff,
+  logs, settings, approve, pinRules, addAdmins } (boolean), appointedBy?: tayinlagan admin id si.
+  Yozilmagan (eski) admin: barcha bo'limlar + approve. Ega uchun bu maydonlar hisobga olinmaydi (hammasi bor).
   PIN: admin va warehouse uchun 6 xonali, qolganlari uchun 4 xonali.
   Ikki xodimda bir xil PIN bo'lishi mumkin emas (LockScreen PIN bo'yicha
   xodimni topadi).
-  Oxirgi yagona adminni o'chirib bo'lmaydi.
+  Oxirgi yagona adminni o'chirib bo'lmaydi. Egani hech kim tahrirlay/o'chira olmaydi (faqat o'zi ism va PIN'ini);
+  adminni - Ega yoki uni tayinlagan admin ("addAdmins" huquqi bilan); xodimni - "staff" huquqi bor admin.
 
 pos_inventory: { id, name, unit, quantity, minLimit, costPrice, updatedAt }
 pos_inv_logs: ombor amallari, turlari: 'kirim', 'chiqim_avto', 'spisanie'
@@ -249,8 +270,9 @@ pos_calls: [{ id, table, time, createdAt, source?: 'qr', keyOk? }]
   Kassa oshxonadagi chekni to'lasa ogohlantiradi, chek oshxonada qoladi va tayyor bo'lgach xabar.
 - Ombor: quantity <= minLimit bo'lsa "Kam qoldi" belgisi.
 - Statistika: faqat "To'langan" (va alohida blokda 'Qarz') hisoblanadi.
-- Xavfsiz amallar (o'chirish, zaxira tiklash, bazani tozalash) admin PIN
-  tasdig'ini talab qiladi.
+- Xavfli amallar (chekni bekor qilish, chegirma, qarz, ombor chiqimi...) admin PIN
+  tasdig'ini talab qiladi - har biri Boshqaruv -> "PIN himoyasi" da alohida yoqiladi. Zaxiradan tiklash,
+  zavod holati, audit jurnalini tozalash, Telegram sozlamasi, egalikni topshirish - faqat Ega (Ega PIN'i bilan).
 - QR-buyurtma: band stolga (to'lanmagan cheki bor) faqat stoldagi QR (to'g'ri k=)
   bilan yoki shu telefon o'zi ochgan chekka; kalitsiz faqat bo'sh stolga. Mijoz
   ekrani (kirish oynasi -> QR-Menyu) faqat bo'sh stolni ochadi. "Faqat kafe

@@ -217,8 +217,9 @@ export default function WarehouseHistoryTab({
       }
     };
 
-    if (typeof requireAdminOverride === 'function' && currentUser?.role !== 'admin') {
-      requireAdminOverride("Ombor harakatlari tarixini tozalash", performClear);
+    // PIN kerakmi va kim tasdiqlaydi - App hal qiladi (Admin -> PIN himoyasi)
+    if (typeof requireAdminOverride === 'function') {
+      requireAdminOverride("Ombor harakatlari tarixini tozalash", performClear, 'warehouseClearHistory');
     } else {
       performClear();
     }

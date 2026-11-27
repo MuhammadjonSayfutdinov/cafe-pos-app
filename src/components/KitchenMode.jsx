@@ -110,6 +110,8 @@ export default function KitchenMode({
   setMenuItems,
   menuCategories,
   currentUser,
+  // Rahbar tasdig'i: Admin -> PIN himoyasida "Oshxona: taomni rad etish" yoqilsa (standart: o'chiq)
+  requireAdminOverride,
   addAuditLog
 }) {
   // =========================================================
@@ -589,6 +591,17 @@ export default function KitchenMode({
       : null;
     setRejectTarget(null);
     if (!target) return;
+    const run = () => performReject(target, { requests, reason, addToStopList });
+    if (typeof requireAdminOverride === 'function') {
+      const count = (Array.isArray(requests) ? requests : []).reduce((sum, r) => sum + (Number(r?.qty) || 0), 0);
+      requireAdminOverride(`${target.table}: ${count} porsiya taomni rad etish (${reason})`, run, 'kitchenReject');
+    } else {
+      run();
+    }
+  };
+
+  // Rad etish (tasdiqdan keyin): chek eng so'nggi holatidan o'zgartiriladi (applyToOrder)
+  const performReject = (target, { requests, reason, addToStopList }) => {
     const now = Date.now();
     const result = applyToOrder(target.id, o => rejectLines(o, requests, { reason, by: actorName, now }));
     if (!result || result.rejected === 0) {
