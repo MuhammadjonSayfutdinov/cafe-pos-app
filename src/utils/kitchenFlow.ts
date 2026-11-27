@@ -462,6 +462,24 @@ export interface CancellationRecord {
 }
 
 /**
+ * Xodim chekdan olib tashlagan porsiya (hisobot uchun, narxi bilan): "Rad etilgan va bekor qilingan
+ * taomlar" (src/utils/lossReport.ts). Oshxonaga xabar alohida - kitchenCancellations (faqat oshxonadagisi).
+ */
+export interface VoidRecord {
+  id: string;
+  lineId: string;
+  menuId: unknown;
+  name: string;
+  qty: number;
+  price: number;
+  /** olib tashlanganda allaqachon tayyor bo'lgan (yoki berilgan) porsiya - isrof */
+  cookedQty: number;
+  by: string;
+  reason: string;
+  at: number;
+}
+
+/**
  * Xodim (PIN bilan) qatorni kamaytiradi yoki o'chiradi (newQty = 0). Avval oshxonada turgan
  * porsiyalar ayiriladi, keyin tayyorlari. Oshxonada turgan porsiya bekor bo'lsa, oshxonaga xabar.
  * Chekda taom qolmasa, chek "Bekor qilindi" bo'ladi (yozuv o'chirilmaydi).
@@ -479,6 +497,7 @@ export function reduceLine(
   let cancelledPending = 0;
   let lastRemovedLine: OrderItem | null = null;
   const cancels: CancellationRecord[] = [];
+  const voids: VoidRecord[] = [];
 
   orderLines(base).forEach(({ item, lineId: id }) => {
     if (id !== lineId) {
@@ -504,6 +523,10 @@ export function reduceLine(
         by: info.by, reason: info.reason, at: info.now
       });
     }
+    voids.push({
+      id: newId('void_'), lineId: id, menuId: item.id ?? null, name: str(item.name) || 'Taom', qty: cut,
+      price: priceOf(item), cookedQty: cut - fromPending, by: info.by, reason: info.reason, at: info.now
+    });
     if (target > 0) {
       items.push(withQty({ ...item, sentQty: target, kitchenDoneQty: done, servedQty: served }, target));
     } else {
@@ -513,9 +536,11 @@ export function reduceLine(
 
   if (removed === 0) return { order, removed: 0, cancelledPending: 0 };
 
-  const withCancels: Order = cancels.length > 0
-    ? { ...base, kitchenCancellations: [...listOf(base.kitchenCancellations), ...cancels] }
-    : base;
+  const withCancels: Order = {
+    ...base,
+    ...(cancels.length > 0 ? { kitchenCancellations: [...listOf(base.kitchenCancellations), ...cancels] } : {}),
+    voids: [...listOf(base.voids), ...voids]
+  };
 
   if (items.length === 0) {
     // Oxirgi taom ham olib tashlandi: chek bekor qilinadi, oxirgi qator yozuvda qoladi (nima bekor bo'lgani)
@@ -549,6 +574,16 @@ export function cancelWholeOrder(order: Order, info: { by: string; reason: strin
         by: info.by, reason: info.reason, at: info.now
       }))
     : [];
+  // Hisobot uchun: chekdagi barcha porsiyalar bekor bo'ldi (qatorlar yozuvda qoladi)
+  const voids: VoidRecord[] = CLOSED.includes(statusOf(base))
+    ? []
+    : orderLines(base)
+      .filter(({ item }) => qtyOf(item) > 0)
+      .map(({ item, lineId }) => ({
+        id: newId('void_'), lineId, menuId: item.id ?? null, name: str(item.name) || 'Taom', qty: qtyOf(item),
+        price: priceOf(item), cookedQty: Math.min(qtyOf(item), doneQtyOf(item, base)), by: info.by,
+        reason: info.reason, at: info.now
+      }));
   return {
     ...base,
     status: ORDER_STATUS.CANCELLED,
@@ -556,7 +591,8 @@ export function cancelWholeOrder(order: Order, info: { by: string; reason: strin
     cancelledBy: info.by,
     cancelReason: info.reason,
     kitchenOpen: false,
-    ...(cancels.length > 0 ? { kitchenCancellations: [...listOf(base.kitchenCancellations), ...cancels] } : {})
+    ...(cancels.length > 0 ? { kitchenCancellations: [...listOf(base.kitchenCancellations), ...cancels] } : {}),
+    voids: [...listOf(base.voids), ...voids]
   };
 }
 

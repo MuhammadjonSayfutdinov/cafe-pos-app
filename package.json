@@ -12,7 +12,8 @@
     "test:kitchen": "node scripts/test-kitchen-flow.mjs",
     "test:access": "node scripts/test-access.mjs",
     "test:qr": "node scripts/test-customer-lines.mjs",
-    "test": "node scripts/test-kitchen-flow.mjs && node scripts/test-access.mjs && node scripts/test-customer-lines.mjs"
+    "test:loss": "node scripts/test-loss-report.mjs",
+    "test": "node scripts/test-kitchen-flow.mjs && node scripts/test-access.mjs && node scripts/test-customer-lines.mjs && node scripts/test-loss-report.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

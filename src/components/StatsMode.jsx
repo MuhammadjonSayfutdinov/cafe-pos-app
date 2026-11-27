@@ -3,6 +3,7 @@ import useSticky from '../hooks/useSticky';
 import StatsOverviewCards from './StatsOverviewCards';
 import StatsPaymentBreakdown from './StatsPaymentBreakdown';
 import StatsPopularItems from './StatsPopularItems';
+import StatsLossReport from './StatsLossReport';
 import PrintReceiptModal from './PrintReceiptModal';
 import { getRecordTimeMs } from '../utils/dates';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS, PAYMENT_METHOD } from '../constants/orderStatus';
@@ -1822,6 +1823,13 @@ export default function StatsMode({
         popularItems={popularItems}
         orders={safeOrders}
         onCloseShift={handleCloseShift}
+      />
+
+      {/* Rad etilgan va bekor qilingan taomlar (sabab, oshpaz, xodim, summa) */}
+      <StatsLossReport
+        orders={safeOrders}
+        activeDateRange={activeDateRange}
+        cafeName={stickyCafeName}
       />
 
       {/* =========================================================================

@@ -6,6 +6,7 @@ import {
   shiftReportRows, shiftTelegramLines, shiftReportHtml
 } from '../shift/shiftReport';
 import { sendTelegramLines } from '../utils/telegramNotifier';
+import { collectLosses, lossTelegramLines, summarizeLosses } from '../utils/lossReport';
 import { newId } from '../utils/ids';
 import { notify } from '../utils/notify';
 
@@ -114,6 +115,11 @@ export function CloseShiftModal({ orders, expenses, setOrders, setExpenses, curr
     ));
 
     sendTelegramLines(shiftTelegramLines(closed, cafeName), 'z_report');
+    // Smena (kun) xulosasi: rad etilgan va bekor qilingan taomlar (bo'lsa)
+    const losses = collectLosses(orders, { startMs: Number(base.openedAt) || 0, endMs: closedAt });
+    if (losses.length > 0) {
+      sendTelegramLines(lossTelegramLines(summarizeLosses(losses), `Smena: ${timeOf(base.openedAt)} — ${timeOf(closedAt)}`, cafeName), 'z_report');
+    }
     if (typeof addAuditLog === 'function') {
       addAuditLog(
         'Z-hisobot (smena yopildi)',

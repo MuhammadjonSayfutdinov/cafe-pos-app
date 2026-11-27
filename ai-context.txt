@@ -171,6 +171,8 @@ Ombor:
 Statistika:
   StatsMode (2497), StatsOverviewCards (218), StatsPaymentBreakdown (141),
   StatsPopularItems (557), StatsWaiterPayroll (1033)
+  StatsLossReport             Rad etilgan va bekor qilingan taomlar (sabab, oshpaz, xodim, ofitsiant, summa)
+  utils/lossReport.ts         Hisob (collectLosses, summarizeLosses, lossTelegramLines); npm run test:loss
 
 Loyiha ildizi: ai-context.txt, PROGRESS.md, package.json, vite.config.js,
 index.html, .gitignore (qo'shilishi kerak).
@@ -219,6 +221,8 @@ pos_orders (buyurtma):
     qty, by, reason, at, ackAt?}] - xodim bekor qilgan (oshxonaga xabar); kitchenOpen - oshxona
     tugatmasdan to'langan (oshxonada qoladi); readyNotice {at, ackAt?} - to'langan chek tayyor;
     refundDue - to'langan chekdan rad etilgan taom puli; cancelledAt, cancelledBy, cancelReason.
+    voids [{id, lineId, menuId, name, qty, price, cookedQty, by, reason, at}] - xodim chekdan olib
+    tashlagan porsiyalar (reduceLine, cancelWholeOrder yozadi; hisobot: src/utils/lossReport.ts).
   Yetkazish buyurtmasi: table "Yetkazish #N", orderType 'delivery',
     delivery: { customerName, phone, address, landmark, note, fee, status
     ('kutilmoqda' | "yo'lda" | 'yetkazildi'), courier, courierId, assignedAt,
