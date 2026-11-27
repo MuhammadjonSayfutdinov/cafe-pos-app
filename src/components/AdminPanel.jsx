@@ -267,6 +267,7 @@ export default function AdminPanel({
             setUsers={updateUsers}
             orders={safeOrders}
             currentUser={currentUser}
+            cafeName={resolvedCafeName}
             addAuditLog={handleAddAuditLog}
           />
         )}

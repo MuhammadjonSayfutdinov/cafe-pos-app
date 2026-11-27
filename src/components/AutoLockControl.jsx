@@ -4,6 +4,8 @@ import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../uti
 import { setUpdateScreenLocked } from '../pwa/update';
 import { checkPin, findUserByPin, pinLengthOf } from '../utils/pinHash';
 import { getRequiredPinLength } from '../constants/roles';
+import { hasTwoFactor } from '../utils/twoFactor';
+import TwoFactorCodeModal from './TwoFactorCodeModal';
 
 // =========================================================
 // VAQT VARIANTLARI (TELEFON VA KOMPYUTER SOZLAMALARIDEK)
@@ -65,7 +67,8 @@ export default function AutoLockControl({
   users = [],
   cafeName = 'Premium Cafe',
   onSwitchUser,
-  onLogout
+  onLogout,
+  onAudit
 }) {
   // =========================================================
   // 1. SOZLAMALAR VA QULF HOLATI STATE'LARI
@@ -78,6 +81,8 @@ export default function AutoLockControl({
   // Qulf ekranidagi PIN-kod statelari
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
+  // PIN to'g'ri, ikki bosqichli kirish yoqilgan: { user, isSwitch } - telefondagi kod kutilmoqda
+  const [twoFactorUnlock, setTwoFactorUnlock] = useState(null);
   const [liveClock, setLiveClock] = useState(() => new Date());
 
   const [menuPos, setMenuPos] = useState(null);
@@ -258,6 +263,17 @@ export default function AutoLockControl({
   // =========================================================
   // 4. QULFNI OCHISH (PIN-KOD TEKSHIRUVI)
   // =========================================================
+  const finishUnlock = useCallback((user, isSwitch) => {
+    setTwoFactorUnlock(null);
+    setIsScreenLocked(false);
+    setPinInput('');
+    setPinError('');
+    lastActivityRef.current = Date.now();
+    if (isSwitch && typeof onSwitchUser === 'function') {
+      onSwitchUser(user);
+    }
+  }, [onSwitchUser]);
+
   const verifyAndUnlock = useCallback((enteredPin) => {
     const cleanPin = String(enteredPin || '').trim();
     if (!cleanPin) return;
@@ -269,17 +285,6 @@ export default function AutoLockControl({
       return;
     }
 
-    // 1. Joriy foydalanuvchining o'z PIN-kodi (universal "1111/0000" kodlar olib tashlandi, B6)
-    if (checkPin(currentUser, cleanPin)) {
-      resetPinGuard('autolock');
-      setIsScreenLocked(false);
-      setPinInput('');
-      setPinError('');
-      lastActivityRef.current = Date.now();
-      return;
-    }
-
-    // 2. Agar boshqa xodim kelib o'z PIN-kodini tersa
     let allUsers = Array.isArray(users) && users.length > 0 ? users : [];
     if (allUsers.length === 0) {
       try {
@@ -290,17 +295,35 @@ export default function AutoLockControl({
       }
     }
 
+    // Joriy xodimning eng so'nggi yozuvi: kirgandan keyin PIN almashgan yoki ikki bosqichli
+    // kirish yoqilgan bo'lishi mumkin
+    const selfRecord = allUsers.find(u => u && currentUser && String(u.id) === String(currentUser.id)) || currentUser;
+
+    // 1. Joriy foydalanuvchining o'z PIN-kodi (universal "1111/0000" kodlar olib tashlandi, B6)
+    if (checkPin(selfRecord, cleanPin)) {
+      resetPinGuard('autolock');
+      setPinInput('');
+      setPinError('');
+      if (hasTwoFactor(selfRecord)) {
+        setTwoFactorUnlock({ user: selfRecord, isSwitch: false });
+        return;
+      }
+      finishUnlock(selfRecord, false);
+      return;
+    }
+
+    // 2. Agar boshqa xodim kelib o'z PIN-kodini tersa
     const matchedOtherUser = findUserByPin(allUsers, cleanPin);
 
     if (matchedOtherUser) {
       resetPinGuard('autolock');
-      setIsScreenLocked(false);
       setPinInput('');
       setPinError('');
-      lastActivityRef.current = Date.now();
-      if (typeof onSwitchUser === 'function') {
-        onSwitchUser(matchedOtherUser);
+      if (hasTwoFactor(matchedOtherUser)) {
+        setTwoFactorUnlock({ user: matchedOtherUser, isSwitch: true });
+        return;
       }
+      finishUnlock(matchedOtherUser, true);
       return;
     }
 
@@ -311,7 +334,7 @@ export default function AutoLockControl({
         : `❌ PIN-kod noto'g'ri! (${attemptsLeft} ta urinish qoldi)`
     );
     setPinInput('');
-  }, [currentUser, users, onSwitchUser]);
+  }, [currentUser, users, finishUnlock]);
 
   const handleNumpadPress = (digit) => {
     setPinError('');
@@ -570,6 +593,16 @@ export default function AutoLockControl({
           </div>
         </div>,
         document.body
+      )}
+
+      {isScreenLocked && twoFactorUnlock && (
+        <TwoFactorCodeModal
+          user={twoFactorUnlock.user}
+          title="🔒 Qulfni ochish: 2-bosqich"
+          onVerified={(user) => finishUnlock(user, twoFactorUnlock.isSwitch)}
+          onCancel={() => setTwoFactorUnlock(null)}
+          onAudit={onAudit}
+        />
       )}
     </>
   );

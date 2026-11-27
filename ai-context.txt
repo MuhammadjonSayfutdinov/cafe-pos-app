@@ -68,6 +68,10 @@ haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
     Ko'rsatish: DishImage (rasm yo'q yoki ochilmasa fallback), DishGallery (surib ko'rish).
     Katta rasmni (data:) yozuvga qo'ymang: bulut bo'lsa Supabase Storage (supabase/storage.sql),
     yozuvda faqat havola va 160 px thumb. localStorage hajmi cheklangan (~5 MB).
+12f. Ikki bosqichli kirish: user.twoFactor ni faqat src/utils/twoFactor.ts orqali o'qing/yozing
+    (hasTwoFactor, verifySecondFactor, withTwoFactor, stripTwoFactor, keepTwoFactorFrom). Yangi joyda
+    admin PIN tekshirsangiz: PIN to'g'ri + hasTwoFactor(user) -> TwoFactorCodeModal, kod tasdiqlangach
+    amalni bajaring. Eksportda stripTwoFactor, tiklashda keepTwoFactorFrom (fayldagisi olinmaydi).
 13. Vazifa oxirida qisqa hisobot bering: o'zgargan fayllar, nima qilindi,
     qanday sinab ko'rish kerak.
 
@@ -91,6 +95,9 @@ src/utils/telegramNotifier.js  Telegram xabarlari (hozir ishlatilmaydi!)
 Avtorizatsiya va umumiy:
   LockScreen (408)            PIN orqali kirish
   ManagerOverrideModal (306)  Xavfli amal uchun admin PIN
+  TwoFactorCodeModal          PIN'dan keyin Authenticator kodi yoki zaxira kod (ikkinchi bosqich)
+  TwoFactorSetupModal         Ikki bosqichli kirishni yoqish: QR, tasdiq, 10 ta zaxira kod
+  utils/totp.ts, twoFactor.ts TOTP (SHA-1, HMAC, base32) va xodim darajasidagi yordamchilar
   AutoLockControl (487)       Avto-qulf
   Modals (485)                Umumiy modallar
   PrintReceiptModal (582)     Chek (58/80 mm)
@@ -186,6 +193,9 @@ pos_users (xodim): { id, name, title?, role, pin, canSeeSales? }
   role: 'admin' | 'warehouse' | 'cashier' | 'waiter' | 'kitchen' | 'courier'
   (yagona ro'yxat: src/constants/roles.js). title - admin yozgan lavozim nomi,
   faqat ko'rsatish uchun; kirish huquqi role bo'yicha.
+  twoFactor?: { type: 'totp', secret (base32), enabledAt, backupCodes: ["b1$tuz$xesh"] }
+  (ikki bosqichli kirish; src/utils/twoFactor.ts). Shu qurilmada oxirgi ishlatilgan kod
+  qadami: localStorage pos_2fa_last_step (bulutga chiqmaydi).
   PIN: admin va warehouse uchun 6 xonali, qolganlari uchun 4 xonali.
   Ikki xodimda bir xil PIN bo'lishi mumkin emas (LockScreen PIN bo'yicha
   xodimni topadi).

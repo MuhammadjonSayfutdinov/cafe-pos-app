@@ -3,6 +3,8 @@ import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../uti
 import { CLOSED_ORDER_STATUSES } from '../constants/orderStatus';
 import { APP_BUILD, APP_BUILD_TIME } from '../pwa/update';
 import { findUserByPin } from '../utils/pinHash';
+import { hasTwoFactor } from '../utils/twoFactor';
+import TwoFactorCodeModal from './TwoFactorCodeModal';
 
 // Qurilmadagi dastur versiyasi: telefon va kompyuter bir xil versiyadami, solishtirish uchun
 const formatBuildTime = (iso) => {
@@ -22,6 +24,7 @@ export default function LockScreen({
   onLogin, 
   onGuestLogin,
   onOpenQrMenu,
+  onAudit,
   isDarkMode = false 
 }) {
   // ==========================================
@@ -30,6 +33,8 @@ export default function LockScreen({
   const [selectedGroup, setSelectedGroup] = useState(null); // 'management' | 'staff' | null
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  // PIN to'g'ri, ikki bosqichli kirish yoqilgan xodim: Authenticator kodini kutyapmiz
+  const [twoFactorUser, setTwoFactorUser] = useState(null);
   
   // Mijoz QR-Menyusi uchun Stol tanlash modali state'i
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
@@ -139,6 +144,12 @@ export default function LockScreen({
 
     if (matchedUser) {
       resetPinGuard(PIN_GUARD_SCOPE);
+      if (hasTwoFactor(matchedUser)) {
+        // PIN yolg'iz yetmaydi: telefondagi kod ham so'raladi (src/utils/twoFactor.ts)
+        setTwoFactorUser(matchedUser);
+        setPin('');
+        return;
+      }
       if (typeof onLogin === 'function') {
         onLogin(matchedUser);
       }
@@ -155,6 +166,14 @@ export default function LockScreen({
         setPin('');
       }, 400);
     }
+  };
+
+  const handleTwoFactorVerified = (verifiedUser) => {
+    setTwoFactorUser(null);
+    if (typeof onLogin === 'function') {
+      onLogin(verifiedUser);
+    }
+    handleClosePinModal();
   };
 
   // ==========================================
@@ -354,6 +373,16 @@ export default function LockScreen({
 
           </div>
         </div>
+      )}
+
+      {twoFactorUser && (
+        <TwoFactorCodeModal
+          user={twoFactorUser}
+          title={selectedGroup === 'management' ? '👔 Boshqaruv: 2-bosqich' : '🔐 Ikkinchi bosqich'}
+          onVerified={handleTwoFactorVerified}
+          onCancel={() => setTwoFactorUser(null)}
+          onAudit={onAudit}
+        />
       )}
 
       {/* =======================================================

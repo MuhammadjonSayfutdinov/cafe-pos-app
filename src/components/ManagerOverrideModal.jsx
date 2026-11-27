@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { findUserByPin, hasPin } from '../utils/pinHash';
+import { hasTwoFactor } from '../utils/twoFactor';
+import TwoFactorCodeModal from './TwoFactorCodeModal';
 
 export default function ManagerOverrideModal({ 
   request,
@@ -7,7 +9,8 @@ export default function ManagerOverrideModal({
   users = [], 
   onSuccess, 
   onCancel,
-  onClose
+  onClose,
+  onAudit
 }) {
   // ==========================================
   // 1. PROP'LARNI XAVFSIZ BIRXILLASHTIRISH
@@ -43,6 +46,8 @@ export default function ManagerOverrideModal({
   const [errorMsg, setErrorMsg] = useState('');
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
+  // PIN to'g'ri, admin ikki bosqichli kirishni yoqqan: telefondagi kod kutilmoqda
+  const [twoFactorAdmin, setTwoFactorAdmin] = useState(null);
 
   // Blokirovka taymeri (5 marta xato terilganda 15 soniya kutish)
   useEffect(() => {
@@ -68,6 +73,10 @@ export default function ManagerOverrideModal({
       setErrorMsg('');
       setFailedAttempts(0);
       setAdminPin('');
+      if (hasTwoFactor(validAdmin)) {
+        setTwoFactorAdmin(validAdmin);
+        return;
+      }
       if (typeof resolvedOnSuccess === 'function') {
         resolvedOnSuccess(validAdmin);
       }
@@ -126,6 +135,8 @@ export default function ManagerOverrideModal({
 
   // Kompyuter klaviaturasidan raqamlar, Backspace, Enter va Escape bosilishini ushlash
   useEffect(() => {
+    // Kod oynasi ochiq: klaviatura o'sha oynaniki
+    if (twoFactorAdmin) return undefined;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -149,7 +160,7 @@ export default function ManagerOverrideModal({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [adminPin, handleBackspace, handleDigitPress, lockoutSeconds, resolvedOnCancel, verifyPinCode]);
+  }, [adminPin, handleBackspace, handleDigitPress, lockoutSeconds, resolvedOnCancel, twoFactorAdmin, verifyPinCode]);
 
   // ==========================================
   // 5. RENDER (UI DIZAYN)
@@ -299,6 +310,22 @@ export default function ManagerOverrideModal({
         </form>
 
       </div>
+
+      {twoFactorAdmin && (
+        <TwoFactorCodeModal
+          user={twoFactorAdmin}
+          title="🛡️ Rahbar tasdig'i: 2-bosqich"
+          actionLabel={resolvedActionName}
+          onVerified={(admin) => {
+            setTwoFactorAdmin(null);
+            if (typeof resolvedOnSuccess === 'function') {
+              resolvedOnSuccess(admin);
+            }
+          }}
+          onCancel={() => setTwoFactorAdmin(null)}
+          onAudit={onAudit}
+        />
+      )}
     </div>
   );
 }

@@ -506,6 +506,7 @@ export default function App() {
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
         onLogin={handleLogin}
+        onAudit={addAuditLog}
         onGuestLogin={handleGuestLogin}
         onOpenQrMenu={handleGuestLogin}
       />
@@ -579,6 +580,7 @@ export default function App() {
             cafeName={cafeName}
             onSwitchUser={handleLogin}
             onLogout={handleLogout}
+            onAudit={addAuditLog}
           />
 
           <button
@@ -790,6 +792,7 @@ export default function App() {
           onSuccess={overrideRequest.onSuccess}
           onCancel={() => setOverrideRequest(null)}
           onClose={() => setOverrideRequest(null)}
+          onAudit={addAuditLog}
         />
       )}
 

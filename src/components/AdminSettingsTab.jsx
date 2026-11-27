@@ -8,6 +8,7 @@ import QrStickerSheet from './QrStickerSheet';
 import QrSecuritySection from './QrSecuritySection';
 import { VALID_ROLES } from '../constants/roles';
 import { copyPinFrom, migrateUserPins, stripPin } from '../utils/pinHash';
+import { keepTwoFactorFrom, stripTwoFactor } from '../utils/twoFactor';
 
 // Telegram sozlamalari: yagona joy - src/utils/telegramNotifier.js (B12)
 const readTelegramConfig = getTelegramConfig;
@@ -248,9 +249,9 @@ export default function AdminSettingsTab({
   };
 
   const handleExportBackup = () => {
-    // PIN kodlar (xeshi ham) va Telegram tokeni faylga yozilmaydi (B5)
+    // PIN kodlar (xeshi ham), ikki bosqichli kirish siri va Telegram tokeni faylga yozilmaydi (B5)
     const safeUsersForExport = (Array.isArray(users) ? users : []).map(u =>
-      u && typeof u === 'object' ? stripPin(u) : u
+      u && typeof u === 'object' ? stripTwoFactor(stripPin(u)) : u
     );
     const { botToken: _botToken, ...safeTelegramConfig } = telegramConfig || {};
 
@@ -309,17 +310,22 @@ export default function AdminSettingsTab({
           if (Array.isArray(parsed.menuItems) && typeof setMenuItems === 'function') setMenuItems(parsed.menuItems);
           if (Array.isArray(parsed.users) && typeof setUsers === 'function') {
             const fileHasPins = parsed.users.some(u => u && u.pin !== undefined);
+            // Ikki bosqichli kirish fayldan hech qachon olinmaydi: qurilmadagi hozirgisi saqlanadi
+            const findCurrent = (list, u) =>
+              (Array.isArray(list) ? list : []).find(c => c && u && String(c.id) === String(u.id));
             if (fileHasPins) {
               // Eski formatdagi fayl: ochiq PIN'lar darhol xeshga o'tkaziladi
-              setUsers(migrateUserPins(parsed.users));
+              setUsers(prev => migrateUserPins(parsed.users).map(u =>
+                u && typeof u === 'object' ? keepTwoFactorFrom(u, findCurrent(prev, u)) : u
+              ));
             } else {
               // Yangi formatda PIN yo'q: hozirgi PIN kodlar saqlanadi, PIN-siz yangi xodim qo'shilmaydi
               setUsers(prev => {
                 const current = Array.isArray(prev) ? prev : [];
                 return parsed.users
                   .map(u => {
-                    const existing = current.find(c => c && String(c.id) === String(u.id));
-                    return existing ? copyPinFrom(u, existing) : null;
+                    const existing = findCurrent(current, u);
+                    return existing ? keepTwoFactorFrom(copyPinFrom(u, existing), existing) : null;
                   })
                   .filter(Boolean)
                   .concat(current.filter(c => c && !parsed.users.some(u => String(u.id) === String(c.id))));

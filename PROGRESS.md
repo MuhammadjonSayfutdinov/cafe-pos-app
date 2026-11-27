@@ -44,7 +44,9 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 ## Joriy vazifa
 
 **Kafe POS 2.0 (foydalanuvchi qarori, 2026-11-27):** foydalanuvchi "boshla" dedi. Reja va bosqichlar
-pastda: "6-bosqich. Kafe POS 2.0". Navbatdagi ish: 1-qadamning qolgan qismi, keyin 2-qadam (xavfsizlik).
+pastda: "6-bosqich. Kafe POS 2.0". Admin uchun ikki bosqichli kirish (PIN + Authenticator) tayyor.
+Navbatdagi ish: 1-qadamning qolgan qismi (yorug' rejim, chap menyu, buyurtma turi, promo-kod), keyin
+2-qadamning qolgani (server hisoblari, PIN serverda, RLS, xodimga Telegram kodi, passkey).
 Taom rasmlari tayyor; foydalanuvchi Supabase'da `supabase/storage.sql` va `supabase/qr.sql` ni
 ishga tushirishi kerak (aks holda admin rasm qo'shganda "Rasm ombori yo'q" xabari chiqadi,
 mijoz QR-menyusida rasm ko'rinmaydi).
@@ -164,8 +166,10 @@ Tartib: xavfsizlik yangi eshiklardan (mijoz ilovasi, kiosk) OLDIN.
 2. Xavfsizlik poydevori
    - [ ] Har bir xodim va qurilmaga alohida server hisobi, ishonchli qurilmalar, qurilma ulash kodi
    - [ ] PIN serverda tekshiriladi, 6 xonali PIN; rol bo'yicha RLS (ofitsiant hisobotni o'qimaydi)
-   - [ ] Xodim: PIN + smena boshida Telegram bot kodi (2 bosqich). Admin: PIN + Authenticator (TOTP)
-     + passkey/barmoq izi (3 bosqich), xavfli amalda qayta tasdiq, 10 ta zaxira kod
+   - [x] Admin: PIN + Authenticator (TOTP), 10 ta zaxira kod; kod kirishda, avto-qulfda va xavfli amalda
+     (rahbar tasdig'i, ofitsiant ekranidagi admin tasdig'i) so'raladi. `src/utils/totp.ts`, `twoFactor.ts`,
+     `TwoFactorCodeModal.jsx`, `TwoFactorSetupModal.jsx`; yoqish: Admin → Xodimlar va Parollar
+   - [ ] Xodim: PIN + smena boshida Telegram bot kodi (2 bosqich). Admin uchun 3-bosqich: passkey/barmoq izi
    - [ ] Shubhali amallar hisoboti Telegramga, chegirma chegarasi rol bo'yicha, jurnal o'chirilmaydi
    - [ ] Rasm yuklashni faqat adminga cheklash (hozir: har qanday ulangan qurilma)
 3. Mijoz ilovasi (mijoz eshigi)
@@ -190,8 +194,8 @@ Tartib: xavfsizlik yangi eshiklardan (mijoz ilovasi, kiosk) OLDIN.
 Foydalanuvchi javoblari (2026-11-27): 5 ta rasm yetarli; telefon tasdig'i - eng arzon va qulay
 (Telegram bot tavsiya qilindi); kiosk ekrani kompyuter monitori kattaligida, bir nechta uslubda;
 "Kassada to'layman" - admin sozlamasi (standart: to'lovdan keyin).
-Ochiq savollar: admin 2-bosqichi (Authenticator tavsiya), kiosk qurilmasi (Windows tavsiya),
-200 belgi yetarlimi, videolardan skrinshot.
+Admin 2-bosqichi - Authenticator ilovasi; taom ma'lumoti uchun 200 belgi yetarli.
+Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 
 ### 5-bosqich. Sifat
 - [x] TypeScript boshlandi: `tsconfig.json` (strict, allowJs), `npm run typecheck`, build avval tekshiradi.
@@ -220,6 +224,7 @@ Ochiq savollar: admin 2-bosqichi (Authenticator tavsiya), kiosk qurilmasi (Windo
 | Sekin internet | Supabase so'rovlari 45 s (`createTimeoutFetch`), sessiya tekshiruvi 10 s, QR tasdiqlash 20 s. Navbat 100 tadan yuboriladi, yuborilgan qism darhol navbatdan o'chadi. Ilova ochilganda: oxirgi to'liq sinxrondan 6 soat o'tmagan bo'lsa faqat o'zgarishlar (`since`), aks holda butun baza. Sessiya tokeni tarmoq xatosi sababli yangilanmasa, saqlangan sessiya bilan ishlaydi (qayta kirish so'ralmaydi). Service worker: sahifa 3,5 s da kelmasa keshdan. Javob 4 s dan uzoq - `🐢 Sekin internet` belgisi | qabul qilindi |
 | Mahalliy server | Kassa kompyuterida Node server (`npm run hub`, kutubxonasiz; bulut uchun supabase-js). Dasturni ham server beradi (`dist`), sahifa `http://<IP>:8080` dan ochiladi: https sahifadan http LAN manzilga so'rov brauzerda taqiqlangan (mixed content). Server `index.html` ga `<meta name="cafe-hub">` qo'yadi, dastur shundan mahalliy server transportini tanlaydi (`src/sync/index.js`). Qurilma API'si fake server bilan bir xil (`/api/all?since`, `/records`, `/kv`, SSE `/events`, `/rpc/qr_claim_request`), qo'shimcha: server paroli → token (`/api/auth`, 10 xato → 5 daqiqa blok, parol o'zgarsa tokenlar bekor, 401 → ulash oynasi). Ma'lumot: `hub-data/` (snapshot + jurnal, elektr o'chsa ham). Bulut bilan: server bitta "qurilma" (`updated_by = hub_<id>`), har 3 s so'raydi (realtime yo'q: Node 20 da WebSocket yo'q), navbat diskda, qoidalar `engine.js` bilan bir xil (oxirgi yozuv g'olib, yuborilmagan mahalliy ustun). QR tasdiqlash faqat bulut orqali (atomik). http da service worker yo'q: server o'chsa sahifani qayta yuklab bo'lmaydi | qabul qilindi |
 | Taom rasmlari | Menyu yozuvida `images: [{id, src, path?}]` (5 tagacha, birinchisi asosiy), `thumb` (asosiy rasmning 160 px nusxasi, data:, yozuvning o'zida: internetsiz ham kartada ko'rinadi), `description` (200 belgi). Rasm qurilmada kvadrat qilib qayta chiziladi (EXIF va yashirin ma'lumot o'chadi). Bulut bo'lsa: 800 px webp, saqlash bosilganda Supabase Storage `menu-images` ga yuklanadi (ochiq o'qish, yozish faqat ulangan qurilma), yozuvda faqat havola; yuklanmasa taom saqlanmaydi, oyna ochiq qoladi. Bulut yo'q (yoki mahalliy server): 480 px rasm yozuvning o'zida. Service worker rasmlarni `menu-images-v1` keshida saqlaydi (400 tagacha). Mijozga `qr_menu` faqat `id, src` va `thumb` beradi. O'chirilgan rasm/taom ombordan ham o'chiriladi (xato bo'lsa jim) | qabul qilindi |
+| Admin ikki bosqichli kirish | PIN + Authenticator ilovasi kodi (TOTP: HMAC-SHA1, 6 raqam, 30 s, ±30 s soat farqi; kutubxonasiz, http da ham ishlaydi). Yozuv: `user.twoFactor = {type:'totp', secret, enabledAt, backupCodes}`; 10 ta zaxira kod (10 raqam, bir martalik) faqat xeshi bilan. Kod kirish oynasida, avto-qulfda, rahbar tasdig'ida (ManagerOverrideModal, ofitsiant ekranidagi admin PIN) so'raladi. Faqat xodimning o'zi yoqadi (o'z telefoni), o'zi o'chirishda kod so'raladi; boshqa admin faqat o'chira oladi (telefon yo'qolsa). 5 xato kod - blok (pinGuard) va audit (Telegramga ham boradi). Ishlatilgan kod shu qurilmada qayta qabul qilinmaydi. Zaxira faylga sir yozilmaydi, tiklashda fayldagisi olinmaydi. Tekshiruv hozircha qurilmada (oflayn kirish): PIN'ni bilgan xodimdan himoya qiladi, bazani o'qiy olgandan emas - serverda tekshirish 2-qadamning "PIN serverda" ishi bilan | qabul qilindi |
 | Mijoz telefonini tasdiqlash | Kafening o'z Telegram boti, "Raqamimni yuborish" tugmasi: bepul (Bot API pulsiz), kod yozish shart emas, raqam Telegram tomonidan tasdiqlangan. Oddiy SMS pullik (shartnoma, matn tasdig'i), Telegram Gateway ~0,01 $/kod. Telegram'siz mijozni ofitsiant tasdiqlaydi | qabul qilindi (6-bosqich, 3-qadamda) |
 | Kiosk "Kassada to'layman" | Admin sozlamasi: oshxonaga "To'lovdan keyin" (standart, hazil buyurtmadan himoya) yoki "Darhol" | qabul qilindi (6-bosqich, 4-qadamda) |
 | TypeScript | Bosqichma-bosqich: `allowJs`, faqat `.ts` fayllar strict tekshiriladi. Yangi util/modul `.ts` da. Komponentlar keyinroq (`@types/react` kerak bo'ladi) | qabul qilindi |
@@ -251,6 +256,7 @@ Ochiq savollar: admin 2-bosqichi (Authenticator tavsiya), kiosk qurilmasi (Windo
 | 19 | Taomga rasmlar va qisqacha ma'lumot (6-bosqich, 1-qadam) | "6: taomga rasmlar va qisqacha ma'lumot" commiti | [x] |
 | 19 | PIN xeshi, xavfsizlik sarlavhalari, sekin/oflayn internet, TypeScript boshlandi | "xavfsizlik: PIN xeshi..." commiti | [x] |
 | 20 | Kafe mahalliy serveri (internetsiz ishlash) | "4: kafe mahalliy serveri..." commiti | [x] |
+| 21 | Admin uchun ikki bosqichli kirish: PIN + Authenticator (6-bosqich, 2-qadam) | "6: admin uchun ikki bosqichli kirish..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

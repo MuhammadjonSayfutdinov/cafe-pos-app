@@ -3,6 +3,9 @@ import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
 import { ROLE_OPTIONS, TITLE_SUGGESTIONS, getRequiredPinLength } from '../constants/roles';
 import { findPinOwner, hasPin, pinLengthOf, withPin } from '../utils/pinHash';
+import { BACKUP_CODE_COUNT, backupCodesLeft, hasTwoFactor, stripTwoFactor, withTwoFactor } from '../utils/twoFactor';
+import TwoFactorSetupModal from './TwoFactorSetupModal';
+import TwoFactorCodeModal from './TwoFactorCodeModal';
 
 const EMPTY_FORM = { name: '', title: '', role: 'waiter', pin: '', canSeeSales: true };
 
@@ -10,6 +13,7 @@ export default function AdminUsersTab({
   users = [], 
   setUsers,
   currentUser,
+  cafeName = 'Kafe POS',
   addAuditLog
 }) {
   // ==========================================
@@ -24,6 +28,10 @@ export default function AdminUsersTab({
   // Yangi yoki tahrirlanayotgan xodim ma'lumotlari.
   // title - lavozim nomi (admin o'zi yozadi), role - qaysi bo'limga kira oladi
   const [formData, setFormData] = useState(EMPTY_FORM);
+
+  // Ikki bosqichli kirish (src/utils/twoFactor.ts): yoqish oynasi va o'z hisobidan o'chirish tasdig'i
+  const [twoFactorSetupUser, setTwoFactorSetupUser] = useState(null);
+  const [twoFactorDisableUser, setTwoFactorDisableUser] = useState(null);
 
   // PIN ochiq matnda saqlanmaydi (src/utils/pinHash.ts): tahrirlashda maydon bo'sh turadi.
   // Bo'sh qoldirilsa eski PIN qoladi (agar yangi rol ham shu uzunlikdagi PIN talab qilsa).
@@ -251,6 +259,45 @@ export default function AdminUsersTab({
   };
 
   // ==========================================
+  // 3.1 IKKI BOSQICHLI KIRISH (PIN + AUTHENTICATOR)
+  // ==========================================
+  // Faqat xodimning o'zi yoqadi (o'z telefoni bilan). Boshqa admin faqat o'chira oladi (telefon yo'qolsa)
+  const handleEnableTwoFactor = (secret, backupCodes) => {
+    const target = twoFactorSetupUser;
+    setTwoFactorSetupUser(null);
+    if (!target || typeof setUsers !== 'function') return;
+    setUsers(prev => prev.map(u => (u && u.id === target.id ? withTwoFactor(u, secret, backupCodes) : u)));
+    if (typeof addAuditLog === 'function') {
+      addAuditLog('Ikki bosqichli kirish yoqildi', `${target.name}: PIN + Authenticator kodi`);
+    }
+    notify("✅ Ikki bosqichli kirish yoqildi. Endi PIN'dan keyin telefondagi kod so'raladi.");
+  };
+
+  const removeTwoFactor = (target, details) => {
+    if (!target || typeof setUsers !== 'function') return;
+    setUsers(prev => prev.map(u => (u && u.id === target.id ? stripTwoFactor(u) : u)));
+    if (typeof addAuditLog === 'function') {
+      addAuditLog("Ikki bosqichli kirish o'chirildi", details);
+    }
+  };
+
+  // O'z hisobi: o'chirishdan oldin telefondagi kod (yoki zaxira kod) so'raladi
+  const handleDisableOwnVerified = () => {
+    const target = twoFactorDisableUser;
+    setTwoFactorDisableUser(null);
+    removeTwoFactor(target, `${target?.name || 'Admin'}: o'zi o'chirdi`);
+    notify("⚠️ Ikki bosqichli kirish o'chirildi: endi faqat PIN bilan kiriladi.");
+  };
+
+  const handleResetOtherTwoFactor = async (user) => {
+    if (!await confirmAsync(`"${user.name}" hisobidagi ikki bosqichli kirish o'chirilsinmi?\n\nTelefoni va zaxira kodlari yo'qolgan bo'lsa shunday qiling: u PIN bilan kirib, yangi telefon bilan qayta yoqadi.`)) {
+      return;
+    }
+    removeTwoFactor(user, `${user.name}: ${currentUser?.name || 'Admin'} o'chirdi (kirishni tiklash)`);
+    notify(`⚠️ ${user.name}: ikki bosqichli kirish o'chirildi.`);
+  };
+
+  // ==========================================
   // 4. FILTRLASH VA GURUHLASH
   // ==========================================
   const filteredUsers = useMemo(() => {
@@ -280,8 +327,48 @@ export default function AdminUsersTab({
   // ==========================================
   const requiredLenForForm = getRequiredPinLength(formData.role);
 
+  const currentRecord = currentUser ? safeUsers.find(u => u && u.id === currentUser.id) : null;
+  const suggestTwoFactor = currentRecord?.role === 'admin' && !hasTwoFactor(currentRecord);
+
   return (
     <div className="space-y-6 md:space-y-8 animate-fade-in">
+
+      {twoFactorSetupUser && (
+        <TwoFactorSetupModal
+          user={twoFactorSetupUser}
+          cafeName={cafeName}
+          onEnable={handleEnableTwoFactor}
+          onCancel={() => setTwoFactorSetupUser(null)}
+        />
+      )}
+
+      {twoFactorDisableUser && (
+        <TwoFactorCodeModal
+          user={twoFactorDisableUser}
+          title="🔓 O'chirishni tasdiqlang"
+          actionLabel="Ikki bosqichli kirishni o'chirish"
+          onVerified={handleDisableOwnVerified}
+          onCancel={() => setTwoFactorDisableUser(null)}
+          onAudit={addAuditLog}
+        />
+      )}
+
+      {suggestTwoFactor && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-3xl border border-brand-500/30 bg-brand-50 dark:bg-brand-500/10">
+          <span className="text-2xl">🔐</span>
+          <p className="flex-1 text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-200">
+            Tavsiya: admin hisobingizga ikki bosqichli kirishni yoqing. PIN'ni bilib olgan odam telefoningizdagi
+            kodsiz kira olmaydi (Google yoki Microsoft Authenticator, bepul).
+          </p>
+          <button
+            type="button"
+            onClick={() => setTwoFactorSetupUser(currentRecord)}
+            className="shrink-0 px-4 py-2.5 rounded-full bg-brand-600 hover:bg-brand-500 text-white text-xs font-black transition active:scale-95"
+          >
+            Yoqish
+          </button>
+        </div>
+      )}
       
       {/* 1. XODIM QO'SHISH YOKI TAHRIRLASH FORMASI */}
       <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-3xl shadow-xs border border-gray-100 dark:border-gray-700">
@@ -553,6 +640,41 @@ export default function AdminUsersTab({
                         <span className="font-black text-xs text-rose-600">O'rnatilmagan</span>
                       )}
                     </div>
+
+                    {/* Ikki bosqichli kirish (admin uchun) */}
+                    {(user.role === 'admin' || hasTwoFactor(user)) && (
+                      <div className="mt-3">
+                        {hasTwoFactor(user) ? (
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl px-3 py-2">
+                            <span className="text-[11px] font-black text-emerald-700 dark:text-emerald-400">
+                              🔐 2-bosqich yoqilgan
+                            </span>
+                            <span className={`text-[10px] font-bold ${backupCodesLeft(user) <= 2 ? 'text-red-500' : 'text-gray-400'}`}>
+                              zaxira kod: {backupCodesLeft(user)}/{BACKUP_CODE_COUNT}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => (isCurrentUser ? setTwoFactorDisableUser(user) : handleResetOtherTwoFactor(user))}
+                              className="ml-auto text-[10px] font-black text-red-500 hover:text-red-600 underline underline-offset-2"
+                            >
+                              {isCurrentUser ? "O'chirish" : "O'chirish (tiklash)"}
+                            </button>
+                          </div>
+                        ) : isCurrentUser ? (
+                          <button
+                            type="button"
+                            onClick={() => setTwoFactorSetupUser(user)}
+                            className="text-[11px] font-black px-3 py-1.5 rounded-xl border border-brand-500/40 bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-400 transition active:scale-95"
+                          >
+                            🔐 Ikki bosqichli kirishni yoqish
+                          </button>
+                        ) : (
+                          <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                            🔓 2-bosqich o'chiq (admin o'zi yoqadi)
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Ofitsiant uchun savdoni ko'rish ruxsati tugmasi */}
                     {user.role === 'waiter' && (

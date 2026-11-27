@@ -143,6 +143,10 @@ stollarning buyurtmalari ko'rinmaydi.
   ko'rinishida saqlanadi (`src/utils/pinHash.ts`). Lekin 4-6 xonali PIN'da variant oz: bulutdagi ma'lumotni
   o'qiy olgan odam xeshni terib topishi mumkin. Shuning uchun asosiy himoya - ro'yxatdan o'tish yopiq
   bo'lishi (3-qadam). Ulangan qurilmani qo'lga kiritgan odam ma'lumotlarni ko'ra oladi: planshetlarni qulflang.
+- **Ikki bosqichli kirish (admin):** Admin → "Xodimlar va Parollar" → "🔐 Ikki bosqichli kirishni yoqish".
+  Shundan keyin PIN'dan keyin telefondagi Authenticator kodi so'raladi (kirish, avto-qulf, rahbar tasdig'i).
+  Kod ham qurilmada tekshiriladi (internetsiz ham ishlaydi), sir xodimlar ro'yxati bilan bulutda turadi:
+  PIN'ni bilib olgan xodimdan himoya qiladi, bazani o'qiy olgan odamdan emas. Zaxira faylga sir yozilmaydi.
 - **PIN xeshiga o'tish:** yangi versiya ochilganda eski ochiq PIN'lar o'zi xeshga o'tadi. Shundan keyin
   eski versiyada qolgan qurilmada xodimlar kira olmaydi. Qurilmalar yangi versiyaga o'zi o'tadi (avtomatik
   yangilanish); o'tmagan bo'lsa, sahifani yangilang.
@@ -166,6 +170,7 @@ stollarning buyurtmalari ko'rinmaydi.
 | Doim `📴 Oflayn` | Internetni tekshiring. Supabase loyihasi uxlab qolgan bo'lishi mumkin (Dashboard → Restore) |
 | Boshqa qurilmaga o'zgarish kelmayapti | SQL'dagi 5-qism (Realtime) bajarilganini tekshiring. Belgini bosing: "Hozir sinxronlash" |
 | Qurilmani boshqa kafe hisobiga ulash kerak | Tizim Sozlamalari → "Qurilmani bulutdan uzish" |
+| Admin telefoni ham, zaxira kodlari ham yo'qoldi | Boshqa admin: "Xodimlar va Parollar" → shu admin kartasida "O'chirish (tiklash)". Yagona admin bo'lsa: Supabase → SQL Editor → `update public.pos_records set data = data - 'twoFactor', updated_by = 'sql' where collection = 'pos_users' and data ? 'twoFactor';` → Run. Bir daqiqadan keyin admin faqat PIN bilan kiradi va telefonni qayta ulaydi |
 
 ## Dasturchilar uchun: avtomatik sinov
 

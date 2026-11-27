@@ -24,6 +24,8 @@ import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
 import { reservedByOpenOrders, stockStatus } from '../utils/inventoryCalc';
 import { findUserByPin } from '../utils/pinHash';
+import { hasTwoFactor } from '../utils/twoFactor';
+import TwoFactorCodeModal from './TwoFactorCodeModal';
 
 // Ovozli bildirishnoma (Taom tayyor bo'lganda yoki mijoz chaqirganda)
 const playWaiterBeep = () => {
@@ -182,6 +184,8 @@ export default function WaiterMode({
 
   // Admin PIN tasdiqlash modali statelari
   const [securityPrompt, setSecurityPrompt] = useState(null);
+  // Admin PIN to'g'ri, ikki bosqichli kirish yoqilgan: telefondagi kod kutilmoqda
+  const [twoFactorAdmin, setTwoFactorAdmin] = useState(null);
   const [pinInput, setPinInput] = useState('');
   const [cancelReasonInput, setCancelReasonInput] = useState('Mijoz rad etdi');
   const [pinError, setPinError] = useState('');
@@ -291,6 +295,17 @@ export default function WaiterMode({
     }
     resetPinGuard('waiter_override');
 
+    if (hasTwoFactor(matchedAdmin)) {
+      setTwoFactorAdmin(matchedAdmin);
+      setPinInput('');
+      setPinError('');
+      return;
+    }
+    finishSecurityApproval(matchedAdmin);
+  };
+
+  const finishSecurityApproval = (matchedAdmin) => {
+    if (!securityPrompt) return;
     const adminLabel = matchedAdmin?.name || 'Admin';
     const callback = securityPrompt.onConfirm;
     const reason = `${cancelReasonInput} (Tasdiqladi: ${adminLabel})`;
@@ -1322,6 +1337,20 @@ export default function WaiterMode({
           orders={safeOrders}
           onClose={() => setIsDeliveryModalOpen(false)}
           onSubmit={handleStartDelivery}
+        />
+      )}
+
+      {twoFactorAdmin && securityPrompt && (
+        <TwoFactorCodeModal
+          user={twoFactorAdmin}
+          title="🔒 Admin tasdig'i: 2-bosqich"
+          actionLabel={securityPrompt.title}
+          onVerified={(admin) => {
+            setTwoFactorAdmin(null);
+            finishSecurityApproval(admin);
+          }}
+          onCancel={() => setTwoFactorAdmin(null)}
+          onAudit={(action, details) => recordAuditLog(action, details)}
         />
       )}
 
