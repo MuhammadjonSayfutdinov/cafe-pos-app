@@ -169,16 +169,29 @@ Tartib: xavfsizlik yangi eshiklardan (mijoz ilovasi, kiosk) OLDIN.
    - [ ] Shubhali amallar hisoboti Telegramga, chegirma chegarasi rol bo'yicha, jurnal o'chirilmaydi
    - [ ] Rasm yuklashni faqat adminga cheklash (hozir: har qanday ulangan qurilma)
 3. Mijoz ilovasi (mijoz eshigi)
-   - [ ] Telefon + SMS kod, joylashuv (rad etsa menyu ochiladi, buyurtmada qayta so'raladi)
+   - [ ] Telefonni tasdiqlash: kafening o'z Telegram boti (bepul), "📱 Raqamimni yuborish" tugmasi
+     (request_contact; contact.user_id == from.id tekshiriladi). Ilova bir martalik token bilan
+     t.me/<bot>?start=<token> ni ochadi, bot raqamni serverga (Supabase Edge Function, webhook) yozadi,
+     ilova o'zi davom etadi. Bot tokeni faqat serverda (Edge Function secret), qurilmada emas.
+     Telegram'i yo'q mijoz: ofitsiant o'z ekranida raqamni tasdiqlaydi (bepul). SMS (Eskiz va b.) keyin,
+     kerak bo'lsa (pullik, shartnoma). Telegram Gateway (har kod ~0,01 $) - zaxira variant
+   - [ ] Joylashuv (rad etsa menyu ochiladi, buyurtmada qayta so'raladi)
    - [ ] Bosh sahifa, taom sahifasi, savatcha, buyurtma holati, profil va bonus, tarix, bron
 4. Kiosk (uchinchi eshik): kafe ichidagi sensorli ekran, doim tayyor
    - [ ] Kutish ekrani, til, joy, menyu, savat, to'lov, raqamli chek, 60+15 s da o'zi tozalanadi
-   - [ ] Admin → Sozlamalar → "Kiosklar": ulash kodi, nomi, holati; kiosk faqat menyu + yangi buyurtma
+   - [ ] Bir nechta ekran uslubi: vertikal kiosk, gorizontal monitor (kompyuter monitori kattaligida:
+     chapda toifalar, o'rtada taomlar, o'ngda savat), planshet. Ekran o'lchami/yo'nalishiga qarab o'zi
+     tanlanadi, admin "Kiosklar" da majburan belgilashi mumkin. Sensorli va sichqoncha bilan ham ishlaydi
+   - [ ] Admin → Sozlamalar → "Kiosklar": ulash kodi, nomi, holati, ekran uslubi; kiosk faqat menyu + yangi buyurtma
+   - [ ] "Kassada to'layman" buyurtmasi oshxonaga qachon tushishi - admin sozlamasi: "To'lovdan keyin"
+     (standart) yoki "Darhol"
 5. Kengaytirish: Google Play, push xabar, Click/Payme, sharh va baho, bonus darajalari, uch til, navbat ekrani
 
-Ochiq savollar (foydalanuvchi javob bermagan): SMS (oddiy SMS yoki Telegram kodi), admin 2-bosqichi
-(Authenticator tavsiya), kiosk uskunasi (Windows tavsiya), "Kassada to'layman" buyurtmasi oshxonaga
-qachon tushadi (tavsiya: to'lovdan keyin), 5 ta rasm / 200 belgi yetarlimi, videolardan skrinshot.
+Foydalanuvchi javoblari (2026-11-27): 5 ta rasm yetarli; telefon tasdig'i - eng arzon va qulay
+(Telegram bot tavsiya qilindi); kiosk ekrani kompyuter monitori kattaligida, bir nechta uslubda;
+"Kassada to'layman" - admin sozlamasi (standart: to'lovdan keyin).
+Ochiq savollar: admin 2-bosqichi (Authenticator tavsiya), kiosk qurilmasi (Windows tavsiya),
+200 belgi yetarlimi, videolardan skrinshot.
 
 ### 5-bosqich. Sifat
 - [x] TypeScript boshlandi: `tsconfig.json` (strict, allowJs), `npm run typecheck`, build avval tekshiradi.
@@ -207,6 +220,8 @@ qachon tushadi (tavsiya: to'lovdan keyin), 5 ta rasm / 200 belgi yetarlimi, vide
 | Sekin internet | Supabase so'rovlari 45 s (`createTimeoutFetch`), sessiya tekshiruvi 10 s, QR tasdiqlash 20 s. Navbat 100 tadan yuboriladi, yuborilgan qism darhol navbatdan o'chadi. Ilova ochilganda: oxirgi to'liq sinxrondan 6 soat o'tmagan bo'lsa faqat o'zgarishlar (`since`), aks holda butun baza. Sessiya tokeni tarmoq xatosi sababli yangilanmasa, saqlangan sessiya bilan ishlaydi (qayta kirish so'ralmaydi). Service worker: sahifa 3,5 s da kelmasa keshdan. Javob 4 s dan uzoq - `🐢 Sekin internet` belgisi | qabul qilindi |
 | Mahalliy server | Kassa kompyuterida Node server (`npm run hub`, kutubxonasiz; bulut uchun supabase-js). Dasturni ham server beradi (`dist`), sahifa `http://<IP>:8080` dan ochiladi: https sahifadan http LAN manzilga so'rov brauzerda taqiqlangan (mixed content). Server `index.html` ga `<meta name="cafe-hub">` qo'yadi, dastur shundan mahalliy server transportini tanlaydi (`src/sync/index.js`). Qurilma API'si fake server bilan bir xil (`/api/all?since`, `/records`, `/kv`, SSE `/events`, `/rpc/qr_claim_request`), qo'shimcha: server paroli → token (`/api/auth`, 10 xato → 5 daqiqa blok, parol o'zgarsa tokenlar bekor, 401 → ulash oynasi). Ma'lumot: `hub-data/` (snapshot + jurnal, elektr o'chsa ham). Bulut bilan: server bitta "qurilma" (`updated_by = hub_<id>`), har 3 s so'raydi (realtime yo'q: Node 20 da WebSocket yo'q), navbat diskda, qoidalar `engine.js` bilan bir xil (oxirgi yozuv g'olib, yuborilmagan mahalliy ustun). QR tasdiqlash faqat bulut orqali (atomik). http da service worker yo'q: server o'chsa sahifani qayta yuklab bo'lmaydi | qabul qilindi |
 | Taom rasmlari | Menyu yozuvida `images: [{id, src, path?}]` (5 tagacha, birinchisi asosiy), `thumb` (asosiy rasmning 160 px nusxasi, data:, yozuvning o'zida: internetsiz ham kartada ko'rinadi), `description` (200 belgi). Rasm qurilmada kvadrat qilib qayta chiziladi (EXIF va yashirin ma'lumot o'chadi). Bulut bo'lsa: 800 px webp, saqlash bosilganda Supabase Storage `menu-images` ga yuklanadi (ochiq o'qish, yozish faqat ulangan qurilma), yozuvda faqat havola; yuklanmasa taom saqlanmaydi, oyna ochiq qoladi. Bulut yo'q (yoki mahalliy server): 480 px rasm yozuvning o'zida. Service worker rasmlarni `menu-images-v1` keshida saqlaydi (400 tagacha). Mijozga `qr_menu` faqat `id, src` va `thumb` beradi. O'chirilgan rasm/taom ombordan ham o'chiriladi (xato bo'lsa jim) | qabul qilindi |
+| Mijoz telefonini tasdiqlash | Kafening o'z Telegram boti, "Raqamimni yuborish" tugmasi: bepul (Bot API pulsiz), kod yozish shart emas, raqam Telegram tomonidan tasdiqlangan. Oddiy SMS pullik (shartnoma, matn tasdig'i), Telegram Gateway ~0,01 $/kod. Telegram'siz mijozni ofitsiant tasdiqlaydi | qabul qilindi (6-bosqich, 3-qadamda) |
+| Kiosk "Kassada to'layman" | Admin sozlamasi: oshxonaga "To'lovdan keyin" (standart, hazil buyurtmadan himoya) yoki "Darhol" | qabul qilindi (6-bosqich, 4-qadamda) |
 | TypeScript | Bosqichma-bosqich: `allowJs`, faqat `.ts` fayllar strict tekshiriladi. Yangi util/modul `.ts` da. Komponentlar keyinroq (`@types/react` kerak bo'ladi) | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
