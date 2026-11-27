@@ -105,6 +105,8 @@ src/App.jsx (791)       Global state, routing, biznes-logika markazi
 src/main.jsx            React root
 src/index.css           Tailwind, dizayn tokenlari (brand rangi, neytral gray, Geist shrift)
 src/hooks/useSticky.js  localStorage + oynalararo (tablararo) sinxron
+src/sync/mergeOrder.ts  Ikki qurilma bir chekni bir vaqtda o'zgartirsa: taom darajasida birlashtirish
+                        (engine.js chaqiradi; tekshiruv: npm run test:merge)
 src/pwa/                register.js (service worker, oflayn kesh), update.js (yangi versiyaga
                         avtomatik o'tish; markUnsavedWork - yo'qolishi mumkin bo'lgan ish bor ekan kutadi)
 src/utils/telegramNotifier.js  Telegram xabarlari (hozir ishlatilmaydi!)
@@ -223,6 +225,8 @@ pos_orders (buyurtma):
     refundDue - to'langan chekdan rad etilgan taom puli; cancelledAt, cancelledBy, cancelReason.
     voids [{id, lineId, menuId, name, qty, price, cookedQty, by, reason, at}] - xodim chekdan olib
     tashlagan porsiyalar (reduceLine, cancelWholeOrder yozadi; hisobot: src/utils/lossReport.ts).
+    _rev, _revs - sinxron versiya belgisi (src/sync/engine.js qo'yadi, src/sync/mergeOrder.ts):
+    ikki qurilma bir chekni bir vaqtda o'zgartirsa birlashtirish uchun. Qo'lda yozmang va o'chirmang.
   Yetkazish buyurtmasi: table "Yetkazish #N", orderType 'delivery',
     delivery: { customerName, phone, address, landmark, note, fee, status
     ('kutilmoqda' | "yo'lda" | 'yetkazildi'), courier, courierId, assignedAt,

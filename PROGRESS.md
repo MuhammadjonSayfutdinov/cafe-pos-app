@@ -51,8 +51,8 @@ o'zgartiradi (B35-B40). Batafsil: pastda "Ega va admin huquqlari". Hozirgi ma'lu
 (o'chirilmagan) admin; boshqasi bo'lishi kerak bo'lsa, Ega uning kartasida "👑 Egalikni topshirish" ni bosadi.
 Navbatdagi ish: 7-bosqichning "Keyingi qadamlar" ro'yxati (7 ta) tartib bilan. 1-qadam (mijoz telefonida rad
 etilgan taom) tayyor: foydalanuvchi `supabase/qr.sql` ni Supabase'da yana bir marta ishga tushirishi kerak.
-2-qadam (rad etilgan va bekor qilingan taomlar hisoboti) tayyor. Keyingisi: 3-qadam (ikki qurilma bir chekni
-bir vaqtda o'zgartirishi).
+2-qadam (rad etilgan va bekor qilingan taomlar hisoboti) va 3-qadam (ikki qurilma bir chekni bir vaqtda
+o'zgartirsa birlashtirish) tayyor. Keyingisi: 4-qadam (har taom uchun taymer, sex ekranlari, KOT chop etish).
 
 **Oshxona va buyurtma oqimi (7-bosqich, foydalanuvchi so'rovi, 2026-11-27):** oshpaz bir nechta taomni
 belgilab "Tayyor" bossa butun chek tayyor bo'lib ketardi (B19) - tuzatildi; oshxonaga "Rad etish" oynasi
@@ -245,8 +245,11 @@ rad etish oynasi) va namunalar (RestroBit POS, iiko, Dribbble POS). Tamoyil: hol
      pul; davr - Statistika filtri (filtrsiz - joriy smena). Xodim olib tashlagan porsiya endi chekda narxi bilan
      saqlanadi (`order.voids`). Telegramga: smena yopilganda (Z-hisobotdan keyin, bo'lsa) va "📤 Telegramga
      yuborish" tugmasi bilan (`StatsLossReport.jsx`, `src/utils/lossReport.ts`, `npm run test:loss`)
-   - [ ] Ikki qurilma bir chekni bir soniyada o'zgartirsa, hozir oxirgi yozuv g'olib (yozuv darajasida):
-     oshxona belgilari alohida yozuvga (`pos_kds_marks`) yoki serverda birlashtirish
+   - [x] Ikki qurilma bir chekni bir vaqtda o'zgartirsa ikkala o'zgarish saqlanadi: har bir chek versiyasida
+     kelib chiqish belgisi (`_rev`, `_revs`), qurilma eskirgan versiyani e'tiborsiz qoldiradi, bir vaqtdagi
+     o'zgarishni umumiy ota bo'yicha taom darajasida birlashtirib qayta yuboradi (`src/sync/mergeOrder.ts`,
+     `engine.js`; `npm run test:merge`). Ikki brauzer + soxta server bilan sinaldi: internet uzilganda oshpaz
+     "tayyor", ofitsiant dozakaz - ulangach ikkalasi ham saqlandi. SQL o'zgarmadi
    - [ ] Har taom uchun alohida taymer (dozakaz o'z vaqtidan), sex ekranlari (bar, issiq sex), KOT chop etish
    - [ ] To'langan chekdan rad etilgan taom: kassada "Qaytarish" amali (pul va ombor yozuvi bilan)
    - [ ] "Olib ketish" uchun ofitsiant ekranida bir vaqtda bir nechta ochiq chek
@@ -310,6 +313,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | Taom statusi | Taomda `kitchenDoneQty`; dozakazda oshxona faqat qolgan porsiyani ko'radi | qabul qilindi |
 | Oshxona holati taom darajasida (7-bosqich) | Qatorda `kitchenDoneQty` (oshxona tayyor degan), `servedQty` (mijozga berilgan), `kitchenSentAt`, `kitchenReadyAt`; eski yozuvda yo'q bo'lsa statusdan taxmin qilinadi va birinchi yozishda qotiriladi. Ochiq chek statusi qatorlardan: oshxonada porsiya bor - 'Yangi'/'Tayyorlanmoqda', hammasi tayyor - 'Tayyor', hammasi berilgan - 'Yetkazildi'. Chekni faqat `src/utils/kitchenFlow.ts` funksiyalari bilan va `setOrders(prev => ...)` ichida (eng so'nggi holatdan) o'zgartirish. Oshpazning tanlovi faqat shu qurilmada (`pos_kds_selected`), holat chekka yoziladi | qabul qilindi |
 | Mijoz telefonida taom holati | So'rov qabul qilinganda `pos_qr_requests.lineIds` (so'rov taomlari tartibida chekdagi `cartItemId`). `qr_request_status` faqat shu qatorlarni qaytaradi (boshqa mijoz/ofitsiant taomi ko'rinmaydi): porsiya, tayyor, berilgan va rad etilgan porsiya. Rad etish sababi serverda standart ro'yxatga keltiriladi (oshpazning erkin izohi mijozga chiqmaydi). Qatordagi porsiya kamaygan, lekin rad etilmagan bo'lsa - "bekor qilindi" (ofitsiant olib tashlagan). SQL yangilanmagan yoki eski so'rov - telefon avvalgidek umumiy holatni ko'rsatadi | qabul qilindi |
+| Bir vaqtdagi o'zgarish (chek) | `pos_kds_marks` (alohida yozuv) o'rniga chekning o'zida versiya belgisi + qurilmada birlashtirish: barcha ekranlar chekni avvalgidek o'qiydi, SQL va server o'zgarmaydi. Qurilma bilgan server versiyasi (`serverCopy`) va so'nggi 400 versiya xotirada; yuborilmagan o'zgarishda asos navbatda saqlanadi (qayta ochilsa ham). Birlashtirish: porsiya hisoblagichlari farq bilan qo'shiladi (oshpaz +2 tayyor, ofitsiant +1 porsiya), qo'shilgan qator ikkalasidan, o'chirilgani o'chadi, rad etish/bekor yozuvlari id bo'yicha, "ko'rildi" yo'qolmaydi. Bir tomon chekni yopsa (to'lov) - uning qatorlari va summasi (to'lanmagan dozakaz to'langan chekka kirmaydi). Natija simmetrik; daqiqasiga 6 tadan ko'p birlashtirish bo'lmaydi (cheksiz aylanish yo'q). Asos topilmasa yoki eski (kalitsiz) qator - eski usul (oxirgi yozuv) | qabul qilindi |
 | Yo'qotish hisoboti | Manba - chekning o'zi: `kitchenRejections` (oshxona) va `voids` (xodim, narx bilan; `reduceLine`, `cancelWholeOrder` yozadi). Eski bekor qilingan chek (voids yo'q) - qatorlaridan. Vaqt - hodisa vaqti. Filtrsiz Statistika - ochiq smena boshidan (smena yo'q - bugun). "Kunlik" Telegram xulosasi smena yopilganda (Z-hisobotdan keyin) yuboriladi: dastur qurilmada ishlaydi, server jadvali yo'q; smena = ish kuni | qabul qilindi |
 | Oshxona rad etishi (otkaz) | Faqat hali tayyor bo'lmagan porsiya. Rad etilgan porsiya qatordan ayiriladi (summa, ombor, statistika o'zgarishsiz to'g'ri), yozuv `order.kitchenRejections` da (sabab, oshpaz, vaqt, ko'rildi). PIN so'ralmaydi (oshpaz tez ishlashi kerak), lekin audit + Telegram (xavfsizlik). Chekda taom qolmasa - 'Bekor qilindi'. To'langan chekda summa o'zgarmaydi, `refundDue` (qaytariladigan pul) xabarda chiqadi | qabul qilindi |
 | Bekor qilingan chek | Yangi status 'Bekor qilindi' (`ORDER_STATUS.CANCELLED`, yopilganlar ro'yxatida): ofitsiantning "Chekni o'chirish", oxirgi taomni o'chirish va kassadagi "bekor qilish" endi chekni O'CHIRMAYDI. Oshxonada turgan porsiyalar `order.kitchenCancellations` ga yoziladi (oshxonada qizil xabar). Statistika hisoblamaydi, "Cheklar tarixini tozalash" o'chiradi. `qr.sql`: stol bo'sh hisoblanadi, telefonda "❌ Bekor qilindi" ko'rinadi | qabul qilindi |
@@ -368,6 +372,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | 23 | Ega va admin huquqlari, PIN himoyasi har amal uchun (B34-B40) | "tuzatish: Ega va admin huquqlari..." commiti | [x] |
 | 24 | Mijoz telefonida har taom holati va oshxona rad etgan taom (7-bosqich, 3-qism, 1-qadam) | "7: mijoz telefonida rad etilgan taom..." commiti | [x] |
 | 25 | Rad etilgan va bekor qilingan taomlar hisoboti, Telegram xulosasi (7-bosqich, 3-qism, 2-qadam) | "7: rad etilgan va bekor qilingan taomlar hisoboti..." commiti | [x] |
+| 26 | Ikki qurilma bir chekni bir vaqtda o'zgartirsa birlashtirish (7-bosqich, 3-qism, 3-qadam) | "7: bir chekni ikki qurilma bir vaqtda..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

@@ -13,6 +13,9 @@
 //  6. Sekin internet: har bir so'rov vaqti cheklangan (src/sync/timeouts.ts), navbat kichik
 //     qismlarda yuboriladi (yuborilgan qism navbatdan darhol o'chadi), dastur ochilganda butun
 //     baza emas, faqat oxirgi sinxrondan keyingi o'zgarishlar olinadi (to'liq tekshiruv 6 soatda bir).
+//  7. Cheklar (pos_orders) - 5-banddan istisno: har versiyada kelib chiqish belgisi (_rev, _revs).
+//     Ikki qurilma bir chekni bir vaqtda o'zgartirsa, chek taom darajasida birlashtiriladi va qayta
+//     yuboriladi (src/sync/mergeOrder.ts); eskirgan (kechikkan) versiya yangisini bosib ketmaydi.
 
 import {
   SAME_TAB_EVENT, RECORD_COLLECTIONS, KV_KEYS,
@@ -21,6 +24,8 @@ import {
 } from './config';
 import { withTimeout } from './timeouts';
 import { isAuthRequiredError } from './types';
+import { ancestorsOf, commonAncestor, mergeOrder3, relationOf, revOf, sameContent, stampRev } from './mergeOrder';
+import { newId } from '../utils/ids';
 
 const FLUSH_DEBOUNCE_MS = 300;
 const RETRY_MIN_MS = 2000;
@@ -96,6 +101,117 @@ let catchupTimer = null;
 let subscribedOnce = false;
 const shadow = new Map(); // har bir kalitning sinxronlangan oxirgi holati
 let outbox = new Map();   // opKey -> op
+
+// ---------- cheklarni birlashtirish (7-band, src/sync/mergeOrder.ts) ----------
+const MERGE_COLLECTIONS = new Set(['pos_orders']);
+const HISTORY_LIMIT = 400;
+const MERGE_WINDOW_MS = 60000;
+const MERGE_LIMIT = 6;
+const serverCopy = new Map(); // "pos_orders:<id>" -> shu qurilma bilgan oxirgi server versiyasi (o'zi yuborgani ham)
+const history = new Map();    // _rev -> versiya (umumiy otani topish uchun, faqat xotirada)
+const mergeLog = new Map();   // "pos_orders:<id>" -> birlashtirish vaqtlari (cheksiz aylanishdan himoya)
+const mergeKey = (collection, id) => `${collection}:${id}`;
+
+function rememberServer(collection, id, data) {
+  if (!MERGE_COLLECTIONS.has(collection) || !data || typeof data !== 'object') return;
+  serverCopy.set(mergeKey(collection, id), data);
+  const rev = revOf(data);
+  if (!rev) return;
+  history.delete(rev);
+  history.set(rev, data);
+  if (history.size > HISTORY_LIMIT) history.delete(history.keys().next().value);
+}
+
+function mergeAllowed(key) {
+  const now = Date.now();
+  const recent = (mergeLog.get(key) || []).filter(t => now - t < MERGE_WINDOW_MS);
+  if (recent.length >= MERGE_LIMIT) return false;
+  mergeLog.set(key, [...recent, now]);
+  return true;
+}
+
+function safeMerge(base, a, b) {
+  try {
+    return mergeOrder3(base, a, b);
+  } catch (e) {
+    console.warn('Chekni birlashtirib bo\'lmadi:', e);
+    return null;
+  }
+}
+
+const readLocalRecord = (collection, id) =>
+  (Array.isArray(readLocal(collection)) ? readLocal(collection) : []).find(r => recordId(r) === id) || null;
+
+function writeMergedLocal(collection, id, data) {
+  const list = Array.isArray(readLocal(collection)) ? readLocal(collection) : [];
+  const idx = list.findIndex(r => recordId(r) === id);
+  const next = idx === -1
+    ? (RECORD_COLLECTIONS[collection] === 'prepend' ? [data, ...list] : [...list, data])
+    : list.map((r, i) => (i === idx ? data : r));
+  writeLocalFromRemote(collection, next);
+}
+
+/**
+ * Serverdan kelgan chek versiyasi: kelib chiqishiga qarab qabul, e'tiborsiz yoki birlashtirish.
+ * true - hal qilindi; false - eski usul (yuborilmagan mahalliy o'zgarish ustun, aks holda qabul).
+ */
+function applyRemoteMerge(collection, id, incoming) {
+  const key = mergeKey(collection, id);
+  const pendingOp = outbox.get(`rec:${collection}:${id}`) || null;
+  if (pendingOp && pendingOp.deleted) return false;
+  const known = serverCopy.get(key) || pendingOp?.base || null;
+  const rel = relationOf(known, incoming);
+  if (rel === 'unknown') return false;
+  if (rel === 'same' || rel === 'older') return true; // kechikkan (eski) xabar: yangisini bosib ketmasin
+
+  const local = readLocalRecord(collection, id) || pendingOp?.data || null;
+  if (rel === 'newer') {
+    rememberServer(collection, id, incoming);
+    if (!pendingOp || !local) return false; // oddiy qabul
+    // Yuborilmagan mahalliy o'zgarish: asosi - known, ikkalasi birlashtiriladi
+    const merged = mergeAllowed(key) ? safeMerge(known, local, incoming) : null;
+    if (!merged) return false;
+    writeMergedLocal(collection, id, merged);
+    // Ikkinchi ota - kelgan versiya: yuborilgan natija uni o'z ichiga olgani belgisida ko'rinsin
+    enqueue({ ...pendingOp, data: merged, base: incoming, mergedWith: { _rev: revOf(incoming), _revs: ancestorsOf(incoming) } });
+    saveOutbox();
+    setStatus({});
+    scheduleFlush();
+    return true;
+  }
+
+  // Bir vaqtda o'zgartirilgan (ikki qurilma bir asosdan): umumiy ota bo'yicha birlashtirish
+  const baseRev = commonAncestor(known, incoming, rev => history.has(rev));
+  const base = baseRev ? history.get(baseRev) : null;
+  // Birlashtirib bo'lmadi: eski usul. Yuborilmagan o'zgarish bo'lsa kelgan versiya "server holati"
+  // deb yozilmaydi: aks holda yuborilganda u kelgan versiyadan kelib chiqqandek ko'rinib, ikkinchi
+  // qurilma o'z o'zgarishini birlashtira olmasdi
+  if (!base || !mergeAllowed(key)) {
+    if (!pendingOp) rememberServer(collection, id, incoming);
+    return false;
+  }
+  let merged = safeMerge(base, known, incoming);
+  if (!merged) {
+    if (!pendingOp) rememberServer(collection, id, incoming);
+    return false;
+  }
+  if (pendingOp && local) {
+    const withLocal = safeMerge(known, local, merged);
+    if (withLocal) merged = withLocal;
+  }
+  rememberServer(collection, id, incoming);
+  if (!pendingOp && sameContent(merged, incoming)) return false; // kelgan versiya hammasini o'z ichiga oladi
+  writeMergedLocal(collection, id, merged);
+  enqueue({
+    kind: 'rec', collection, id, data: merged, deleted: false, base: incoming,
+    // ikkinchi ota: yuborilganda kelib chiqish belgisiga qo'shiladi
+    mergedWith: { _rev: revOf(known), _revs: ancestorsOf(known) }
+  });
+  saveOutbox();
+  setStatus({});
+  scheduleFlush();
+  return true;
+}
 
 // transport: 'supabase' | 'hub' | 'fake'; upstream: mahalliy serverning bulut bilan aloqasi (faqat hub)
 let status = { state: 'disabled', pending: 0, lastSyncAt: null, error: null, email: null, slow: false, transport: null, upstream: null };
@@ -198,7 +314,18 @@ export function localWrite(key, nextValue, { seed = false } = {}) {
 
   if (isRecordCollection(key)) {
     const { upserts, deletes } = diffRecords(prev, nextValue);
-    upserts.forEach(r => enqueue({ kind: 'rec', collection: key, id: recordId(r), data: r, deleted: false }));
+    upserts.forEach(r => {
+      const id = recordId(r);
+      const op = { kind: 'rec', collection: key, id, data: r, deleted: false };
+      if (MERGE_COLLECTIONS.has(key)) {
+        // O'zgarish qaysi server versiyasidan boshlangani (birlashtirish uchun asos)
+        const prevOp = outbox.get(`rec:${key}:${id}`);
+        const base = prevOp ? prevOp.base : serverCopy.get(mergeKey(key, id));
+        if (base) op.base = base;
+        if (prevOp?.mergedWith) op.mergedWith = prevOp.mergedWith;
+      }
+      enqueue(op);
+    });
     deletes.forEach(id => enqueue({ kind: 'rec', collection: key, id, data: {}, deleted: true }));
     if (!upserts.length && !deletes.length) return;
   } else {
@@ -259,10 +386,28 @@ export async function flush() {
     // Kichik qismlarda: internet o'rtada uzilsa, yuborib bo'lingan qism qayta yuborilmaydi
     for (let i = 0; i < recs.length; i += PUSH_BATCH) {
       const batch = recs.slice(i, i + PUSH_BATCH);
-      await timed(transport.pushRecords(batch.map(o => ({
-        collection: o.collection, id: o.id, data: o.data ?? {}, deleted: Boolean(o.deleted), updated_by: deviceId
-      }))), PUSH_TIMEOUT_MS, 'Yuborish');
+      // Cheklar: kelib chiqish belgisi (ota - shu qurilma bilgan oxirgi server versiyasi)
+      const rows = batch.map(o => {
+        let data = o.data ?? {};
+        if (MERGE_COLLECTIONS.has(o.collection) && !o.deleted) {
+          const parent = serverCopy.get(mergeKey(o.collection, o.id)) || o.base || data;
+          data = stampRev(data, newId('r'), o.mergedWith ? [parent, o.mergedWith] : [parent]);
+        }
+        return { collection: o.collection, id: o.id, data, deleted: Boolean(o.deleted), updated_by: deviceId };
+      });
+      await timed(transport.pushRecords(rows), PUSH_TIMEOUT_MS, 'Yuborish');
       settleOps(batch);
+      rows.forEach(r => {
+        if (r.deleted) {
+          serverCopy.delete(mergeKey(r.collection, r.id));
+          return;
+        }
+        rememberServer(r.collection, r.id, r.data);
+        // Yuborish paytida yana o'zgargan chek: endi uning asosi - hozir yuborilgan versiya
+        const next = MERGE_COLLECTIONS.has(r.collection) ? outbox.get(`rec:${r.collection}:${r.id}`) : null;
+        if (next && !next.deleted) next.base = r.data;
+      });
+      saveOutbox();
     }
     if (kvs.length) {
       await timed(
@@ -315,6 +460,11 @@ function applyRemote(ev) {
     const key = ev.collection;
     const id = ev.id === undefined || ev.id === null ? null : String(ev.id);
     if (!isRecordCollection(key) || !id) return;
+    if (MERGE_COLLECTIONS.has(key)) {
+      if (ev.deleted) serverCopy.delete(mergeKey(key, id));
+      else if (applyRemoteMerge(key, id, ev.data)) return;
+      else if (!hasPending('rec', key, id)) rememberServer(key, id, ev.data);
+    }
     if (hasPending('rec', key, id)) return; // mahalliy o'zgarish hali yuborilmagan - u ustun
 
     const current = readLocal(key);
@@ -371,7 +521,10 @@ function mergeInitial(records, kvRows, { firstTime }) {
         }
         const s = serverMap.get(id);
         if (s) {
-          if (!s.deleted) merged.push(s.data);
+          if (!s.deleted) {
+            merged.push(s.data);
+            rememberServer(key, id, s.data);
+          }
           return;
         }
         if (!firstTime) {
@@ -382,6 +535,7 @@ function mergeInitial(records, kvRows, { firstTime }) {
         // firstTime: yangi qurilmadagi standart ma'lumotlar tashlab yuboriladi, server ustun
       });
       const fresh = rows.filter(s => !s.deleted && !seen.has(String(s.id)) && !hasPending('rec', key, String(s.id)));
+      fresh.forEach(s => rememberServer(key, String(s.id), s.data));
       if (RECORD_COLLECTIONS[key] === 'prepend') {
         merged = [...fresh.reverse().map(s => s.data), ...merged];
       } else {
