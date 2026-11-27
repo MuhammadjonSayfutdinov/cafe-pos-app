@@ -73,7 +73,7 @@ export default function KitchenNoticesPanel({ orders, onAck }) {
               </p>
               {n.refundDue > 0 && (
                 <p className="mt-1.5 inline-block text-xs font-black bg-white/20 rounded-lg px-2.5 py-1">
-                  💸 Chek to'langan: mijozga {n.refundDue.toLocaleString()} so'm qaytaring
+                  💸 Chek to'langan: mijozga {n.refundDue.toLocaleString()} so'm qaytaring (Kassa → "💸 Qaytarish")
                 </p>
               )}
             </div>

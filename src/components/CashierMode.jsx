@@ -12,6 +12,8 @@ import ShiftPanel from './ShiftPanel';
 import { getOpenShift } from '../shift/shiftReport';
 import { itemUsage, normalizeUnit } from '../utils/inventoryCalc';
 import { cancelWholeOrder, keepInKitchenOnPayment, kitchenSummary } from '../utils/kitchenFlow';
+import { applyRefund, refundExpense, restockLinesOf } from '../utils/refunds';
+import CashierRefundsPanel from './CashierRefundsPanel';
 
 // ==========================================
 // 1. STANDART DOIMIY MIJOZLAR VA VIP DARAJALAR
@@ -1021,6 +1023,101 @@ export default function CashierMode({
     }
   };
 
+  // ==========================================
+  // 12.1 TO'LANGAN CHEKDAN RAD ETILGAN TAOM: MIJOZGA PUL QAYTARISH (src/utils/refunds.ts)
+  // ==========================================
+  // Masalliqlar omborga qaytadi (to'lovda ayirilgan edi, taom tayyorlanmadi)
+  const restockIngredients = (lines, tableName) => {
+    const additions = {};
+    lines.forEach(l => {
+      itemUsage({ id: l.id, name: l.name, price: l.price, quantity: l.quantity }, safeMenu, safeInventory).forEach((amount, id) => {
+        additions[id] = Number(((additions[id] || 0) + amount).toFixed(6));
+      });
+    });
+    if (Object.keys(additions).length === 0) return 0;
+    const nowStr = new Date().toLocaleString();
+    const what = lines.map(l => `${l.name} (x${l.quantity})`).join(', ');
+    const logs = [];
+    updateInventory(prev => (Array.isArray(prev) ? prev : safeInventory).map(inv => {
+      const add = inv && additions[String(inv.id)];
+      if (!add) return inv;
+      const currentQty = Number(inv.quantity ?? inv.qty ?? 0) || 0;
+      const nextQty = Number((currentQty + add).toFixed(6));
+      logs.push({
+        id: newId('invlog_'), date: nowStr, type: 'Kirim (Qaytarish)', itemName: inv.name, productName: inv.name,
+        diffAmount: `+${add}`, amount: add, unit: normalizeUnit(inv.unit || 'kg'),
+        note: `${tableName}: oshxona rad etgan taom - ${what}`, reason: 'Rad etilgan taom qaytdi',
+        user: currentUser?.name || 'Kassir'
+      });
+      return { ...inv, quantity: nextQty, qty: nextQty, lastUpdated: nowStr };
+    }));
+    if (logs.length > 0) updateInventoryLogs(prev => [...logs, ...(Array.isArray(prev) ? prev : [])]);
+    return logs.length;
+  };
+
+  const handleRefund = ({ orderId, amount, method, restock }) => {
+    if (!openShift) {
+      notify("⚠️ Avval smenani oching: qaytarilgan pul smena hisobotiga kiradi");
+      return;
+    }
+    const target = safeOrders.find(o => o && String(o.id) === String(orderId));
+    if (!target) return;
+    const perform = () => {
+      const at = Date.now();
+      const latest = safeOrders.find(o => o && String(o.id) === String(orderId)) || target;
+      const lines = restock ? restockLinesOf(latest) : [];
+      const refund = {
+        id: newId('ref_'),
+        amount,
+        method,
+        by: currentUser?.name || 'Kassir',
+        at,
+        shiftId: openShift.id,
+        restocked: lines.length > 0,
+        rejectionIds: (Array.isArray(latest.kitchenRejections) ? latest.kitchenRejections : [])
+          .filter(r => r && Number(r.refundDue) > 0)
+          .map(r => String(r.id))
+      };
+      // Chekning eng so'nggi holatiga (boshqa kassada shu payt qaytarilgan bo'lsa ikki marta bo'lmasin)
+      let applied = 0;
+      updateOrders(prev => (Array.isArray(prev) ? prev : []).map(o => {
+        if (!o || String(o.id) !== String(orderId)) return o;
+        const r = applyRefund(o, refund, lines.map(l => l.rejectionId));
+        applied = r.amount;
+        return r.order;
+      }));
+      if (applied <= 0) {
+        notify("⚠️ Qaytariladigan summa qolmagan (boshqa qurilmada qaytarilgan bo'lishi mumkin)");
+        return;
+      }
+      const finalRefund = { ...refund, amount: applied };
+      updateExpenses(prev => [refundExpense(latest, finalRefund, currentUser?.name || 'Kassir'), ...(Array.isArray(prev) ? prev : [])]);
+      const restocked = lines.length > 0 ? restockIngredients(lines, latest.table || '') : 0;
+      if (typeof addAuditLog === 'function') {
+        addAuditLog(
+          'Kassa: mijozga pul qaytarildi',
+          `${latest.table}: ${applied.toLocaleString()} so'm (${method})${restocked > 0 ? ` • ${restocked} xil masalliq omborga qaytdi` : ''}`
+        );
+      }
+      sendCashierTelegramAlert(
+        [
+          `💸 <b>MIJOZGA PUL QAYTARILDI (${escapeHtml(resolvedCafeName)})</b>`,
+          `🪑 <b>Joy:</b> ${escapeHtml(latest.table || '')}`,
+          `💰 <b>Summa:</b> ${applied.toLocaleString()} so'm (${escapeHtml(method)})`,
+          `👤 <b>Kassir:</b> ${escapeHtml(currentUser?.name || 'Kassir')}`,
+          restocked > 0 ? `📦 Masalliqlar omborga qaytdi (${restocked} xil)` : null
+        ],
+        'notifyOnSecurity'
+      );
+      notify(`✅ ${latest.table}: ${applied.toLocaleString()} so'm qaytarildi`);
+    };
+    if (typeof requireAdminOverride === 'function') {
+      requireAdminOverride(`${target.table}: mijozga ${Number(amount).toLocaleString()} so'm qaytarish (${method})`, perform, 'cashierRefund');
+    } else {
+      perform();
+    }
+  };
+
   const filteredCrmCustomers = useMemo(() => {
     const q = crmSearch.trim().toLowerCase();
     if (!q) return safeCustomers;
@@ -1037,6 +1134,9 @@ export default function CashierMode({
   // ==========================================
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-4 pb-6 animate-fade-in">
+      {/* To'langan chekdan oshxona rad etgan taom: mijozga qaytariladigan pul */}
+      <CashierRefundsPanel orders={safeOrders} onRefund={handleRefund} />
+
 
       {/* KASSA SMENASI: ochish / yopish / Z-hisobot */}
       <ShiftPanel

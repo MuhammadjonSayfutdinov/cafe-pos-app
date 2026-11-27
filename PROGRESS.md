@@ -52,8 +52,8 @@ o'zgartiradi (B35-B40). Batafsil: pastda "Ega va admin huquqlari". Hozirgi ma'lu
 Navbatdagi ish: 7-bosqichning "Keyingi qadamlar" ro'yxati (7 ta) tartib bilan. 1-qadam (mijoz telefonida rad
 etilgan taom) tayyor: foydalanuvchi `supabase/qr.sql` ni Supabase'da yana bir marta ishga tushirishi kerak.
 2-qadam (rad etilgan va bekor qilingan taomlar hisoboti) va 3-qadam (ikki qurilma bir chekni bir vaqtda
-o'zgartirsa birlashtirish) va 4-qadam (taom taymeri, sexlar, oshxona cheki) tayyor. Keyingisi: 5-qadam (to'langan
-chekdan rad etilgan taom uchun kassada "Qaytarish").
+o'zgartirsa birlashtirish), 4-qadam (taom taymeri, sexlar, oshxona cheki) va 5-qadam (kassada qaytarish) tayyor.
+Keyingisi: 6-qadam ("Olib ketish" uchun bir vaqtda bir nechta ochiq chek).
 
 **Oshxona va buyurtma oqimi (7-bosqich, foydalanuvchi so'rovi, 2026-11-27):** oshpaz bir nechta taomni
 belgilab "Tayyor" bossa butun chek tayyor bo'lib ketardi (B19) - tuzatildi; oshxonaga "Rad etish" oynasi
@@ -256,7 +256,11 @@ rad etish oynasi) va namunalar (RestroBit POS, iiko, Dribbble POS). Tamoyil: hol
      orqali, planshet qaysi sexni ko'rsatishi - qurilmada (qayta ochilsa ham saqlanadi). Oshxona cheki (KOT):
      kartadagi "🖨 Chek" va ixtiyoriy avtomatik chop etish (faqat yangi porsiyalar, dozakaz "QO'SHIMCHA" belgisi bilan)
      (`src/utils/kitchenStations.ts`, `KitchenStationsModal.jsx`, `npm run test:stations`)
-   - [ ] To'langan chekdan rad etilgan taom: kassada "Qaytarish" amali (pul va ombor yozuvi bilan)
+   - [x] To'langan chekdan rad etilgan taom: kassada "💸 Mijozga qaytarilishi kerak" paneli va "Qaytarish" oynasi
+     (summa, usul: naqd/plastik/Click/Payme, masalliqni omborga qaytarish). Chekka `refunds` yoziladi (chek summasi
+     o'zgarmaydi), kassa xarajati "Qaytarish" (naqd - smena hisobotida chiqim), masalliq "Kirim (Qaytarish)" bilan
+     omborga, audit va Telegram. PIN: "Mijozga pul qaytarish" (standart yoqiq). `src/utils/refunds.ts`,
+     `CashierRefundsPanel.jsx`, `npm run test:refund`
    - [ ] "Olib ketish" uchun ofitsiant ekranida bir vaqtda bir nechta ochiq chek
    - [ ] Vitest (yangi kutubxona: ruxsat kerak); hozircha `scripts/test-kitchen-flow.mjs` (kutubxonasiz)
 
@@ -319,6 +323,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | Oshxona holati taom darajasida (7-bosqich) | Qatorda `kitchenDoneQty` (oshxona tayyor degan), `servedQty` (mijozga berilgan), `kitchenSentAt`, `kitchenReadyAt`; eski yozuvda yo'q bo'lsa statusdan taxmin qilinadi va birinchi yozishda qotiriladi. Ochiq chek statusi qatorlardan: oshxonada porsiya bor - 'Yangi'/'Tayyorlanmoqda', hammasi tayyor - 'Tayyor', hammasi berilgan - 'Yetkazildi'. Chekni faqat `src/utils/kitchenFlow.ts` funksiyalari bilan va `setOrders(prev => ...)` ichida (eng so'nggi holatdan) o'zgartirish. Oshpazning tanlovi faqat shu qurilmada (`pos_kds_selected`), holat chekka yoziladi | qabul qilindi |
 | Mijoz telefonida taom holati | So'rov qabul qilinganda `pos_qr_requests.lineIds` (so'rov taomlari tartibida chekdagi `cartItemId`). `qr_request_status` faqat shu qatorlarni qaytaradi (boshqa mijoz/ofitsiant taomi ko'rinmaydi): porsiya, tayyor, berilgan va rad etilgan porsiya. Rad etish sababi serverda standart ro'yxatga keltiriladi (oshpazning erkin izohi mijozga chiqmaydi). Qatordagi porsiya kamaygan, lekin rad etilmagan bo'lsa - "bekor qilindi" (ofitsiant olib tashlagan). SQL yangilanmagan yoki eski so'rov - telefon avvalgidek umumiy holatni ko'rsatadi | qabul qilindi |
 | Bir vaqtdagi o'zgarish (chek) | `pos_kds_marks` (alohida yozuv) o'rniga chekning o'zida versiya belgisi + qurilmada birlashtirish: barcha ekranlar chekni avvalgidek o'qiydi, SQL va server o'zgarmaydi. Qurilma bilgan server versiyasi (`serverCopy`) va so'nggi 400 versiya xotirada; yuborilmagan o'zgarishda asos navbatda saqlanadi (qayta ochilsa ham). Birlashtirish: porsiya hisoblagichlari farq bilan qo'shiladi (oshpaz +2 tayyor, ofitsiant +1 porsiya), qo'shilgan qator ikkalasidan, o'chirilgani o'chadi, rad etish/bekor yozuvlari id bo'yicha, "ko'rildi" yo'qolmaydi. Bir tomon chekni yopsa (to'lov) - uning qatorlari va summasi (to'lanmagan dozakaz to'langan chekka kirmaydi). Natija simmetrik; daqiqasiga 6 tadan ko'p birlashtirish bo'lmaydi (cheksiz aylanish yo'q). Asos topilmasa yoki eski (kalitsiz) qator - eski usul (oxirgi yozuv) | qabul qilindi |
+| Mijozga qaytarish | To'langan chek summasi va holati o'zgarmaydi (tushum to'lov paytidagidek), qaytarish alohida: chekda `refunds`, kassa xarajati "Qaytarish" (shu bilan Z-hisobotdagi kutilgan naqd to'g'ri kamayadi, sof foyda ham). Faqat ochiq smenada. Summa qolgan qarzdan oshmaydi va chekning eng so'nggi holatidan hisoblanadi (ikki kassa bir vaqtda ikki marta qaytara olmaydi). Masalliq faqat bir marta qaytadi (rad etish yozuvida `restockedAt`). PIN qoidasi yangi bo'lsa ham standart yoqiq (pul chiqimi) | qabul qilindi |
 | Oshxona sexlari va KOT | Sex = bir nechta kategoriya (`pos_kds_stations`, bulut). Planshet sexi, avtomatik chek va chop etilgan porsiyalar - faqat qurilmada (har planshet o'z sexini chiqaradi). Chop etish yashirin iframe orqali (qalqib chiquvchi oyna kerak emas); brauzer baribir chop etish oynasini so'raydi - so'ramasligi uchun Chrome `--kiosk-printing`. Avtomatik chek faqat yangi porsiyani chiqaradi: chop etilgan jami porsiya qator bo'yicha eslab qolinadi, tayyor bo'lgani qayta chiqmaydi, yoqilganda oshxonadagi eski taomlar chiqmaydi | qabul qilindi |
 | Yo'qotish hisoboti | Manba - chekning o'zi: `kitchenRejections` (oshxona) va `voids` (xodim, narx bilan; `reduceLine`, `cancelWholeOrder` yozadi). Eski bekor qilingan chek (voids yo'q) - qatorlaridan. Vaqt - hodisa vaqti. Filtrsiz Statistika - ochiq smena boshidan (smena yo'q - bugun). "Kunlik" Telegram xulosasi smena yopilganda (Z-hisobotdan keyin) yuboriladi: dastur qurilmada ishlaydi, server jadvali yo'q; smena = ish kuni | qabul qilindi |
 | Oshxona rad etishi (otkaz) | Faqat hali tayyor bo'lmagan porsiya. Rad etilgan porsiya qatordan ayiriladi (summa, ombor, statistika o'zgarishsiz to'g'ri), yozuv `order.kitchenRejections` da (sabab, oshpaz, vaqt, ko'rildi). PIN so'ralmaydi (oshpaz tez ishlashi kerak), lekin audit + Telegram (xavfsizlik). Chekda taom qolmasa - 'Bekor qilindi'. To'langan chekda summa o'zgarmaydi, `refundDue` (qaytariladigan pul) xabarda chiqadi | qabul qilindi |
@@ -380,6 +385,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | 25 | Rad etilgan va bekor qilingan taomlar hisoboti, Telegram xulosasi (7-bosqich, 3-qism, 2-qadam) | "7: rad etilgan va bekor qilingan taomlar hisoboti..." commiti | [x] |
 | 26 | Ikki qurilma bir chekni bir vaqtda o'zgartirsa birlashtirish (7-bosqich, 3-qism, 3-qadam) | "7: bir chekni ikki qurilma bir vaqtda..." commiti | [x] |
 | 27 | Har taom taymeri, oshxona sexlari, oshxona cheki KOT (7-bosqich, 3-qism, 4-qadam) | "7: har taom taymeri, sexlar va oshxona cheki..." commiti | [x] |
+| 28 | Kassada mijozga qaytarish: pul, xarajat, ombor (7-bosqich, 3-qism, 5-qadam) | "7: kassada mijozga pul qaytarish..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

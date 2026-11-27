@@ -15,7 +15,8 @@
     "test:loss": "node scripts/test-loss-report.mjs",
     "test:merge": "node scripts/test-merge-order.mjs",
     "test:stations": "node scripts/test-kitchen-stations.mjs",
-    "test": "node scripts/test-kitchen-flow.mjs && node scripts/test-access.mjs && node scripts/test-customer-lines.mjs && node scripts/test-loss-report.mjs && node scripts/test-merge-order.mjs && node scripts/test-kitchen-stations.mjs"
+    "test:refund": "node scripts/test-refunds.mjs",
+    "test": "node scripts/test-kitchen-flow.mjs && node scripts/test-access.mjs && node scripts/test-customer-lines.mjs && node scripts/test-loss-report.mjs && node scripts/test-merge-order.mjs && node scripts/test-kitchen-stations.mjs && node scripts/test-refunds.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

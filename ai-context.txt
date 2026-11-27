@@ -230,6 +230,10 @@ pos_orders (buyurtma):
     refundDue - to'langan chekdan rad etilgan taom puli; cancelledAt, cancelledBy, cancelReason.
     voids [{id, lineId, menuId, name, qty, price, cookedQty, by, reason, at}] - xodim chekdan olib
     tashlagan porsiyalar (reduceLine, cancelWholeOrder yozadi; hisobot: src/utils/lossReport.ts).
+    refunds [{id, amount, method, by, at, shiftId, restocked, rejectionIds}] - kassada mijozga qaytarilgan
+    pul (to'langan chekdan rad etilgan taom: src/utils/refunds.ts). Qolgan qarz = refundDue - refunds summasi.
+    Qaytarish kassa xarajati bo'lib ham yoziladi (category 'Qaytarish', isRefund), masalliq omborga
+    'Kirim (Qaytarish)' bilan qaytadi (rad etish yozuvida restockedAt).
     _rev, _revs - sinxron versiya belgisi (src/sync/engine.js qo'yadi, src/sync/mergeOrder.ts):
     ikki qurilma bir chekni bir vaqtda o'zgartirsa birlashtirish uchun. Qo'lda yozmang va o'chirmang.
   Yetkazish buyurtmasi: table "Yetkazish #N", orderType 'delivery',

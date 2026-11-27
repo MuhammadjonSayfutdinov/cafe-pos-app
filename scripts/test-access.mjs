@@ -147,6 +147,7 @@ test("Eski umumiy tugma yoqilgan: avval himoyalangan amallar yoqiq, yangilari o'
   assert.equal(r.cashierDebt, false);
   assert.equal(r.kitchenReject, false);
   assert.equal(r.warehouseWriteOff, false);
+  assert.equal(r.cashierRefund, true); // yangi, lekin pul chiqimi: standart yoqiq
 });
 
 test("Eski umumiy tugma o'chiq: hammasi o'chiq", () => {

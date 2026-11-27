@@ -17,6 +17,7 @@ export type PinRuleKey =
   | 'cashierDebt'
   | 'cashierCancelOrder'
   | 'cashierDeleteExpense'
+  | 'cashierRefund'
   | 'kitchenReject'
   | 'warehouseWriteOff'
   | 'warehouseDeleteItem'
@@ -29,6 +30,8 @@ export interface PinRuleMeta {
   hint: string;
   /** Oldin umumiy tugma bilan himoyalangan edi (yozilmagan bo'lsa eski tugma qiymatini oladi) */
   legacy: boolean;
+  /** Yangi amal, lekin standart holatda yoqiq (pul chiqimi): umumiy himoya o'chiq bo'lsa - o'chiq */
+  defaultOn?: boolean;
 }
 
 export interface PinRuleGroup {
@@ -56,7 +59,8 @@ export const PIN_RULE_GROUPS: readonly PinRuleGroup[] = Object.freeze([
       { key: 'cashierDiscount', label: 'Katta chegirma', hint: "20% va undan ko'p yoki pre-chek chiqqandan keyin", legacy: true },
       { key: 'cashierDebt', label: 'Chekni qarzga yozish', hint: 'Mijoz keyin to\'laydi', legacy: false },
       { key: 'cashierCancelOrder', label: 'Chekni bekor qilish (kassada)', hint: '', legacy: true },
-      { key: 'cashierDeleteExpense', label: "Kassa xarajatini o'chirish", hint: '', legacy: true }
+      { key: 'cashierDeleteExpense', label: "Kassa xarajatini o'chirish", hint: '', legacy: true },
+      { key: 'cashierRefund', label: 'Mijozga pul qaytarish', hint: "To'langan chekdan oshxona rad etgan taom puli", legacy: false, defaultOn: true }
     ]
   },
   {
@@ -112,7 +116,9 @@ export function resolvePinRules(stored: unknown, legacyEnabled: unknown): PinRul
   const obj = isObject(stored) ? stored : {};
   const out = {} as PinRules;
   PIN_RULES.forEach(rule => {
-    out[rule.key] = typeof obj[rule.key] === 'boolean' ? (obj[rule.key] as boolean) : rule.legacy && legacyOn;
+    out[rule.key] = typeof obj[rule.key] === 'boolean'
+      ? (obj[rule.key] as boolean)
+      : (rule.legacy || Boolean(rule.defaultOn)) && legacyOn;
   });
   return out;
 }
