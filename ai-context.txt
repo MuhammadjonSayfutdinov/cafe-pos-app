@@ -164,6 +164,8 @@ Oshxona:
   KitchenMode (1300)          Buyurtmalar, taomni tanlab "tayyor", rad etish, stop-list, SLA
   KitchenRejectModal          Taomni (yoki butun chekni) rad etish oynasi: porsiya, sabab, stop-list
   KitchenNoticesPanel         Ofitsiant/kassa/admin ekrani tepasida: oshxona rad etdi, to'langan chek tayyor
+  KitchenStationsModal        Sexlar (bar, issiq sex), shu planshet sexi, avtomatik oshxona cheki (KOT)
+  utils/kitchenStations.ts    Sex tanlovi, taom taymeri, KOT cheki (kotDocument, printHtml); npm run test:stations
   utils/kitchenFlow.ts        Taom darajasidagi holat va amallar (yagona joy), scripts/test-kitchen-flow.mjs
 
 Ombor:
@@ -194,6 +196,9 @@ pos_override_enabled  ESKI umumiy PIN himoyasi tugmasi (boolean): endi pos_pin_r
 pos_pin_rules     { waiterCancelOrder: true, cashierDebt: false, ... } - qaysi amalda admin PIN so'raladi
                   (src/utils/pinRules.ts; yozilmagan amal: avval himoyalangani - eski tugmadan, yangisi - o'chiq)
 pos_owner         { id, at, by } - Ega (kafe egasi). Yo'q bo'lsa yoki u admin emas - eng birinchi qo'shilgan admin
+pos_kds_stations  oshxona sexlari [{ id, name, icon, categories }] (bulut orqali). Faqat qurilmada:
+                  pos_kds_station (shu planshet qaysi sexni ko'rsatadi: 'all' | 'st:<id>' | 'cat:<kategoriya>'),
+                  pos_kds_autoprint (avtomatik oshxona cheki), pos_kds_printed ({ lineId: chop etilgan jami porsiya })
 pos_qr_base_url   stol QR kodi ochadigan sayt manzili ('' = joriy manzil)
 pos_qr_secret     stol QR kalitlari siri (src/qr/tableKey.js); mijozga ko'rinmaydi
 pos_qr_geofence   { enabled, lat, lng, radius }: QR buyurtma faqat kafe ichidan

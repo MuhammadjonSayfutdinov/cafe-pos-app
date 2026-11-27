@@ -16,8 +16,15 @@ import {
   startCooking
 } from '../utils/kitchenFlow';
 import KitchenRejectModal from './KitchenRejectModal';
+import KitchenStationsModal from './KitchenStationsModal';
+import useSticky from '../hooks/useSticky';
 import { notify } from '../utils/notify';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
+import {
+  AUTO_PRINT_KEY, DEVICE_STATION_KEY, PRINTED_KEY, STATIONS_KEY, formatTimer, kotDocument, lineCategory,
+  lineSentMs, normalizeStations, printHtml, prunePrinted, selectionCategories, selectionLabel, slaLevelOf,
+  unprintedLines
+} from '../utils/kitchenStations';
 
 // =========================================================
 // STANDART SLA SOZLAMALARI (DAQIQALARDA)
@@ -147,7 +154,14 @@ export default function KitchenMode({
   // UI Statelari
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'stoplist'
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'delayed' | 'new' | 'cooking'
-  const [stationCategory, setStationCategory] = useState('Barchasi'); // Sex filtri
+  // Sex: ro'yxat barcha qurilmalarda bir xil, qaysi sexni ko'rsatishi - shu qurilmada (src/utils/kitchenStations.ts)
+  const [stationsRaw, setStationsRaw] = useSticky(STATIONS_KEY, []);
+  const stations = useMemo(() => normalizeStations(stationsRaw), [stationsRaw]);
+  const [stationSelection, setStationSelection] = useSticky(DEVICE_STATION_KEY, 'all');
+  const stationCats = useMemo(() => selectionCategories(stationSelection, stations), [stationSelection, stations]);
+  const [isStationsModalOpen, setIsStationsModalOpen] = useState(false);
+  // Avtomatik oshxona cheki (KOT): faqat shu qurilmada
+  const [autoPrint, setAutoPrint] = useSticky(AUTO_PRINT_KEY, false);
   const [stopSearch, setStopSearch] = useState('');
   const [stopCategoryFilter, setStopCategoryFilter] = useState('Barchasi');
   const [isSlaModalOpen, setIsSlaModalOpen] = useState(false);
@@ -309,15 +323,11 @@ export default function KitchenMode({
   // =========================================================
   // 4. HAR BIR BUYURTMA UCHUN SLA HOLATINI HISOBLASH
   // =========================================================
-  // Sex (kategoriya) filtri: taom shu sexnikimi
+  // Sex (bir nechta kategoriya) yoki bitta kategoriya filtri: taom shu sexnikimi
   const stationMatches = useCallback((it) => {
-    if (stationCategory === 'Barchasi') return true;
-    if (it?.category === stationCategory) return true;
-    const foundMenu = safeMenuItems.find(
-      m => m && (String(m.id) === String(it?.id) || m.name === it?.baseName || m.name === it?.name)
-    );
-    return foundMenu?.category === stationCategory;
-  }, [stationCategory, safeMenuItems]);
+    if (!stationCats) return true;
+    return stationCats.has(lineCategory(it, safeMenuItems));
+  }, [stationCats, safeMenuItems]);
 
   const enrichedOrders = useMemo(() => {
     const warnSec = (Number(slaConfig.warningMinutes) || 10) * 60;
@@ -325,41 +335,46 @@ export default function KitchenMode({
 
     return kitchenActiveOrders.map(order => {
       const startMs = getOrderStartMs(order);
-      const elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
-      const mins = Math.floor(elapsedSeconds / 60);
-      const secs = elapsedSeconds % 60;
-      const formattedTimer = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-
-      let slaLevel = 'normal'; // 'normal' | 'warning' | 'critical'
-      if (elapsedSeconds >= critSec) {
-        slaLevel = 'critical';
-      } else if (elapsedSeconds >= warnSec) {
-        slaLevel = 'warning';
-      }
-
-      const slaProgressPct = Math.min(100, Math.round((elapsedSeconds / critSec) * 100));
+      let elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+      let formattedTimer = formatTimer(elapsedSeconds);
+      let slaLevel = slaLevelOf(elapsedSeconds, warnSec, critSec); // 'normal' | 'warning' | 'critical'
+      let slaProgressPct = Math.min(100, Math.round((elapsedSeconds / critSec) * 100));
 
       // To'langan (oshxona tugatmagan) chek oshxonada "tayyorlanmoqda" bosqichida ko'rinadi
       const isPaidOrder = isClosedStatus(String(order.status || ''));
       const kitchenStatus = isPaidOrder ? ORDER_STATUS.COOKING : order.status;
 
       // Faqat hali tayyorlanmagan porsiyalar (dozakazda eski taomlar qayta chiqmaydi, B3).
-      // Har qatorning doimiy kaliti (lineId): tanlov va amallar shu kalit bo'yicha (B20)
+      // Har qatorning doimiy kaliti (lineId): tanlov va amallar shu kalit bo'yicha (B20).
+      // Har taomning o'z taymeri: oshxonaga tushgan vaqtidan (dozakaz - o'z vaqtidan)
       const lines = orderLines(order);
       const pendingLines = lines
         .map(({ item, lineId }) => {
           const pending = pendingQtyOf(item, order);
           if (pending <= 0) return null;
+          const sentMs = lineSentMs(item, startMs);
+          const lineSeconds = Math.max(0, Math.floor((nowMs - sentMs) / 1000));
           return {
             ...item,
             lineId,
             pending,
+            sentMs,
+            lineTimer: formatTimer(lineSeconds),
+            lineSla: slaLevelOf(lineSeconds, warnSec, critSec),
             // Oshxonadagi chekka keyin qo'shilgan taom (dozakaz)
             isAddition: Number(item.kitchenSentAt) > startMs + 60000
           };
         })
         .filter(Boolean);
       const displayItems = pendingLines.filter(stationMatches);
+      // Kartadagi taymer: shu sexda eng uzoq kutayotgan taomdan (oldin chek boshidan: dozakaz kech ko'rinardi)
+      if (displayItems.length > 0) {
+        const oldest = Math.min(...displayItems.map(l => l.sentMs));
+        elapsedSeconds = Math.max(0, Math.floor((nowMs - oldest) / 1000));
+        formattedTimer = formatTimer(elapsedSeconds);
+        slaLevel = slaLevelOf(elapsedSeconds, warnSec, critSec);
+        slaProgressPct = Math.min(100, Math.round((elapsedSeconds / critSec) * 100));
+      }
       // Shu bosqichda tayyor bo'lganlar (oshpazga ma'lumot: qolganini tayyorlash kerak)
       const readyNow = lines
         .filter(({ item }) =>
@@ -640,6 +655,79 @@ export default function KitchenMode({
     ], 'security');
     notify(`❌ ${target.table}: ${what} rad etildi. Ofitsiantga xabar ketdi.`);
   };
+
+  // =========================================================
+  // 6.1 SEXLAR VA OSHXONA CHEKI (KOT)
+  // =========================================================
+  const [cafeName] = useSticky('pos_cafe_name', '');
+  const kotLinesOf = (order) => (Array.isArray(order?.displayItems) ? order.displayItems : []).map(l => ({
+    lineId: l.lineId,
+    name: l.name,
+    qty: l.pending,
+    total: Number(l.quantity ?? l.qty ?? l.pending) || l.pending,
+    note: l.note,
+    isAddition: l.isAddition
+  }));
+  const kotBaseOf = (order) => ({
+    cafeName: String(cafeName || ''),
+    table: String(order.table || ''),
+    waiter: String(order.waiterName || order.waiter || ''),
+    orderId: String(order.id),
+    station: selectionLabel(stationSelection, stations),
+    printedAt: Date.now()
+  });
+
+  // Qo'lda chop etish: shu sexdagi oshxonada turgan taomlar. Avtomatik chop etish ularni qayta chiqarmaydi
+  const handlePrintKot = (order) => {
+    const lines = kotLinesOf(order);
+    if (lines.length === 0) return;
+    printHtml(kotDocument([{ ...kotBaseOf(order), lines }]));
+    const printed = readLocalJSON(PRINTED_KEY, {}) || {};
+    writeLocalJSON(PRINTED_KEY, unprintedLines(lines, printed).next);
+  };
+
+  const handleChangeStations = (next) => {
+    setStationsRaw(next);
+    if (stationSelection.startsWith?.('st:') && !next.some(s => `st:${s.id}` === stationSelection)) {
+      setStationSelection('all');
+    }
+    if (typeof addAuditLog === 'function') {
+      addAuditLog('Oshxona sexlari', next.map(s => `${s.icon} ${s.name}: ${s.categories.join(', ')}`).join(' • ') || "sex yo'q");
+    }
+  };
+
+  // Yoqilganda hozir oshxonada turgan taomlar "chop etilgan" deb olinadi: eskilari birdan chiqib ketmasin
+  const handleToggleAutoPrint = (next) => {
+    if (next) {
+      let printed = readLocalJSON(PRINTED_KEY, {}) || {};
+      enrichedOrders.forEach(o => {
+        printed = unprintedLines(kotLinesOf(o), printed).next;
+      });
+      writeLocalJSON(PRINTED_KEY, printed);
+    }
+    setAutoPrint(Boolean(next));
+  };
+
+  // Avtomatik oshxona cheki: yangi buyurtma yoki dozakaz porsiyalari (shu qurilmaning sexi bo'yicha)
+  useEffect(() => {
+    if (!autoPrint) return;
+    const printed = readLocalJSON(PRINTED_KEY, {}) || {};
+    let next = printed;
+    const tickets = [];
+    enrichedOrders.forEach(order => {
+      const res = unprintedLines(kotLinesOf(order), next);
+      next = res.next;
+      if (res.lines.length > 0) {
+        tickets.push({ ...kotBaseOf(order), lines: res.lines, isUpdate: res.lines.some(l => l.isAddition) });
+      }
+    });
+    // Oshxonadan chiqqan cheklar qatorlari xaritadan o'chadi (cheksiz o'smasin)
+    const keep = new Set(kitchenActiveOrders.flatMap(o => orderLines(o).map(l => l.lineId)));
+    next = prunePrinted(next, keep);
+    if (JSON.stringify(next) !== JSON.stringify(printed)) writeLocalJSON(PRINTED_KEY, next);
+    if (tickets.length > 0) printHtml(kotDocument(tickets));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPrint, enrichedOrders, kitchenActiveOrders]);
 
   // Xodim bekor qilgan, oshxonada turgan taomlar (oshpaz bekorga tayyorlamasin)
   const kitchenCancelNotices = useMemo(
@@ -947,25 +1035,42 @@ export default function KitchenMode({
               ))}
             </div>
 
-            {/* Oshxona Sexi (Kategoriya) filtri */}
+            {/* Oshxona sexi: sozlangan sexlar (bar, issiq sex) va kategoriyalar. Tanlov shu qurilmada saqlanadi */}
             <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
               <span className="text-[10px] font-black uppercase text-gray-400 whitespace-nowrap pl-1">
                 👨‍🍳 Sex:
               </span>
-              {['Barchasi', ...safeCategories].map(cat => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setStationCategory(cat)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition ${
-                    stationCategory === cat
-                      ? 'bg-amber-500 text-white shadow-xs'
-                      : 'bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+              {[
+                { id: 'all', label: 'Barchasi' },
+                ...stations.map(s => ({ id: `st:${s.id}`, label: `${s.icon} ${s.name}` })),
+                ...safeCategories.map(cat => ({ id: `cat:${cat}`, label: cat }))
+              ].map(opt => {
+                const active = stationSelection === opt.id ||
+                  (opt.id === 'all' && (!stationSelection || stationSelection === 'Barchasi')) ||
+                  (opt.id === `cat:${stationSelection}`);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setStationSelection(opt.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition ${
+                      active
+                        ? 'bg-amber-500 text-white shadow-xs'
+                        : 'bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setIsStationsModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                title="Sexlar va oshxona cheki (KOT) sozlamasi"
+              >
+                ⚙️ Sexlar{autoPrint ? ' • 🖨' : ''}
+              </button>
             </div>
           </div>
 
@@ -1090,10 +1195,21 @@ export default function KitchenMode({
                       <div className="p-4 space-y-2.5">
                         <div className="flex justify-between items-center gap-2 text-[11px] font-black text-gray-400 uppercase">
                           <span>Taomlar (bosib tanlang)</span>
-                          <span className={selectedLines.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}>
-                            {selectedLines.length > 0
-                              ? `Tanlandi: ${selectedLines.length}/${order.displayItems.length}`
-                              : `${order.visiblePending} pors`}
+                          <span className="flex items-center gap-2">
+                            <span className={selectedLines.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}>
+                              {selectedLines.length > 0
+                                ? `Tanlandi: ${selectedLines.length}/${order.displayItems.length}`
+                                : `${order.visiblePending} pors`}
+                            </span>
+                            <button
+                              type="button"
+                              data-testid="kitchen-kot-button"
+                              onClick={() => handlePrintKot(order)}
+                              className="px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 normal-case transition"
+                              title="Oshxona chekini (KOT) chop etish"
+                            >
+                              🖨 Chek
+                            </button>
                           </span>
                         </div>
 
@@ -1139,12 +1255,27 @@ export default function KitchenMode({
                                   </span>
                                 </span>
 
-                                <span className={`px-3 py-1 rounded-xl font-black text-sm shrink-0 ${
-                                  isPicked
-                                    ? 'bg-emerald-500 text-white'
-                                    : 'bg-amber-500 text-white shadow-xs'
-                                }`}>
-                                  x{item.pending}
+                                <span className="flex flex-col items-end gap-1 shrink-0">
+                                  <span className={`px-3 py-1 rounded-xl font-black text-sm ${
+                                    isPicked
+                                      ? 'bg-emerald-500 text-white'
+                                      : 'bg-amber-500 text-white shadow-xs'
+                                  }`}>
+                                    x{item.pending}
+                                  </span>
+                                  {/* Taomning o'z taymeri (dozakaz - o'z vaqtidan) */}
+                                  <span
+                                    data-testid="kitchen-line-timer"
+                                    className={`font-mono text-[11px] font-black px-1.5 rounded-md ${
+                                      item.lineSla === 'critical'
+                                        ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                                        : item.lineSla === 'warning'
+                                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                                          : 'text-gray-400'
+                                    }`}
+                                  >
+                                    ⏱ {item.lineTimer}
+                                  </span>
                                 </span>
                               </button>
                             );
@@ -1298,6 +1429,19 @@ export default function KitchenMode({
             })}
           </div>
         </div>
+      )}
+
+      {isStationsModalOpen && (
+        <KitchenStationsModal
+          stations={stations}
+          categories={safeCategories}
+          selection={stationSelection}
+          autoPrint={Boolean(autoPrint)}
+          onChangeStations={handleChangeStations}
+          onSelect={setStationSelection}
+          onToggleAutoPrint={handleToggleAutoPrint}
+          onClose={() => setIsStationsModalOpen(false)}
+        />
       )}
 
       {rejectTarget && (() => {
