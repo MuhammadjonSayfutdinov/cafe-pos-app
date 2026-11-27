@@ -1,6 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
+import { canUploadFiles, uploadPublicFile, removePublicFiles } from '../sync/engine';
+import DishImage from './DishImage';
+import {
+  MAX_MENU_IMAGES,
+  MAX_DESCRIPTION_LENGTH,
+  CLOUD_IMAGE_SIZE,
+  LOCAL_IMAGE_SIZE,
+  getMenuImages,
+  getMenuThumb,
+  getMenuDescription,
+  processImageFile,
+  blobToDataUrl,
+  makeThumbFromSrc,
+  cloudImagePath
+} from '../utils/menuImages';
 
 // Birliklar konvertatsiyasi (Retseptdagi gr/kg/ml/litr ni ombordagi birlikka aniq o'girish)
 const RECIPE_UNITS = [
@@ -106,6 +121,28 @@ export default function AdminMenuTab({
   
   const [recipeInputs, setRecipeInputs] = useState([]);
 
+  // Rasmlar va qisqacha ma'lumot (src/utils/menuImages.ts).
+  // imageInputs: [{ id, src, path?, blob?, thumb? }] - blob bor bo'lsa, hali bulutga yuklanmagan yangi rasm
+  // (src - oldindan ko'rish uchun blob: havola)
+  const [imageInputs, setImageInputs] = useState([]);
+  const [descriptionInput, setDescriptionInput] = useState('');
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const imageInputsRef = useRef(imageInputs);
+  imageInputsRef.current = imageInputs;
+  const isTouchDevice = useMemo(() => {
+    try {
+      return window.matchMedia('(pointer: coarse)').matches;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Oyna yopilmay turib komponent o'chsa ham oldindan ko'rish havolalari xotirada qolmasin
+  useEffect(() => () => revokePreviews(imageInputsRef.current), []);
+
   // ==========================================
   // 1. TAOM TANNARXI VA SOF FOYDASINI HISOBLASH
   // ==========================================
@@ -177,8 +214,28 @@ export default function AdminMenuTab({
   // ==========================================
   // 3. MODALNI OCHISH VA BOSHQARISH
   // ==========================================
+  const revokePreviews = (list) => {
+    (Array.isArray(list) ? list : []).forEach(img => {
+      if (img?.blob && String(img.src || '').startsWith('blob:')) URL.revokeObjectURL(img.src);
+    });
+  };
+
+  const closeMenuModal = () => {
+    if (isSaving) return;
+    revokePreviews(imageInputsRef.current);
+    setImageInputs([]);
+    setIsMenuModalOpen(false);
+  };
+
   const handleOpenMenuModal = (item = null) => {
     setLocalInventory(readLocalBackup('pos_inventory', []));
+    revokePreviews(imageInputsRef.current);
+    const existingImages = item ? getMenuImages(item) : [];
+    const existingThumb = item ? getMenuThumb(item) : '';
+    setImageInputs(existingImages.map((img, idx) => (
+      idx === 0 && existingThumb.startsWith('data:') ? { ...img, thumb: existingThumb } : { ...img }
+    )));
+    setDescriptionInput(item ? getMenuDescription(item) : '');
 
     if (item) {
       setEditingItem(item);
@@ -232,6 +289,66 @@ export default function AdminMenuTab({
     setIsMenuModalOpen(true);
   };
 
+  // ==========================================
+  // RASMLAR: qo'shish, tartib, o'chirish
+  // ==========================================
+  const handleAddImages = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ''; // o'sha faylni qayta tanlash mumkin bo'lsin
+    if (files.length === 0) return;
+
+    const room = MAX_MENU_IMAGES - imageInputsRef.current.length;
+    if (room <= 0) {
+      notify(`Bitta taomga ko'pi bilan ${MAX_MENU_IMAGES} ta rasm qo'shiladi.`, 'warning');
+      return;
+    }
+    if (files.length > room) {
+      notify(`Faqat ${room} ta rasm qo'shildi: bitta taomga ko'pi bilan ${MAX_MENU_IMAGES} ta.`, 'warning');
+    }
+
+    // Bulut ombori bo'lsa - katta (tiniq) rasm, saqlashda yuklanadi; bo'lmasa kichikroq rasm yozuvning o'zida
+    const toCloud = canUploadFiles();
+    setIsProcessingImage(true);
+    const added = [];
+    for (const file of files.slice(0, room)) {
+      try {
+        const { blob, thumb } = await processImageFile(file, toCloud ? CLOUD_IMAGE_SIZE : LOCAL_IMAGE_SIZE);
+        const id = newId('img_');
+        added.push(toCloud
+          ? { id, src: URL.createObjectURL(blob), blob, thumb }
+          : { id, src: await blobToDataUrl(blob), thumb });
+      } catch (err) {
+        notify(`❌ ${err?.message || "Rasmni qayta ishlab bo'lmadi"}`, 'error');
+      }
+    }
+    setIsProcessingImage(false);
+    if (added.length === 0) return;
+
+    setImageInputs(prev => {
+      const next = [...prev, ...added];
+      revokePreviews(next.slice(MAX_MENU_IMAGES));
+      return next.slice(0, MAX_MENU_IMAGES);
+    });
+  };
+
+  const handleRemoveImage = (index) => {
+    setImageInputs(prev => {
+      revokePreviews([prev[index]]);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  // dir: -1 chapga, +1 o'ngga. Eng chapdagi rasm - asosiy
+  const handleMoveImage = (index, dir) => {
+    setImageInputs(prev => {
+      const target = index + dir;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
   const handleAddVariantInput = () => {
     setVariantInputs(prev => [
       ...prev,
@@ -276,8 +393,13 @@ export default function AdminMenuTab({
   // ==========================================
   // 4. TAOMNI SAQLASH, STOP-LIST VA O'CHIRISH
   // ==========================================
-  const handleSaveMenuItem = (e) => {
+  const handleSaveMenuItem = async (e) => {
     e.preventDefault(); 
+    if (isSaving) return;
+    if (isProcessingImage) {
+      notify('Rasm tayyorlanmoqda, bir soniya kuting.', 'info');
+      return;
+    }
     
     const safeName = newItemData.name.trim();
     if (!safeName) {
@@ -322,11 +444,52 @@ export default function AdminMenuTab({
       });
 
     const computedCost = calculateRecipeFoodCost(cleanedRecipe);
+    const itemId = editingItem ? editingItem.id : newId('menu_');
+    const description = descriptionInput.replace(/\s+/g, ' ').trim().slice(0, MAX_DESCRIPTION_LENGTH);
+
+    // Yangi rasmlar bulutga yuklanadi (internet kerak). Yuklanmasa taom saqlanmaydi, oyna ochiq qoladi:
+    // admin internet qaytgach qayta "Saqlash" bosadi yoki rasmni olib tashlaydi
+    setIsSaving(true);
+    let finalImages = [];
+    let thumb = '';
+    try {
+      for (const img of imageInputsRef.current) {
+        if (img.blob) {
+          const path = cloudImagePath(itemId, img.id, img.blob);
+          const url = await uploadPublicFile(path, img.blob);
+          finalImages.push({ id: img.id, src: url, path });
+        } else {
+          finalImages.push(img.path ? { id: img.id, src: img.src, path: img.path } : { id: img.id, src: img.src });
+        }
+      }
+      const cover = imageInputsRef.current[0];
+      if (cover) thumb = cover.thumb || await makeThumbFromSrc(finalImages[0].src);
+    } catch (err) {
+      setIsSaving(false);
+      notify(
+        `❌ Rasm yuklanmadi: ${err?.message || 'internetni tekshiring'}.\nInternet qaytgach qayta "Saqlash" bosing yoki yangi rasmni olib tashlang.`,
+        'error'
+      );
+      return;
+    }
+
+    // Yozuvga rasm va ma'lumot maydonlari: bo'sh bo'lsa umuman yozilmaydi
+    const withMedia = (base) => {
+      const next = { ...base, images: finalImages, thumb, description };
+      if (finalImages.length === 0) {
+        delete next.images;
+        delete next.thumb;
+      }
+      if (!thumb) delete next.thumb;
+      if (!description) delete next.description;
+      return next;
+    };
+    const mediaNote = finalImages.length > 0 ? ` | Rasm: ${finalImages.length} ta` : '';
 
     if (editingItem) {
       if (typeof setMenuItems === 'function') {
         setMenuItems(prev => prev.map(item => 
-          item.id === editingItem.id ? {
+          item.id === editingItem.id ? withMedia({
             ...item, 
             name: safeName, 
             category: newItemData.category || safeCategories[0], 
@@ -335,18 +498,21 @@ export default function AdminMenuTab({
             is_available: newItemData.is_available,
             price: cleanedVariants[0].price,
             variants: cleanedVariants
-          } : item
+          }) : item
         ));
       }
+      // Olib tashlangan rasmlar bulut omboridan ham o'chadi (xato bo'lsa jim o'tadi)
+      const keptPaths = new Set(finalImages.map(i => i.path).filter(Boolean));
+      removePublicFiles(getMenuImages(editingItem).map(i => i.path).filter(p => p && !keptPaths.has(p)));
       if (typeof addAuditLog === 'function') {
         addAuditLog(
           "Taom tahrirlandi", 
-          `"${safeName}" (Sotish: ${cleanedVariants[0].price.toLocaleString()} s | Tannarx: ${computedCost.toLocaleString()} s)`
+          `"${safeName}" (Sotish: ${cleanedVariants[0].price.toLocaleString()} s | Tannarx: ${computedCost.toLocaleString()} s${mediaNote})`
         );
       }
     } else {
-      const newItem = {
-        id: newId('menu_'), 
+      const newItem = withMedia({
+        id: itemId, 
         name: safeName, 
         category: newItemData.category || safeCategories[0], 
         is_available: newItemData.is_available, 
@@ -354,17 +520,20 @@ export default function AdminMenuTab({
         costPrice: computedCost,
         price: cleanedVariants[0].price,
         variants: cleanedVariants
-      };
+      });
       if (typeof setMenuItems === 'function') {
         setMenuItems(prev => [...prev, newItem]);
       }
       if (typeof addAuditLog === 'function') {
         addAuditLog(
           "Yangi taom qo'shildi", 
-          `"${safeName}" (Sotish: ${cleanedVariants[0].price.toLocaleString()} s | Tannarx: ${computedCost.toLocaleString()} s)`
+          `"${safeName}" (Sotish: ${cleanedVariants[0].price.toLocaleString()} s | Tannarx: ${computedCost.toLocaleString()} s${mediaNote})`
         );
       }
     }
+    revokePreviews(imageInputsRef.current);
+    setImageInputs([]);
+    setIsSaving(false);
     setIsMenuModalOpen(false);
   };
 
@@ -386,9 +555,11 @@ export default function AdminMenuTab({
 
   const handleDeleteMenuItem = async (id, itemName) => {
     if (await confirmAsync(`Rostdan ham "${itemName}" taomini menyudan butunlay o'chirmoqchimisiz?`)) {
+      const removed = safeMenuItems.find(item => item && item.id === id);
       if (typeof setMenuItems === 'function') {
         setMenuItems(prev => prev.filter(item => item.id !== id));
       }
+      removePublicFiles(getMenuImages(removed).map(i => i.path).filter(Boolean));
       if (typeof addAuditLog === 'function') {
         addAuditLog("Taom o'chirildi", `"${itemName}" menyudan o'chirildi`);
       }
@@ -518,12 +689,36 @@ export default function AdminMenuTab({
                       }`}
                     >
                       <td className="p-4">
-                        <p className="font-black text-gray-900 dark:text-gray-100 text-base">
-                          {item.name}
-                        </p>
-                        <span className="inline-block mt-1 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 px-2.5 py-0.5 rounded-md text-[11px] font-bold">
-                          {item.category}
-                        </span>
+                        <div className="flex items-center gap-3 min-w-[200px]">
+                          <DishImage
+                            src={getMenuThumb(item)}
+                            alt={item.name}
+                            className="w-12 h-12 rounded-xl object-cover shrink-0 bg-gray-100 dark:bg-gray-700"
+                            fallback={
+                              <div className="w-12 h-12 rounded-xl shrink-0 bg-gray-100 dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-[9px] font-bold text-gray-400 text-center leading-tight">
+                                Rasm yo'q
+                              </div>
+                            }
+                          />
+                          <div className="min-w-0">
+                            <p className="font-black text-gray-900 dark:text-gray-100 text-base">
+                              {item.name}
+                            </p>
+                            <span className="inline-block mt-1 bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 px-2.5 py-0.5 rounded-md text-[11px] font-bold">
+                              {item.category}
+                            </span>
+                            {getMenuImages(item).length > 1 && (
+                              <span className="inline-block mt-1 ml-1.5 text-[10px] font-bold text-gray-400">
+                                {getMenuImages(item).length} ta rasm
+                              </span>
+                            )}
+                            {getMenuDescription(item) && (
+                              <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1 max-w-xs truncate" title={getMenuDescription(item)}>
+                                {getMenuDescription(item)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       <td className="p-4">
@@ -632,7 +827,8 @@ export default function AdminMenuTab({
               </h3>
               <button 
                 type="button"
-                onClick={() => setIsMenuModalOpen(false)} 
+                onClick={closeMenuModal} 
+                disabled={isSaving}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 hover:text-red-500 font-bold transition"
               >
                 ✕
@@ -668,6 +864,119 @@ export default function AdminMenuTab({
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Rasmlar (ixtiyoriy, 5 tagacha) */}
+              <div className="bg-gray-50 dark:bg-gray-900/40 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-3">
+                <div className="flex justify-between items-center gap-2 flex-wrap">
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Rasmlar (ixtiyoriy) · {imageInputs.length}/{MAX_MENU_IMAGES}
+                  </label>
+                  <span className="text-[10px] font-bold text-gray-400">
+                    {canUploadFiles() ? '☁️ Saqlashda bulutga yuklanadi' : '📱 Shu qurilmada saqlanadi'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                  {imageInputs.map((img, idx) => (
+                    <div key={img.id} className="relative aspect-square rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-700">
+                      <DishImage
+                        src={img.src}
+                        alt={`${newItemData.name || 'Taom'}: ${idx + 1}-rasm`}
+                        loading="eager"
+                        className="w-full h-full object-cover"
+                        fallback={<div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-400 text-center p-1">Rasm ochilmadi</div>}
+                      />
+                      {idx === 0 && (
+                        <span className="absolute left-1.5 top-1.5 px-1.5 py-0.5 rounded-md bg-brand-600 text-white text-[9px] font-black uppercase tracking-wide shadow">
+                          Asosiy
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        disabled={isSaving}
+                        aria-label={`${idx + 1}-rasmni olib tashlash`}
+                        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/65 hover:bg-red-600 text-white text-xs font-black flex items-center justify-center transition"
+                      >
+                        ✕
+                      </button>
+                      {imageInputs.length > 1 && (
+                        <div className="absolute inset-x-1.5 bottom-1.5 flex justify-between">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveImage(idx, -1)}
+                            disabled={idx === 0 || isSaving}
+                            aria-label="Chapga surish"
+                            className="w-7 h-7 rounded-full bg-black/65 text-white text-xs font-black flex items-center justify-center disabled:opacity-0 transition"
+                          >
+                            ◀
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveImage(idx, 1)}
+                            disabled={idx === imageInputs.length - 1 || isSaving}
+                            aria-label="O'ngga surish"
+                            className="w-7 h-7 rounded-full bg-black/65 text-white text-xs font-black flex items-center justify-center disabled:opacity-0 transition"
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {imageInputs.length < MAX_MENU_IMAGES && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isProcessingImage || isSaving}
+                      className="aspect-square rounded-xl border-2 border-dashed border-brand-500/60 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 font-black text-[11px] flex flex-col items-center justify-center gap-1 hover:bg-brand-100 dark:hover:bg-brand-900/40 disabled:opacity-60 transition active:scale-95"
+                    >
+                      <span className="text-2xl leading-none">+</span>
+                      {isProcessingImage ? 'Tayyorlanmoqda…' : 'Rasm tanlash'}
+                    </button>
+                  )}
+                  {imageInputs.length < MAX_MENU_IMAGES && isTouchDevice && (
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={isProcessingImage || isSaving}
+                      className="aspect-square rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-black text-[11px] flex flex-col items-center justify-center gap-1 disabled:opacity-60 transition active:scale-95"
+                    >
+                      <span className="text-xl leading-none">📷</span>
+                      Suratga olish
+                    </button>
+                  )}
+                </div>
+
+                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddImages} />
+                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddImages} />
+
+                <p className="text-[11px] font-bold text-gray-400 leading-relaxed">
+                  Birinchi rasm asosiy: menyu kartasida shu chiqadi. ◀ ▶ bilan tartibini o'zgartiring.
+                  Dastur rasmni o'zi kvadrat qilib kichraytiradi.
+                </p>
+              </div>
+
+              {/* Qisqacha ma'lumot (ixtiyoriy) */}
+              <div>
+                <label htmlFor="menu-item-description" className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                  Qisqacha ma'lumot (ixtiyoriy)
+                </label>
+                <textarea
+                  id="menu-item-description"
+                  value={descriptionInput}
+                  onChange={e => setDescriptionInput(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
+                  maxLength={MAX_DESCRIPTION_LENGTH}
+                  rows={3}
+                  placeholder="Masalan: Devzira guruch, qo'y go'shti, sariq sabzi. Qozonda o'tinda pishiriladi."
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 outline-hidden focus:border-amber-500 text-gray-900 dark:text-white text-sm font-medium resize-y"
+                />
+                <div className="flex justify-between text-[10px] font-bold text-gray-400 mt-1">
+                  <span>Mijoz menyusida va kioskda taom ostida chiqadi</span>
+                  <span>{descriptionInput.length} / {MAX_DESCRIPTION_LENGTH}</span>
                 </div>
               </div>
 
@@ -874,16 +1183,20 @@ export default function AdminMenuTab({
               <div className="flex gap-3 pt-4 border-t dark:border-gray-700">
                 <button 
                   type="button" 
-                  onClick={() => setIsMenuModalOpen(false)} 
+                  onClick={closeMenuModal} 
+                  disabled={isSaving}
                   className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white py-3 rounded-xl font-bold transition active:scale-95"
                 >
                   Bekor qilish
                 </button>
                 <button 
                   type="submit" 
-                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-xl font-black shadow-lg shadow-amber-600/30 transition active:scale-95"
+                  disabled={isSaving || isProcessingImage}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 disabled:cursor-wait text-white py-3 rounded-xl font-black shadow-lg shadow-amber-600/30 transition active:scale-95"
                 >
-                  Saqlash
+                  {isSaving
+                    ? (imageInputs.some(i => i.blob) ? 'Rasmlar yuklanmoqda…' : 'Saqlanmoqda…')
+                    : isProcessingImage ? 'Rasm tayyorlanmoqda…' : 'Saqlash'}
                 </button>
               </div>
               

@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import DishImage from './DishImage';
+import { getMenuThumb, getMenuDescription } from '../utils/menuImages';
 
 export default function WaiterMenu({
   menuItems,
@@ -176,13 +178,24 @@ export default function WaiterMenu({
                     </span>
                   )}
 
-                  <div className="pr-12">
+                  <div className="flex gap-3 items-start">
+                  <DishImage
+                    src={getMenuThumb(dish)}
+                    alt={dish.name}
+                    className="w-16 h-16 rounded-xl object-cover shrink-0 bg-gray-200 dark:bg-gray-800"
+                  />
+                  <div className="pr-12 min-w-0">
                     <span className="text-[10px] font-black uppercase tracking-wider text-brand-600 dark:text-brand-400 block mb-0.5">
                       {dish.category}
                     </span>
                     <h4 className="font-black text-sm sm:text-base text-gray-900 dark:text-white leading-snug">
                       {dish.name}
                     </h4>
+                    {getMenuDescription(dish) && (
+                      <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2" title={getMenuDescription(dish)}>
+                        {getMenuDescription(dish)}
+                      </p>
+                    )}
                     {isAvailable && stockLeft !== null && stockLeft === 0 && (
                       <span data-stock="0" className="mt-1 inline-block px-2 py-0.5 rounded-lg bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-[10px] font-black">
                         ⚠️ Omborda yetarli emas{stock.limitingName ? ` (${stock.limitingName})` : ''}
@@ -193,6 +206,7 @@ export default function WaiterMenu({
                         📦 {stockLeft} porsiyaga yetadi
                       </span>
                     )}
+                  </div>
                   </div>
 
                   {/* Pastki qism: Narxi yoki Porsiya variantlari tugmalari */}

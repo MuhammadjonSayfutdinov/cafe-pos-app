@@ -5,8 +5,8 @@
 --
 -- Xavfsizlik:
 --  * Mijoz jadvallarni to'g'ridan-to'g'ri o'qiy olmaydi (RLS). Faqat shu funksiyalar ochiq.
---  * qr_menu faqat sotuvdagi taomlarning nomi, toifasi va narxini qaytaradi
---    (xodimlar, PIN, mijozlar, buyurtmalar ko'rinmaydi).
+--  * qr_menu faqat sotuvdagi taomlarning nomi, toifasi, narxi, qisqacha ma'lumoti va rasmlarini
+--    qaytaradi (xodimlar, PIN, tannarx, texnologik karta, mijozlar, buyurtmalar ko'rinmaydi).
 --  * Narx SERVERDA menyudan olinadi: telefondan kelgan narxga ishonilmaydi.
 --  * Buyurtma darhol oshxonaga tushmaydi: ofitsiant/kassir "Qabul qilish" ni bosadi.
 --  * Cheklov: bitta stoldan daqiqasiga 3 ta so'rov, umumiy daqiqasiga 60 ta,
@@ -166,6 +166,15 @@ begin
            'variants', coalesce(r.data -> 'variants', '[]'::jsonb),
            'price', r.data -> 'price',
            'description', r.data -> 'description',
+           -- Taom rasmlari (supabase/storage.sql): faqat havola, ombordagi yo'l berilmaydi
+           'images', coalesce((
+             select jsonb_agg(jsonb_build_object('id', e -> 'id', 'src', e -> 'src'))
+               from jsonb_array_elements(
+                      case when jsonb_typeof(r.data -> 'images') = 'array' then r.data -> 'images' else '[]'::jsonb end
+                    ) e
+              where jsonb_typeof(e) = 'object'
+           ), '[]'::jsonb),
+           'thumb', r.data -> 'thumb',
            'is_available', true
          ) order by r.created_at), '[]'::jsonb)
     into v_menu

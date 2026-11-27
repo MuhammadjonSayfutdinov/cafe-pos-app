@@ -30,6 +30,11 @@ bitta bazaga ulashni tushuntiradi. Sozlanmasa ham dastur avvalgidek bitta qurilm
 3. "Success" chiqishi kerak. Faylni qayta ishga tushirish xavfsiz: mavjud ma'lumot o'chmaydi.
 4. Mijoz telefonidan QR-buyurtma uchun: yana **New query** oching, [`supabase/qr.sql`](supabase/qr.sql)
    faylini joylab, **Run** bosing ("Success. No rows returned" chiqishi kerak).
+5. Taom rasmlari uchun: yana **New query** oching, [`supabase/storage.sql`](supabase/storage.sql) faylini
+   joylab, **Run** bosing ("Success. No rows returned"). Rasm ombori (`menu-images`) yaratiladi:
+   rasmlarni hamma ko'ra oladi (mijoz menyusi uchun), yuklash va o'chirish faqat ulangan qurilmadan.
+   Tekshirish: chap menyu **Storage** → `menu-images` papkasi ko'rinadi. Ishga tushirilmasa, admin
+   rasm qo'shganda "Rasm ombori yo'q: supabase/storage.sql ni ishga tushiring" xabari chiqadi.
 
 ## 3. Kafe hisobini yarating va ro'yxatdan o'tishni yoping (MUHIM)
 
@@ -121,6 +126,7 @@ stollarning buyurtmalari ko'rinmaydi.
 - [ ] Menyu, narxlar, stollar va kategoriyalar kiritilgan
 - [ ] Supabase'da ochiq ro'yxatdan o'tish o'chirilgan (3-qadam)
 - [ ] `supabase/qr.sql` ishga tushirilgan, QR stikerlar chop etilgan, telefondan sinov buyurtmasi berilgan
+- [ ] `supabase/storage.sql` ishga tushirilgan, bitta taomga rasm qo'shildi va telefondagi QR-menyuda ko'rindi
 - [ ] Telefondan "🔔 Ofitsiant" bosildi → kassa/ofitsiant ekranida qizil chaqiruv chiqdi
 - [ ] "🛡️ QR-buyurtma himoyasi": kafe joylashuvi kiritilgan, "Faqat kafe ichidan" yoqilgan (ixtiyoriy)
 - [ ] Har bir qurilma ulangan, sarlavhada `☁️ Bulut` belgisi ko'rinadi

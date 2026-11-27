@@ -1,6 +1,6 @@
 # PROGRESS — cafe-pos-app
 
-Oxirgi yangilanish: 2026-11-24
+Oxirgi yangilanish: 2026-11-27
 Joriy bosqich: **pilot**. 3-bosqich (Supabase) va 4-bosqichning asosiy funksiyalari `tortinchi-bosqich` branch'ida. Sozlash: `SUPABASE.md`.
 
 > Bu fayl Claude uchun yozilgan. Barcha kodni faqat Claude yozadi (Gemini ishlatilmaydi).
@@ -42,6 +42,12 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 `https://github.com/MuhammadjonSayfutdinov/cafe-pos-app/commit/<hash>.diff`
 
 ## Joriy vazifa
+
+**Kafe POS 2.0 (foydalanuvchi qarori, 2026-11-27):** foydalanuvchi "boshla" dedi. Reja va bosqichlar
+pastda: "6-bosqich. Kafe POS 2.0". Navbatdagi ish: 1-qadamning qolgan qismi, keyin 2-qadam (xavfsizlik).
+Taom rasmlari tayyor; foydalanuvchi Supabase'da `supabase/storage.sql` va `supabase/qr.sql` ni
+ishga tushirishi kerak (aks holda admin rasm qo'shganda "Rasm ombori yo'q" xabari chiqadi,
+mijoz QR-menyusida rasm ko'rinmaydi).
 
 **Pilot:** foydalanuvchi `supabase/qr.sql` ni ishga tushiradi, saytni Vercel'ga joylaydi, kafeda sinaydi.
 **QR himoyasi (B15–B18) dan keyin:** `supabase/qr.sql` ni Supabase'da yana bir marta to'liq ishga tushirish,
@@ -146,6 +152,34 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 - [x] Stollar uchun QR stikerlar: A4 varaq (3 o'lcham, stollarni tanlash, nusxa soni), QR kod qurilmada chiziladi
   (`QrStickerSheet.jsx`, `src/qr/qrEncode.js`, `src/qr/tableQrUrl.js`); ofitsiantning bitta stol QR oynasi ham shunga o'tdi
 
+### 6-bosqich. Kafe POS 2.0 (foydalanuvchi qarori, 2026-11-27)
+Manba: foydalanuvchi bilan kelishilgan taklif (Dribbble'dagi RestroBit POS tahlili + uch eshik).
+Tartib: xavfsizlik yangi eshiklardan (mijoz ilovasi, kiosk) OLDIN.
+1. Yangi ko'rinish va taom rasmlari
+   - [x] Taomga 5 tagacha rasm (fayl yoki planshet kamerasi), birinchisi asosiy, ◀ ▶ bilan tartib;
+     ixtiyoriy qisqacha ma'lumot (200 belgi). Admin ro'yxati, ofitsiant menyusi, mijoz QR-menyusi
+     (karta + galereya). `src/utils/menuImages.ts`, `DishImage.jsx`, `DishGallery.jsx`, `supabase/storage.sql`
+   - [ ] Yorug' rejimni Dribbble uslubida pardozlash, admin/kassa uchun chap menyu
+   - [ ] Buyurtma turi bitta joyda (zalda / olib ketish / yetkazish), qoralamalar ro'yxati, promo-kod/kupon
+2. Xavfsizlik poydevori
+   - [ ] Har bir xodim va qurilmaga alohida server hisobi, ishonchli qurilmalar, qurilma ulash kodi
+   - [ ] PIN serverda tekshiriladi, 6 xonali PIN; rol bo'yicha RLS (ofitsiant hisobotni o'qimaydi)
+   - [ ] Xodim: PIN + smena boshida Telegram bot kodi (2 bosqich). Admin: PIN + Authenticator (TOTP)
+     + passkey/barmoq izi (3 bosqich), xavfli amalda qayta tasdiq, 10 ta zaxira kod
+   - [ ] Shubhali amallar hisoboti Telegramga, chegirma chegarasi rol bo'yicha, jurnal o'chirilmaydi
+   - [ ] Rasm yuklashni faqat adminga cheklash (hozir: har qanday ulangan qurilma)
+3. Mijoz ilovasi (mijoz eshigi)
+   - [ ] Telefon + SMS kod, joylashuv (rad etsa menyu ochiladi, buyurtmada qayta so'raladi)
+   - [ ] Bosh sahifa, taom sahifasi, savatcha, buyurtma holati, profil va bonus, tarix, bron
+4. Kiosk (uchinchi eshik): kafe ichidagi sensorli ekran, doim tayyor
+   - [ ] Kutish ekrani, til, joy, menyu, savat, to'lov, raqamli chek, 60+15 s da o'zi tozalanadi
+   - [ ] Admin → Sozlamalar → "Kiosklar": ulash kodi, nomi, holati; kiosk faqat menyu + yangi buyurtma
+5. Kengaytirish: Google Play, push xabar, Click/Payme, sharh va baho, bonus darajalari, uch til, navbat ekrani
+
+Ochiq savollar (foydalanuvchi javob bermagan): SMS (oddiy SMS yoki Telegram kodi), admin 2-bosqichi
+(Authenticator tavsiya), kiosk uskunasi (Windows tavsiya), "Kassada to'layman" buyurtmasi oshxonaga
+qachon tushadi (tavsiya: to'lovdan keyin), 5 ta rasm / 200 belgi yetarlimi, videolardan skrinshot.
+
 ### 5-bosqich. Sifat
 - [x] TypeScript boshlandi: `tsconfig.json` (strict, allowJs), `npm run typecheck`, build avval tekshiradi.
   `.ts`: `sync/config`, `sync/timeouts`, `utils/ids`, `utils/pinGuard`, `utils/orderTotals`, `utils/pinHash`, `utils/sha256`
@@ -172,6 +206,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | PIN saqlash | `user.pinHash` = `s1$2000$<tuz>$<xesh>` (tuzli, 2000 marta takrorlangan SHA-256, `src/utils/pinHash.ts`) va `user.pinLength`; ochiq `pin`/`password` saqlanmaydi. App ochilganda eski ochiq PIN'lar xeshga o'tadi (bulutdan kelganlari ham). Tekshiruv qurilmada: internetsiz ham kirish kerak. 4-6 xonali PIN'ni xeshdan terib topish mumkin, shuning uchun asosiy himoya - RLS va yopiq ro'yxatdan o'tish. Admin PIN'ni ko'ra olmaydi, faqat yangisini beradi. SHA-256 kutubxonasiz (`src/utils/sha256.ts`): crypto.subtle http (192.168.x.x) da yo'q | qabul qilindi |
 | Sekin internet | Supabase so'rovlari 45 s (`createTimeoutFetch`), sessiya tekshiruvi 10 s, QR tasdiqlash 20 s. Navbat 100 tadan yuboriladi, yuborilgan qism darhol navbatdan o'chadi. Ilova ochilganda: oxirgi to'liq sinxrondan 6 soat o'tmagan bo'lsa faqat o'zgarishlar (`since`), aks holda butun baza. Sessiya tokeni tarmoq xatosi sababli yangilanmasa, saqlangan sessiya bilan ishlaydi (qayta kirish so'ralmaydi). Service worker: sahifa 3,5 s da kelmasa keshdan. Javob 4 s dan uzoq - `🐢 Sekin internet` belgisi | qabul qilindi |
 | Mahalliy server | Kassa kompyuterida Node server (`npm run hub`, kutubxonasiz; bulut uchun supabase-js). Dasturni ham server beradi (`dist`), sahifa `http://<IP>:8080` dan ochiladi: https sahifadan http LAN manzilga so'rov brauzerda taqiqlangan (mixed content). Server `index.html` ga `<meta name="cafe-hub">` qo'yadi, dastur shundan mahalliy server transportini tanlaydi (`src/sync/index.js`). Qurilma API'si fake server bilan bir xil (`/api/all?since`, `/records`, `/kv`, SSE `/events`, `/rpc/qr_claim_request`), qo'shimcha: server paroli → token (`/api/auth`, 10 xato → 5 daqiqa blok, parol o'zgarsa tokenlar bekor, 401 → ulash oynasi). Ma'lumot: `hub-data/` (snapshot + jurnal, elektr o'chsa ham). Bulut bilan: server bitta "qurilma" (`updated_by = hub_<id>`), har 3 s so'raydi (realtime yo'q: Node 20 da WebSocket yo'q), navbat diskda, qoidalar `engine.js` bilan bir xil (oxirgi yozuv g'olib, yuborilmagan mahalliy ustun). QR tasdiqlash faqat bulut orqali (atomik). http da service worker yo'q: server o'chsa sahifani qayta yuklab bo'lmaydi | qabul qilindi |
+| Taom rasmlari | Menyu yozuvida `images: [{id, src, path?}]` (5 tagacha, birinchisi asosiy), `thumb` (asosiy rasmning 160 px nusxasi, data:, yozuvning o'zida: internetsiz ham kartada ko'rinadi), `description` (200 belgi). Rasm qurilmada kvadrat qilib qayta chiziladi (EXIF va yashirin ma'lumot o'chadi). Bulut bo'lsa: 800 px webp, saqlash bosilganda Supabase Storage `menu-images` ga yuklanadi (ochiq o'qish, yozish faqat ulangan qurilma), yozuvda faqat havola; yuklanmasa taom saqlanmaydi, oyna ochiq qoladi. Bulut yo'q (yoki mahalliy server): 480 px rasm yozuvning o'zida. Service worker rasmlarni `menu-images-v1` keshida saqlaydi (400 tagacha). Mijozga `qr_menu` faqat `id, src` va `thumb` beradi. O'chirilgan rasm/taom ombordan ham o'chiriladi (xato bo'lsa jim) | qabul qilindi |
 | TypeScript | Bosqichma-bosqich: `allowJs`, faqat `.ts` fayllar strict tekshiriladi. Yangi util/modul `.ts` da. Komponentlar keyinroq (`@types/react` kerak bo'ladi) | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
@@ -198,6 +233,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 16 | Avtomatik yangilanish (telefon va kompyuter) | "pilot: yangi versiya qurilmalarga o'zi keladi..." commiti | [x] |
 | 17 | Chaqiruv xodimga yetadi, to'langan QR-buyurtma yo'qoladi, band stol va uzoqdan buyurtma himoyasi (B15–B18) | "pilot: ofitsiant chaqiruvi, to'langan QR-buyurtma va QR himoyasi" commiti | [x] |
 | 18 | Zamonaviy restoran dizayni (mijoz QR-menyusi va xodimlar ekranlari) | "dizayn: zamonaviy restoran ko'rinishi..." commiti | [x] |
+| 19 | Taomga rasmlar va qisqacha ma'lumot (6-bosqich, 1-qadam) | "6: taomga rasmlar va qisqacha ma'lumot" commiti | [x] |
 | 19 | PIN xeshi, xavfsizlik sarlavhalari, sekin/oflayn internet, TypeScript boshlandi | "xavfsizlik: PIN xeshi..." commiti | [x] |
 | 20 | Kafe mahalliy serveri (internetsiz ishlash) | "4: kafe mahalliy serveri..." commiti | [x] |
 

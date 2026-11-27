@@ -128,7 +128,7 @@ const upstream = createUpstream({
 const SECURITY_HEADERS = {
   'Content-Security-Policy': [
     "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:", "font-src 'self' data:",
+    "img-src 'self' data: blob: https://*.supabase.co", "font-src 'self' data:",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.telegram.org",
     "manifest-src 'self'", "worker-src 'self'", "object-src 'none'", "base-uri 'self'",
     "form-action 'self'", "frame-ancestors 'none'"

@@ -10,6 +10,8 @@ const REQUEST_TIMEOUT_MS = 45000;
 // Sessiyani tekshirish (token yangilash) shundan uzoq cho'zilsa, saqlangan sessiya bilan ishlaymiz
 const SESSION_TIMEOUT_MS = 10000;
 const AUTH_STORAGE_KEY = 'cafe_supabase_auth';
+// Taom rasmlari ombori (supabase/storage.sql). Ochiq o'qiladi, yozish faqat ulangan qurilmadan
+const IMAGE_BUCKET = 'menu-images';
 
 export function createSupabaseTransport({ url, anonKey }) {
   const client = createClient(url, anonKey, {
@@ -85,6 +87,30 @@ export function createSupabaseTransport({ url, anonKey }) {
       const { data, error } = await client.rpc(fn, args);
       if (error) throw new Error(error.message);
       return data;
+    },
+    async uploadPublicFile(path, file) {
+      const bucket = client.storage.from(IMAGE_BUCKET);
+      const { error } = await bucket.upload(path, file, {
+        contentType: file.type || 'image/webp',
+        // Har bir rasmning yo'li noyob va o'zgarmaydi: brauzer va telefon uni bir yil keshda saqlaydi
+        cacheControl: '31536000',
+        // Qayta urinishda (oldingi safar yarmi yuklangan) xato bermasin: o'sha fayl qayta yoziladi
+        upsert: true
+      });
+      if (error) {
+        const msg = String(error.message || error);
+        if (/bucket not found/i.test(msg)) {
+          throw new Error("Rasm ombori yo'q: Supabase'da supabase/storage.sql ni ishga tushiring.");
+        }
+        throw new Error(msg);
+      }
+      return bucket.getPublicUrl(path).data.publicUrl;
+    },
+    async removePublicFiles(paths) {
+      const list = (Array.isArray(paths) ? paths : []).filter(p => typeof p === 'string' && p);
+      if (list.length === 0) return;
+      const { error } = await client.storage.from(IMAGE_BUCKET).remove(list);
+      if (error) throw new Error(String(error.message || error));
     },
     pushRecords: (rows) => upsertChunks('pos_records', rows, 'collection,id'),
     pushKv: (rows) => upsertChunks('pos_kv', rows, 'key'),

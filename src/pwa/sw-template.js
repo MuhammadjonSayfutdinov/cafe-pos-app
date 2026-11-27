@@ -5,12 +5,43 @@
 // - Sahifaning o'zi (navigatsiya): avval internetdan, bo'lmasa keshdan. Internet sekin bo'lsa
 //   (NAV_TIMEOUT_MS ichida javob yo'q) - keshdan darhol: dastur sekin internetda ham tez ochiladi.
 //   Yangi versiya baribir keladi: src/pwa/update.js /version.json ni alohida tekshiradi.
-// - Boshqa saytlarga so'rovlar (Supabase, Telegram) keshlanmaydi.
+// - Boshqa saytlarga so'rovlar (Supabase, Telegram) keshlanmaydi. Istisno: taom rasmlari
+//   (Supabase Storage, supabase/storage.sql) - bir marta ochilgan rasm internetsiz ham ko'rinadi.
 // - /version.json har doim internetdan (yangi versiyani bilish uchun: src/pwa/update.js).
 const VERSION = '__VERSION__';
 const CACHE = `cafe-pos-${VERSION}`;
 const PRECACHE = __PRECACHE__;
 const NAV_TIMEOUT_MS = 3500;
+// Taom rasmlari keshi: nomi 'cafe-pos-' bilan boshlanmaydi, yangi versiyada o'chmaydi
+const IMAGE_CACHE = 'menu-images-v1';
+const IMAGE_CACHE_LIMIT = 400;
+
+const isMenuImage = (url) =>
+  url.hostname.endsWith('.supabase.co') && url.pathname.startsWith('/storage/v1/object/public/menu-images/');
+
+function trimImageCache(cache) {
+  return cache.keys().then((keys) => {
+    const extra = keys.length - IMAGE_CACHE_LIMIT;
+    if (extra > 0) return Promise.all(keys.slice(0, extra).map((k) => cache.delete(k)));
+    return undefined;
+  });
+}
+
+// Har bir rasm yo'li noyob va o'zgarmaydi (src/utils/menuImages.ts): avval keshdan
+function cacheFirstImage(req) {
+  return caches.open(IMAGE_CACHE).then((cache) =>
+    cache.match(req).then((hit) => {
+      if (hit) return hit;
+      return fetch(req).then((res) => {
+        // Faqat CORS javob (DishImage crossOrigin bilan so'raydi). Opaque javob kesh kvotasini behuda yeydi
+        if (res.ok && res.type === 'cors') {
+          cache.put(req, res.clone()).then(() => trimImageCache(cache)).catch(() => {});
+        }
+        return res;
+      });
+    })
+  );
+}
 
 const cachedPage = () =>
   caches.open(CACHE).then((cache) => cache.match('/index.html').then((hit) => hit || cache.match('/')));
@@ -70,6 +101,10 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (isMenuImage(url)) {
+    event.respondWith(cacheFirstImage(req));
+    return;
+  }
   if (url.origin !== self.location.origin) return;
   if (url.pathname === '/version.json') return;
 

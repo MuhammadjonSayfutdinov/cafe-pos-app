@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
+import DishImage from './DishImage';
+import DishGallery from './DishGallery';
+import { getMenuImages, getMenuThumb, getMenuDescription } from '../utils/menuImages';
 
 const QUICK_NOTE_TAGS = [
   'Piyozsiz',
@@ -568,14 +571,26 @@ export default function CustomerQRView({
                         </span>
                       )}
 
-                      <div className="w-14 h-14 shrink-0 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-700/5 border border-brand-500/20 flex items-center justify-center text-2xl font-extrabold text-brand-600 dark:text-brand-500">
-                        {String(item.name || '?').trim().charAt(0).toUpperCase()}
-                      </div>
+                      <DishImage
+                        src={getMenuThumb(item)}
+                        alt={item.name}
+                        className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-2xl object-cover bg-zinc-100 dark:bg-zinc-800"
+                        fallback={
+                          <div className="w-14 h-14 shrink-0 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-700/5 border border-brand-500/20 flex items-center justify-center text-2xl font-extrabold text-brand-600 dark:text-brand-500">
+                            {String(item.name || '?').trim().charAt(0).toUpperCase()}
+                          </div>
+                        }
+                      />
 
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-zinc-900 dark:text-zinc-100 text-base sm:text-lg leading-snug">
                           {item.name}
                         </h3>
+                        {getMenuDescription(item) && (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 line-clamp-2">
+                            {getMenuDescription(item)}
+                          </p>
+                        )}
                         <p className="text-xs font-medium text-zinc-500 mt-0.5">
                           {variants.length > 1
                             ? `${variants.map(v => v.name).join(' / ')}`
@@ -775,14 +790,21 @@ export default function CustomerQRView({
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="sm:hidden w-10 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-700 mx-auto -mt-2" />
 
+            <DishGallery images={getMenuImages(selectedItemForAdd)} alt={selectedItemForAdd.name} />
+
             <div className="flex justify-between items-start gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-4">
-              <div>
+              <div className="min-w-0">
                 <h3 className="font-bold text-xl sm:text-2xl tracking-tight text-zinc-900 dark:text-zinc-100">
                   {selectedItemForAdd.name}
                 </h3>
                 <p className="font-bold text-brand-600 dark:text-brand-500 text-lg sm:text-xl mt-1">
                   {currentModalUnitPrice.toLocaleString()} so'm
                 </p>
+                {getMenuDescription(selectedItemForAdd) && (
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mt-2">
+                    {getMenuDescription(selectedItemForAdd)}
+                  </p>
+                )}
               </div>
               <button
                 type="button"

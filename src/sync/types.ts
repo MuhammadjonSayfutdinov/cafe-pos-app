@@ -54,6 +54,13 @@ export interface SyncTransport {
   pushRecords(rows: RecordRow[]): Promise<unknown>;
   pushKv(rows: KvRow[]): Promise<unknown>;
   subscribe(onEvent: (ev: SyncEvent) => void, onStatus?: (s: RealtimeStatus) => void): () => void;
+  /**
+   * Ochiq faylni (taom rasmi) bulut omboriga yuklab, uning doimiy havolasini qaytaradi.
+   * Ixtiyoriy: yo'q bo'lsa rasm menyu yozuvining o'zida saqlanadi (src/utils/menuImages.ts).
+   */
+  uploadPublicFile?(path: string, file: Blob): Promise<string>;
+  /** Ombordagi fayllarni o'chirish (taom yoki rasm o'chirilganda) */
+  removePublicFiles?(paths: string[]): Promise<void>;
 }
 
 /** Server qurilmani tanimadi (parol o'zgargan yoki qurilma uzilgan): qayta ulash kerak */

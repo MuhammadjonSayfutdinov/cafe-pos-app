@@ -33,6 +33,8 @@ const PUSH_BATCH = 100;
 const PUSH_TIMEOUT_MS = 60000;
 const FETCH_TIMEOUT_MS = 180000;
 const RPC_TIMEOUT_MS = 20000;
+// Bitta rasm (taxminan 100 KB) sekin mobil internetda ham sig'sin
+const FILE_UPLOAD_TIMEOUT_MS = 60000;
 // Shundan uzoq javob - "sekin internet" (sarlavhadagi belgida ko'rinadi)
 const SLOW_MS = 4000;
 // Dastur ochilganda butun bazani qayta tekshirish oralig'i (qolgan paytda faqat o'zgarishlar)
@@ -629,6 +631,29 @@ export function syncNow() {
 }
 
 export const getDeviceId = () => deviceId;
+
+/** Bulut rasm ombori bormi (taom rasmlari bulutga yuklanadimi yoki menyu yozuvida saqlanadimi) */
+export const canUploadFiles = () => Boolean(transport && typeof transport.uploadPublicFile === 'function');
+
+/** Ochiq faylni bulutga yuklash; havolasini qaytaradi. Ombor yo'q bo'lsa - xato */
+export async function uploadPublicFile(path, file) {
+  if (!canUploadFiles()) throw new Error("Bulut rasm ombori ulanmagan");
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new Error("Internet yo'q");
+  }
+  return withTimeout(transport.uploadPublicFile(path, file), FILE_UPLOAD_TIMEOUT_MS, 'Rasm yuklash');
+}
+
+/** Ombordagi fayllarni o'chirish. Xato bo'lsa jim o'tadi: ortiqcha fayl ishni to'xtatmasin */
+export async function removePublicFiles(paths) {
+  const list = (Array.isArray(paths) ? paths : []).filter(Boolean);
+  if (list.length === 0 || !transport || typeof transport.removePublicFiles !== 'function') return;
+  try {
+    await withTimeout(transport.removePublicFiles(list), RPC_TIMEOUT_MS, "Rasm o'chirish");
+  } catch (e) {
+    console.warn("Eski rasmlarni ombordan o'chirib bo'lmadi:", e);
+  }
+}
 
 /** Server funksiyasini chaqirish (masalan, qr_claim_request). Sinxron o'chiq bo'lsa - xato. */
 export async function callRpc(fn, args) {
