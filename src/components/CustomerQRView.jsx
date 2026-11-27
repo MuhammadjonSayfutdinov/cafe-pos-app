@@ -3,6 +3,16 @@ import { CLOSED_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 import DishImage from './DishImage';
 import DishGallery from './DishGallery';
 import { getMenuImages, getMenuThumb, getMenuDescription } from '../utils/menuImages';
+import { billableSubtotal, buildOrderLines } from '../qr/customerLines';
+
+// Har bir taomning holati (mijoz uchun): oshxona rad etgan va bekor qilingan taom alohida ko'rinadi
+const LINE_STATE = {
+  cooking: { text: '⏳ Tayyorlanmoqda', cls: 'text-amber-600 dark:text-amber-400' },
+  ready: { text: '🥘 Tayyor', cls: 'text-emerald-600 dark:text-emerald-400' },
+  served: { text: '✅ Berildi', cls: 'text-sky-600 dark:text-sky-400' },
+  rejected: { text: '❌ Oshxona rad etdi', cls: 'text-red-600 dark:text-red-400' },
+  cancelled: { text: '🚫 Bekor qilindi', cls: 'text-zinc-500 dark:text-zinc-400' }
+};
 
 const QUICK_NOTE_TAGS = [
   'Piyozsiz',
@@ -643,11 +653,17 @@ export default function CustomerQRView({
           ) : (
             <>
               {myActiveOrders.map((ord, idx) => {
-                const ordItems = Array.isArray(ord.items) ? ord.items : [];
-                const ordSubtotal = ordItems.reduce(
-                  (s, it) => s + (Number(it.price || 0) * Number(it.quantity || it.qty || 1)),
-                  0
-                );
+                // Taomlar holati: telefondagi so'rov (customerLines, serverdan) yoki to'liq chek (kafe ekrani).
+                // Rad etilgan va bekor qilingan porsiya hisobga kirmaydi
+                const isWholeCancelled = ord.status === 'rejected' || ord.status === ORDER_STATUS.CANCELLED;
+                const rawLines = Array.isArray(ord.customerLines) ? ord.customerLines : buildOrderLines(ord, ord.status);
+                const ordLines = isWholeCancelled
+                  ? rawLines.map(l => (l.state === 'rejected' ? l : { ...l, state: 'cancelled' }))
+                  : rawLines;
+                const rejectedLines = ordLines.filter(l => l.state === 'rejected');
+                // Taom holati faqat taomlar har xil holatda bo'lsa ko'rsatiladi (aks holda yuqoridagi belgi yetadi)
+                const showLineStates = new Set(ordLines.map(l => l.state)).size > 1;
+                const ordSubtotal = billableSubtotal(ordLines);
                 const ordService = Math.round((ordSubtotal * serviceFeePercent) / 100);
                 const ordTotal = ordSubtotal + ordService;
 
@@ -693,27 +709,44 @@ export default function CustomerQRView({
                       </span>
                     </div>
 
+                    {rejectedLines.length > 0 && !isWholeCancelled && (
+                      <div className="px-4 py-3 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-xs sm:text-sm font-semibold text-red-700 dark:text-red-300">
+                        ❌ Kechirasiz, oshxona bu taomni tayyorlay olmadi:{' '}
+                        {rejectedLines.map(l => `${l.name} (${l.qty} ta${l.reason ? `, ${l.reason.toLowerCase()}` : ''})`).join(', ')}.
+                        {' '}Hisobga kirmaydi. Boshqa taom tanlashingiz mumkin.
+                      </div>
+                    )}
+
                     <div className="space-y-2.5">
-                      {ordItems.map((it, i) => (
-                        <div key={i} className="flex justify-between items-start gap-3 text-sm">
-                          <div>
-                            <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                              {it.name}
+                      {ordLines.map((it) => {
+                        const off = it.state === 'rejected' || it.state === 'cancelled';
+                        const stateMeta = LINE_STATE[it.state];
+                        return (
+                          <div key={it.key} className="flex justify-between items-start gap-3 text-sm">
+                            <div className="min-w-0">
+                              <span className={`font-semibold ${off ? 'text-zinc-400 dark:text-zinc-500 line-through' : 'text-zinc-800 dark:text-zinc-200'}`}>
+                                {it.name}
+                              </span>
+                              <span className="text-xs font-bold text-brand-600 dark:text-brand-500 ml-2">
+                                x{it.qty}
+                              </span>
+                              {stateMeta && showLineStates && (
+                                <p className={`text-[11px] font-semibold mt-0.5 ${stateMeta.cls}`}>
+                                  {stateMeta.text}{it.reason ? `: ${it.reason}` : ''}
+                                </p>
+                              )}
+                              {it.note && !off && (
+                                <p className="text-[11px] font-medium text-sky-600 dark:text-sky-400 mt-0.5">
+                                  💬 {it.note}
+                                </p>
+                              )}
+                            </div>
+                            <span className={`font-semibold whitespace-nowrap ${off ? 'text-zinc-400 dark:text-zinc-500 line-through' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                              {(Number(it.price || 0) * Number(it.qty || 0)).toLocaleString()} s
                             </span>
-                            <span className="text-xs font-bold text-brand-600 dark:text-brand-500 ml-2">
-                              x{it.quantity || it.qty || 1}
-                            </span>
-                            {it.note && (
-                              <p className="text-[11px] font-medium text-sky-600 dark:text-sky-400 mt-0.5">
-                                💬 {it.note}
-                              </p>
-                            )}
                           </div>
-                          <span className="font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
-                            {(Number(it.price || 0) * Number(it.quantity || it.qty || 1)).toLocaleString()} s
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     <div className="border-t border-zinc-200 dark:border-zinc-800 pt-3 space-y-1 text-xs font-medium">

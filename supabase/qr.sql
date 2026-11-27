@@ -375,6 +375,9 @@ $$;
 --    Qabul qilingan so'rov uchun chek holati ham: orderStatus (Yangi, Tayyor, ...) va
 --    closed = chek to'langan/qarzga yozilgan/bekor qilingan. Telefon yopilgan chekni ro'yxatdan
 --    olib tashlaydi (oldin to'langan taom "tayyorlanmoqda" bo'lib qolib ketardi).
+--    Taom darajasida (7-bosqich): lineIds - so'rov taomlarining chekdagi qator kalitlari (so'rov tartibida),
+--    lines - shu qatorlarning hozirgi porsiyasi, oshxona tayyorlagani va berilgani, rejected - oshxona rad
+--    etgan porsiyalar. Rad etish sababi faqat standart ro'yxatdan (oshpazning erkin izohi mijozga chiqmaydi).
 create or replace function public.qr_request_status(p_ids text[])
 returns jsonb
 language sql stable security definer set search_path = public
@@ -391,13 +394,40 @@ as $$
              else case when jsonb_typeof(r.data -> 'handledAt') = 'number'
                        then (r.data ->> 'handledAt')::numeric else 0 end
                   < floor(extract(epoch from now()) * 1000) - 60000
-           end
+           end,
+           'lineIds', case when jsonb_typeof(r.data -> 'lineIds') = 'array' then r.data -> 'lineIds' else '[]'::jsonb end,
+           'lines', coalesce(o.lines, '[]'::jsonb),
+           'rejected', coalesce(o.rejected, '[]'::jsonb)
          )), '[]'::jsonb)
     from pos_records r
     left join lateral (
       -- 'Bekor qilindi' bu yerda yopiq hisoblanmaydi: telefonda "❌ Bekor qilindi" bo'lib ko'rinadi
       select x.data ->> 'status' as status,
-             (x.deleted or coalesce(x.data ->> 'status', '') in ('To''langan', 'Qarz', 'Arxiv')) as closed
+             (x.deleted or coalesce(x.data ->> 'status', '') in ('To''langan', 'Qarz', 'Arxiv')) as closed,
+             (select jsonb_agg(jsonb_build_object(
+                       'lineId', it ->> 'cartItemId',
+                       'qty', coalesce(it -> 'quantity', it -> 'qty'),
+                       'done', it -> 'kitchenDoneQty',
+                       'served', it -> 'servedQty'))
+                from jsonb_array_elements(case when jsonb_typeof(x.data -> 'items') = 'array'
+                                               then x.data -> 'items' else '[]'::jsonb end) it
+               where jsonb_typeof(it) = 'object'
+                 and (it ->> 'cartItemId') in (
+                   select jsonb_array_elements_text(case when jsonb_typeof(r.data -> 'lineIds') = 'array'
+                                                         then r.data -> 'lineIds' else '[]'::jsonb end))
+             ) as lines,
+             (select jsonb_agg(jsonb_build_object(
+                       'lineId', rj ->> 'lineId',
+                       'qty', rj -> 'qty',
+                       'reason', substring(rj ->> 'reason'
+                                           from '^(Masalliq tugadi|Taom qolmadi|Uskuna ishlamayapti|Juda uzoq kutiladi|Noto''g''ri buyurtma)')))
+                from jsonb_array_elements(case when jsonb_typeof(x.data -> 'kitchenRejections') = 'array'
+                                               then x.data -> 'kitchenRejections' else '[]'::jsonb end) rj
+               where jsonb_typeof(rj) = 'object'
+                 and (rj ->> 'lineId') in (
+                   select jsonb_array_elements_text(case when jsonb_typeof(r.data -> 'lineIds') = 'array'
+                                                         then r.data -> 'lineIds' else '[]'::jsonb end))
+             ) as rejected
         from pos_records x
        where coalesce(r.data ->> 'status', '') = 'accepted'
          and x.collection = 'pos_orders'

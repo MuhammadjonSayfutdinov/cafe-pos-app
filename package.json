@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "hub": "node server/hub.mjs",
     "test:kitchen": "node scripts/test-kitchen-flow.mjs",
-    "test:access": "node scripts/test-access.mjs"
+    "test:access": "node scripts/test-access.mjs",
+    "test:qr": "node scripts/test-customer-lines.mjs",
+    "test": "node scripts/test-kitchen-flow.mjs && node scripts/test-access.mjs && node scripts/test-customer-lines.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

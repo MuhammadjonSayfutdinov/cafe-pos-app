@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CustomerQRView from '../components/CustomerQRView';
 import { createQrApi } from './qrApi';
+import { buildRequestLines } from './customerLines';
 
 // Mijoz telefonidagi QR-menyu (?table=3-Stol&k=<stol kaliti>). Kirish talab qilinmaydi.
 // Buyurtma "so'rov" bo'lib boradi; ofitsiant qabul qilgach oshxonaga tushadi.
@@ -151,9 +152,14 @@ export default function PublicQrApp({ table, tableKey = '' }) {
               status: s.status || r.status,
               orderStatus: s.orderStatus || '',
               // Server yozuvi o'chirilgan (status yo'q) yoki chek yopilgan
-              closed: Boolean(s.closed) || !s.status
+              closed: Boolean(s.closed) || !s.status,
+              // Har bir taom holati (tayyor, berildi, oshxona rad etdi): supabase/qr.sql yangilangan bo'lsa
+              ...(Array.isArray(s.lineIds) && s.lineIds.length > 0
+                ? { lineIds: s.lineIds, lines: Array.isArray(s.lines) ? s.lines : [], rejected: Array.isArray(s.rejected) ? s.rejected : [] }
+                : {})
             };
-            if (upd.status === r.status && upd.orderStatus === (r.orderStatus || '') && upd.closed === Boolean(r.closed)) return r;
+            const sameLines = JSON.stringify([upd.lineIds, upd.lines, upd.rejected]) === JSON.stringify([r.lineIds, r.lines, r.rejected]);
+            if (upd.status === r.status && upd.orderStatus === (r.orderStatus || '') && upd.closed === Boolean(r.closed) && sameLines) return r;
             changed = true;
             return upd;
           });
@@ -219,7 +225,11 @@ export default function PublicQrApp({ table, tableKey = '' }) {
   const orders = useMemo(
     () => mine
       .filter(r => r && !r.closed && r.status !== 'hidden')
-      .map(r => (r.status === 'accepted' && r.orderStatus ? { ...r, status: r.orderStatus } : r)),
+      .map(r => {
+        const next = r.status === 'accepted' && r.orderStatus ? { ...r, status: r.orderStatus } : r;
+        const customerLines = r.status === 'accepted' ? buildRequestLines(r) : null;
+        return customerLines ? { ...next, customerLines } : next;
+      }),
     [mine]
   );
 

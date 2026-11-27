@@ -169,15 +169,35 @@ const rpc = {
   },
   qr_request_status({ p_ids }) {
     const ids = (p_ids || []).slice(0, 20);
+    // supabase/qr.sql bilan bir xil: so'rov taomlarining qatorlari va oshxona rad etgani (standart sabab)
+    const REASON = /^(Masalliq tugadi|Taom qolmadi|Uskuna ishlamayapti|Juda uzoq kutiladi|Noto'g'ri buyurtma)/;
     return [...records.values()].filter(r => r.collection === 'pos_qr_requests' && ids.includes(r.id)).map(r => {
       const status = r.data.status || null;
-      if (status !== 'accepted') return { id: r.id, status, orderStatus: null, closed: false };
+      const lineIds = Array.isArray(r.data.lineIds) ? r.data.lineIds.map(String) : [];
+      const empty = { lineIds: status === 'accepted' ? lineIds : [], lines: [], rejected: [] };
+      if (status !== 'accepted') return { id: r.id, status, orderStatus: null, closed: false, ...empty };
       const orders = [...records.values()].filter(x => x.collection === 'pos_orders');
       const o = r.data.orderId
         ? orders.find(x => x.id === String(r.data.orderId))
         : orders.find(x => !x.deleted && x.data.table === r.data.table && !CLOSED.includes(x.data.status || ''));
-      if (o) return { id: r.id, status, orderStatus: o.data.status || null, closed: o.deleted || PAID_CLOSED.includes(o.data.status || '') };
-      return { id: r.id, status, orderStatus: null, closed: Number(r.data.handledAt || 0) < Date.now() - 60000 };
+      if (o) {
+        const items = Array.isArray(o.data.items) ? o.data.items : [];
+        const rej = Array.isArray(o.data.kitchenRejections) ? o.data.kitchenRejections : [];
+        return {
+          id: r.id,
+          status,
+          orderStatus: o.data.status || null,
+          closed: o.deleted || PAID_CLOSED.includes(o.data.status || ''),
+          lineIds,
+          lines: items.filter(it => it && lineIds.includes(String(it.cartItemId))).map(it => ({
+            lineId: String(it.cartItemId), qty: it.quantity ?? it.qty, done: it.kitchenDoneQty, served: it.servedQty
+          })),
+          rejected: rej.filter(x => x && lineIds.includes(String(x.lineId))).map(x => ({
+            lineId: String(x.lineId), qty: x.qty, reason: (String(x.reason || '').match(REASON) || [])[1] || null
+          }))
+        };
+      }
+      return { id: r.id, status, orderStatus: null, closed: Number(r.data.handledAt || 0) < Date.now() - 60000, ...empty };
     });
   },
   qr_claim_request({ p_id, p_status, p_by = '' }) {

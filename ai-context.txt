@@ -128,6 +128,7 @@ Avtorizatsiya va umumiy:
 Mijoz (QR):
   CustomerQRView (915), CustomerMode (926)
   src/qr/PublicQrApp.jsx, qrApi.js   ?table=...&k=... sahifasi (kirishsiz, supabase/qr.sql)
+  src/qr/customerLines.ts            "Buyurtmalarim": har taom holati, rad etilgan taom alohida (npm run test:qr)
   src/qr/tableKey.js, useQrTableKey.js  stol kaliti (k) va "faqat kafe ichidan" sozlamasi
   QrSecuritySection                  Admin -> Sozlamalar: QR himoyasi (joylashuv, kalitni yangilash)
   WaiterCallsPanel                   mijoz chaqiruvlari (pos_calls) xodim ekranining tepasida
@@ -193,7 +194,9 @@ pos_qr_base_url   stol QR kodi ochadigan sayt manzili ('' = joriy manzil)
 pos_qr_secret     stol QR kalitlari siri (src/qr/tableKey.js); mijozga ko'rinmaydi
 pos_qr_geofence   { enabled, lat, lng, radius }: QR buyurtma faqat kafe ichidan
 pos_qr_requests   mijoz telefonidan so'rovlar: { id, table, items, subTotal, status
-                  ('pending'|'accepted'|'rejected'), keyOk, geoChecked, orderId (qabul qilingach) }
+                  ('pending'|'accepted'|'rejected'), keyOk, geoChecked, orderId (qabul qilingach),
+                  lineIds (qabul qilingach: items tartibida chekdagi qator kalitlari - telefon har taomni
+                  alohida ko'radi: tayyor, berildi, oshxona rad etdi; src/qr/customerLines.ts) }
 
 pos_menu (taom):
   { id, name, category, is_available, variants: [{id, name, price}],

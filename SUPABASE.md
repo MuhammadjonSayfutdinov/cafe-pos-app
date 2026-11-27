@@ -112,6 +112,9 @@ GitHub'ga yangi commit push qilinganda Vercel saytni avtomatik yangilaydi.
 - Stiker surati tarqalib ketsa: "🔄 QR kalitlarini yangilash" → stikerlarni qayta chop eting.
 - Dastur yangilanganda `supabase/qr.sql` ni **yana bir marta to'liq** ishga tushiring, keyin
   **QR stikerlarni qayta chop eting** (eski stikerda kalit yo'q: band stolga buyurtma o'tmaydi).
+  2026-11-27 dan: SQL yangilangach mijoz telefonida har bir taomning holati ko'rinadi (tayyor, berildi)
+  va oshxona rad etgan taom alohida, sababi bilan chiqadi (hisobga kirmaydi). SQL yangilanmasa telefon
+  avvalgidek ishlaydi (faqat umumiy holat).
 - Tekshirish: Admin → Tizim Sozlamalari → "🛡️ QR-buyurtma himoyasi" da yashil
   **"✅ Server tayyor: supabase/qr.sql yangi versiyada"** yozuvi chiqishi kerak. Qizil
   "⛔ supabase/qr.sql yangilanmagan!" chiqsa, SQL ishga tushirilmagan (QR sahifa baribir ishlaydi,

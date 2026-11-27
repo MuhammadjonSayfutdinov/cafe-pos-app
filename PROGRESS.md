@@ -49,7 +49,8 @@ admin va xodimlarni tayinlaydi, har bir adminga bo'limlarni tugmalar bilan ochad
 himoyasi endi har amal uchun alohida tugma (Boshqaruv → "🔐 PIN himoyasi"), uni Ega yoki u ruxsat bergan admin
 o'zgartiradi (B35-B40). Batafsil: pastda "Ega va admin huquqlari". Hozirgi ma'lumotda Ega - eng birinchi qo'shilgan
 (o'chirilmagan) admin; boshqasi bo'lishi kerak bo'lsa, Ega uning kartasida "👑 Egalikni topshirish" ni bosadi.
-Navbatdagi ish: 7-bosqichning "Keyingi qadamlar" ro'yxati (7 ta) tartib bilan.
+Navbatdagi ish: 7-bosqichning "Keyingi qadamlar" ro'yxati (7 ta) tartib bilan. 1-qadam (mijoz telefonida rad
+etilgan taom) tayyor: foydalanuvchi `supabase/qr.sql` ni Supabase'da yana bir marta ishga tushirishi kerak.
 
 **Oshxona va buyurtma oqimi (7-bosqich, foydalanuvchi so'rovi, 2026-11-27):** oshpaz bir nechta taomni
 belgilab "Tayyor" bossa butun chek tayyor bo'lib ketardi (B19) - tuzatildi; oshxonaga "Rad etish" oynasi
@@ -231,9 +232,12 @@ rad etish oynasi) va namunalar (RestroBit POS, iiko, Dribbble POS). Tamoyil: hol
    - [x] To'langan, lekin tayyorlanmagan chek oshxonada qoladi (B25); bekor qilingan chek o'chirilmaydi,
      "Bekor qilindi" statusi (B26); bir stolda ikki ochiq chek bo'lmaydi (B30)
    - [x] Rasm chekka ko'chmaydi (B29), admin bosh sahifasi (B31), menyu soni (B32), xizmat haqi (B33)
-3. Keyingi qadamlar (foydalanuvchi tanlaydi)
-   - [ ] Mijoz telefonida (QR) rad etilgan taomni alohida ko'rsatish: `qr_request_status` chek qatorlarini
-     ham qaytarsin (`supabase/qr.sql`, `PublicQrApp.jsx`; SQL ni qayta ishga tushirish kerak)
+3. Keyingi qadamlar (foydalanuvchi so'rovi: tartib bilan bajariladi)
+   - [x] Mijoz telefonida (QR) rad etilgan taomni alohida ko'rsatish: so'rov qabul qilinganda taomlarning chekdagi
+     qator kalitlari yoziladi (`lineIds`), `qr_request_status` shu qatorlarni va oshxona rad etgan porsiyalarni
+     qaytaradi (sabab faqat standart ro'yxatdan). Telefonda har taom: tayyorlanmoqda / tayyor / berildi /
+     rad etildi (sabab) / bekor qilindi, rad etilgani hisobga kirmaydi (`src/qr/customerLines.ts`,
+     `npm run test:qr`). Kafe ichidagi mijoz ekrani ham shunday. SQL ni qayta ishga tushirish kerak
    - [ ] Statistika: "Rad etilgan va bekor qilingan taomlar" hisoboti (sabab, oshpaz, ofitsiant, summa) va
      Telegramga kunlik xulosa
    - [ ] Ikki qurilma bir chekni bir soniyada o'zgartirsa, hozir oxirgi yozuv g'olib (yozuv darajasida):
@@ -300,6 +304,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | Ombor qachon ayiriladi | To'lovda (`CashierMode.deductOrderIngredientsFromStock`). Sabab: ofitsiant buyurtmasi `App.jsx` dan o'tmaydi, kassadagi kod birlik va porsiyani hisoblaydi, bekor qilingan chekni qaytarish shart emas | qabul qilindi |
 | Taom statusi | Taomda `kitchenDoneQty`; dozakazda oshxona faqat qolgan porsiyani ko'radi | qabul qilindi |
 | Oshxona holati taom darajasida (7-bosqich) | Qatorda `kitchenDoneQty` (oshxona tayyor degan), `servedQty` (mijozga berilgan), `kitchenSentAt`, `kitchenReadyAt`; eski yozuvda yo'q bo'lsa statusdan taxmin qilinadi va birinchi yozishda qotiriladi. Ochiq chek statusi qatorlardan: oshxonada porsiya bor - 'Yangi'/'Tayyorlanmoqda', hammasi tayyor - 'Tayyor', hammasi berilgan - 'Yetkazildi'. Chekni faqat `src/utils/kitchenFlow.ts` funksiyalari bilan va `setOrders(prev => ...)` ichida (eng so'nggi holatdan) o'zgartirish. Oshpazning tanlovi faqat shu qurilmada (`pos_kds_selected`), holat chekka yoziladi | qabul qilindi |
+| Mijoz telefonida taom holati | So'rov qabul qilinganda `pos_qr_requests.lineIds` (so'rov taomlari tartibida chekdagi `cartItemId`). `qr_request_status` faqat shu qatorlarni qaytaradi (boshqa mijoz/ofitsiant taomi ko'rinmaydi): porsiya, tayyor, berilgan va rad etilgan porsiya. Rad etish sababi serverda standart ro'yxatga keltiriladi (oshpazning erkin izohi mijozga chiqmaydi). Qatordagi porsiya kamaygan, lekin rad etilmagan bo'lsa - "bekor qilindi" (ofitsiant olib tashlagan). SQL yangilanmagan yoki eski so'rov - telefon avvalgidek umumiy holatni ko'rsatadi | qabul qilindi |
 | Oshxona rad etishi (otkaz) | Faqat hali tayyor bo'lmagan porsiya. Rad etilgan porsiya qatordan ayiriladi (summa, ombor, statistika o'zgarishsiz to'g'ri), yozuv `order.kitchenRejections` da (sabab, oshpaz, vaqt, ko'rildi). PIN so'ralmaydi (oshpaz tez ishlashi kerak), lekin audit + Telegram (xavfsizlik). Chekda taom qolmasa - 'Bekor qilindi'. To'langan chekda summa o'zgarmaydi, `refundDue` (qaytariladigan pul) xabarda chiqadi | qabul qilindi |
 | Bekor qilingan chek | Yangi status 'Bekor qilindi' (`ORDER_STATUS.CANCELLED`, yopilganlar ro'yxatida): ofitsiantning "Chekni o'chirish", oxirgi taomni o'chirish va kassadagi "bekor qilish" endi chekni O'CHIRMAYDI. Oshxonada turgan porsiyalar `order.kitchenCancellations` ga yoziladi (oshxonada qizil xabar). Statistika hisoblamaydi, "Cheklar tarixini tozalash" o'chiradi. `qr.sql`: stol bo'sh hisoblanadi, telefonda "❌ Bekor qilindi" ko'rinadi | qabul qilindi |
 | Oldindan to'langan chek | Kassa oshxonadagi chekni to'lasa ogohlantiradi, chek `kitchenOpen: true` bilan oshxonada qoladi (24 soatgacha). Tayyor bo'lgach `readyNotice` - ofitsiant/kassa/admin ekranida "🔔 buyurtma tayyor, mijozga bering" | qabul qilindi |
@@ -355,6 +360,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | 21 | Admin uchun ikki bosqichli kirish: PIN + Authenticator (6-bosqich, 2-qadam) | "6: admin uchun ikki bosqichli kirish..." commiti | [x] |
 | 22 | Oshxona: faqat belgilangan taom tayyor, rad etish oynasi, taom darajasidagi holat va o'xshash xatolar (B19-B33) | "7: oshxona - taom darajasida tayyor, rad etish..." commiti | [x] |
 | 23 | Ega va admin huquqlari, PIN himoyasi har amal uchun (B34-B40) | "tuzatish: Ega va admin huquqlari..." commiti | [x] |
+| 24 | Mijoz telefonida har taom holati va oshxona rad etgan taom (7-bosqich, 3-qism, 1-qadam) | "7: mijoz telefonida rad etilgan taom..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

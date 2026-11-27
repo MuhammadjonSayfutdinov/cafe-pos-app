@@ -496,15 +496,18 @@ export default function App() {
     const handledAt = Date.now();
     // Qabul qilinsa, so'rovga chek id si yoziladi: mijoz telefoni chek holatini (tayyor, to'landi)
     // shu bo'yicha ko'radi (supabase/qr.sql -> qr_request_status). Chek to'langach telefondagi
-    // "Buyurtmalarim" dan o'chadi.
-    const orderId = status === 'accepted'
-      ? handleOrderSubmit(req.table, Array.isArray(req.items) ? req.items : [])
-      : null;
+    // "Buyurtmalarim" dan o'chadi. Har taomning chekdagi qator kaliti (lineIds, so'rov tartibida) ham
+    // yoziladi: telefon har bir taomni alohida ko'radi (tayyor, berildi, oshxona rad etdi)
+    const reqItems = (Array.isArray(req.items) ? req.items : [])
+      .filter(it => it && typeof it === 'object')
+      .map(it => ({ ...it, cartItemId: newId('ci_') }));
+    const orderId = status === 'accepted' ? handleOrderSubmit(req.table, reqItems) : null;
+    const lineIds = orderId ? reqItems.map(it => it.cartItemId) : [];
 
     // Bajarilgan eski so'rovlarni ro'yxatdan tozalaymiz (1 kundan eski)
     setQrRequests(prev => (Array.isArray(prev) ? prev : [])
       .map(r => (r && r.id === req.id
-        ? { ...r, status, handledBy: currentUser?.name || '', handledAt, ...(orderId ? { orderId: String(orderId) } : {}) }
+        ? { ...r, status, handledBy: currentUser?.name || '', handledAt, ...(orderId ? { orderId: String(orderId), lineIds } : {}) }
         : r))
       .filter(r => r && (r.status === 'pending' || handledAt - Number(r.createdAt || handledAt) < 86400000)));
 
