@@ -93,6 +93,13 @@ Ega, admin huquqlari va PIN himoyasi qoidalarini tekshirish:
 npm run test:access
 ```
 
+Barcha tekshiruvlar bittada (oshxona, huquqlar, mijoz ekrani, yo'qotish hisoboti, cheklarni birlashtirish,
+sexlar va KOT, qaytarish, olib ketish):
+
+```bash
+npm test
+```
+
 ## Birinchi kirish
 
 | Rol | Ism | PIN |
