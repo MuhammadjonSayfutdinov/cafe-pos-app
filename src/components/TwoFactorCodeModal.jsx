@@ -7,9 +7,11 @@ import {
   backupCodesLeft,
   findBackupCode,
   formatBackupCode,
+  hasLocalTwoFactor,
   verifySecondFactor,
   withoutBackupCode
 } from '../utils/twoFactor';
+import { dropCachedBackupCode, readVerifierCache, writeVerifierCache } from '../utils/verifierCache';
 import { TOTP_DIGITS, TOTP_PERIOD_SEC } from '../utils/totp';
 import { notify } from '../utils/notify';
 
@@ -18,6 +20,9 @@ import { notify } from '../utils/notify';
 // ofitsiant ekranidagi admin tasdig'i shu oynadan foydalanadi (src/utils/twoFactor.ts).
 //
 // Oyna doim to'q rangda va body'ga chiqariladi (portal): boshqa oynalar ustida turadi.
+//
+// checkCode (ixtiyoriy): kod serverda tekshiriladi (supabase/security.sql, shu qurilmada sir yo'q):
+// (code, 'totp' | 'backup') => Promise<{ ok } | { ok: false, message }>. onVerified(user, { code, kind }).
 
 const GUARD_SCOPE = 'second_factor';
 
@@ -29,7 +34,8 @@ export default function TwoFactorCodeModal({
   actionLabel = '',
   onVerified,
   onCancel,
-  onAudit
+  onAudit,
+  checkCode
 }) {
   const [, setUsers] = useSticky('pos_users', []);
   const [mode, setMode] = useState('totp'); // 'totp' | 'backup'
@@ -37,6 +43,7 @@ export default function TwoFactorCodeModal({
   const [error, setError] = useState('');
   const [lockMs, setLockMs] = useState(() => getPinLockRemainingMs(GUARD_SCOPE));
   const [now, setNow] = useState(() => Date.now());
+  const [checking, setChecking] = useState(false);
   const submittingRef = useRef(false);
 
   const isLocked = lockMs > 0;
@@ -56,8 +63,44 @@ export default function TwoFactorCodeModal({
     if (typeof onAudit === 'function') onAudit(action, details, user);
   }, [onAudit, user]);
 
+  // Kod serverda (shu qurilmada sir yo'q): server o'zi cheklaydi va zaxira kodni o'chiradi
+  const submitRemote = useCallback(async (value) => {
+    setChecking(true);
+    let res;
+    try {
+      res = await checkCode(value, mode);
+    } catch {
+      res = { ok: false, message: "📴 Server bilan aloqa yo'q: kodni tekshirib bo'lmadi." };
+    } finally {
+      setChecking(false);
+    }
+    if (res?.ok) {
+      setCode('');
+      setError('');
+      if (mode === 'backup') {
+        audit('Zaxira kod ishlatildi', `${userName}: ikki bosqichli kirishda zaxira kod ishlatildi`);
+        notify("Zaxira kod ishlatildi. Kodlar kam qolsa: Admin → Xodimlar, ikki bosqichli kirishni o'chirib qayta yoqing.", 'info');
+      }
+      if (typeof onVerified === 'function') onVerified(user, { code: value, kind: mode });
+      return;
+    }
+    setTimeout(() => setCode(''), 300);
+    if (Number(res?.waitS) > 0) setLockMs(Number(res.waitS) * 1000);
+    setError(res?.message || "❌ Kod noto'g'ri.");
+  }, [audit, checkCode, mode, onVerified, user, userName]);
+
   const submit = useCallback((value) => {
     if (getPinLockRemainingMs(GUARD_SCOPE) > 0) return;
+    if (typeof checkCode === 'function') {
+      submitRemote(value);
+      return;
+    }
+    if (!hasLocalTwoFactor(user)) {
+      // Sir faqat serverda, internet yo'q
+      setTimeout(() => setCode(''), 300);
+      setError("📴 Bu admin shu qurilmada avval kirmagan: kod serverda tekshiriladi, internet kerak.");
+      return;
+    }
     const result = verifySecondFactor(user, value, mode);
 
     if (result.ok) {
@@ -71,6 +114,13 @@ export default function TwoFactorCodeModal({
           const idx = findBackupCode(u, value);
           return idx >= 0 ? withoutBackupCode(u, idx) : u;
         }));
+        // Qurilmadagi keshda ham (internetsiz kirish): shu kod qayta ishlamasin
+        const cache = readVerifierCache();
+        const entry = cache[String(user?.id)];
+        if (entry) {
+          const idx = findBackupCode({ twoFactor: entry.twoFactor }, value);
+          if (idx >= 0) writeVerifierCache(dropCachedBackupCode(cache, user?.id, idx));
+        }
         const left = backupCodesLeft(verifiedUser);
         audit('Zaxira kod ishlatildi', `${userName}: ikki bosqichli kirishda zaxira kod ishlatildi (${left} ta qoldi)`);
         notify(
@@ -82,7 +132,7 @@ export default function TwoFactorCodeModal({
       }
       setCode('');
       setError('');
-      if (typeof onVerified === 'function') onVerified(verifiedUser);
+      if (typeof onVerified === 'function') onVerified(verifiedUser, { code: value, kind: mode });
       return;
     }
 
@@ -105,12 +155,12 @@ export default function TwoFactorCodeModal({
         ? `❌ Kod noto'g'ri. Yana ${attemptsLeft} ta urinish qoldi.`
         : `❌ Zaxira kod noto'g'ri yoki ishlatilgan. Yana ${attemptsLeft} ta urinish qoldi.`);
     }
-  }, [audit, mode, onVerified, setUsers, user, userName]);
+  }, [audit, checkCode, mode, onVerified, setUsers, submitRemote, user, userName]);
 
   // Tekshiruv state yangilagichidan tashqarida: StrictMode'da yangilagich ikki marta ishlaydi,
   // zaxira kod esa ikki marta "ishlatilib" qolmasin
   const pressDigit = useCallback((digit) => {
-    if (getPinLockRemainingMs(GUARD_SCOPE) > 0 || submittingRef.current) return;
+    if (getPinLockRemainingMs(GUARD_SCOPE) > 0 || submittingRef.current || checking) return;
     if (code.length >= codeLength) return;
     const next = code + String(digit);
     setError('');
@@ -122,7 +172,7 @@ export default function TwoFactorCodeModal({
         submit(next);
       }, 60);
     }
-  }, [code, codeLength, submit]);
+  }, [checking, code, codeLength, submit]);
 
   const backspace = useCallback(() => {
     setError('');
@@ -217,6 +267,8 @@ export default function TwoFactorCodeModal({
             <p className="text-xs font-bold text-red-400 mb-3">
               ⛔️ Vaqtincha bloklandi: {Math.ceil(lockMs / 1000)} soniya kuting
             </p>
+          ) : checking ? (
+            <p className="text-xs font-bold text-gray-400 mb-3">🔄 Server tekshirmoqda...</p>
           ) : error ? (
             <p className="text-xs font-bold text-red-400 mb-3">{error}</p>
           ) : mode === 'totp' ? (

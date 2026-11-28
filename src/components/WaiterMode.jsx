@@ -22,8 +22,7 @@ import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
 import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
 import { reservedByOpenOrders, stockStatus } from '../utils/inventoryCalc';
-import { findUserByPin } from '../utils/pinHash';
-import { hasTwoFactor } from '../utils/twoFactor';
+import { verifyStaffPin } from '../sync/staffAuth';
 import { OWNER_KEY, canApproveOverride, resolveOwnerId } from '../utils/adminRights';
 import { LEGACY_OVERRIDE_KEY, PIN_RULES_KEY, isPinRuleOn, resolvePinRules } from '../utils/pinRules';
 import { isTakeawayTable, nextTakeawayNo, orderLabel } from '../utils/takeaway';
@@ -210,6 +209,8 @@ export default function WaiterMode({
   const [securityPrompt, setSecurityPrompt] = useState(null);
   // Admin PIN to'g'ri, ikki bosqichli kirish yoqilgan: telefondagi kod kutilmoqda
   const [twoFactorAdmin, setTwoFactorAdmin] = useState(null);
+  // Admin kodi serverda tekshiriladi (shu planshetda admin siri yo'q): src/sync/staffAuth.ts
+  const [twoFactorCheck, setTwoFactorCheck] = useState(null);
   const [pinInput, setPinInput] = useState('');
   const [cancelReasonInput, setCancelReasonInput] = useState('Mijoz rad etdi');
   const [pinError, setPinError] = useState('');
@@ -311,7 +312,7 @@ export default function WaiterMode({
     });
   }, [pinRules]);
 
-  const handleConfirmSecurityPin = (e) => {
+  const handleConfirmSecurityPin = async (e) => {
     e.preventDefault();
     if (!securityPrompt) return;
 
@@ -326,9 +327,17 @@ export default function WaiterMode({
     const ownerId = resolveOwnerId(safeStickyUsers, stickyOwner);
     const adminUsers = safeStickyUsers.filter(u => u && canApproveOverride(u, ownerId));
 
-    const matchedAdmin = cleanPin
-      ? findUserByPin(adminUsers, cleanPin)
-      : null;
+    // Avval planshetda, topilmasa serverda (admin bu planshetda avval kirmagan bo'lsa)
+    const adminIds = new Set(adminUsers.map(u => String(u.id)));
+    const result = cleanPin
+      ? await verifyStaffPin({ users: adminUsers, pin: cleanPin, filter: u => adminIds.has(String(u.id)), mode: 'verify', group: 'management' })
+      : { ok: false, reason: 'wrong' };
+    const matchedAdmin = result.ok ? result.user : null;
+
+    if (!result.ok && result.reason !== 'wrong') {
+      setPinError(result.message);
+      return;
+    }
 
     // Faqat haqiqiy admin PIN qabul qilinadi (oldin '0000', '123456' kabi kodlar ham o'tardi)
     if (!matchedAdmin) {
@@ -342,7 +351,8 @@ export default function WaiterMode({
     }
     resetPinGuard('waiter_override');
 
-    if (hasTwoFactor(matchedAdmin)) {
+    if (result.needCode) {
+      setTwoFactorCheck(() => result.checkCode || null);
       setTwoFactorAdmin(matchedAdmin);
       setPinInput('');
       setPinError('');
@@ -1447,11 +1457,16 @@ export default function WaiterMode({
           user={twoFactorAdmin}
           title="🔒 Admin tasdig'i: 2-bosqich"
           actionLabel={securityPrompt.title}
+          checkCode={twoFactorCheck || undefined}
           onVerified={(admin) => {
             setTwoFactorAdmin(null);
+            setTwoFactorCheck(null);
             finishSecurityApproval(admin);
           }}
-          onCancel={() => setTwoFactorAdmin(null)}
+          onCancel={() => {
+            setTwoFactorAdmin(null);
+            setTwoFactorCheck(null);
+          }}
           onAudit={(action, details) => recordAuditLog(action, details)}
         />
       )}

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 import { setUpdateScreenLocked } from '../pwa/update';
 import { checkPin, findUserByPin, pinLengthOf } from '../utils/pinHash';
+import { verifyStaffPin } from '../sync/staffAuth';
 import { getRequiredPinLength } from '../constants/roles';
 import { hasTwoFactor } from '../utils/twoFactor';
 import TwoFactorCodeModal from './TwoFactorCodeModal';
@@ -263,18 +264,19 @@ export default function AutoLockControl({
   // =========================================================
   // 4. QULFNI OCHISH (PIN-KOD TEKSHIRUVI)
   // =========================================================
-  const finishUnlock = useCallback((user, isSwitch) => {
+  // auth: boshqa xodim kirdi - server sessiyasi uchun (App -> handleLogin, src/sync/staffAuth.ts)
+  const finishUnlock = useCallback((user, isSwitch, auth) => {
     setTwoFactorUnlock(null);
     setIsScreenLocked(false);
     setPinInput('');
     setPinError('');
     lastActivityRef.current = Date.now();
     if (isSwitch && typeof onSwitchUser === 'function') {
-      onSwitchUser(user);
+      onSwitchUser(user, auth);
     }
   }, [onSwitchUser]);
 
-  const verifyAndUnlock = useCallback((enteredPin) => {
+  const verifyAndUnlock = useCallback(async (enteredPin) => {
     const cleanPin = String(enteredPin || '').trim();
     if (!cleanPin) return;
 
@@ -319,11 +321,33 @@ export default function AutoLockControl({
       resetPinGuard('autolock');
       setPinInput('');
       setPinError('');
+      const auth = { pin: cleanPin, group: null, serverVerified: false };
       if (hasTwoFactor(matchedOtherUser)) {
-        setTwoFactorUnlock({ user: matchedOtherUser, isSwitch: true });
+        setTwoFactorUnlock({ user: matchedOtherUser, isSwitch: true, auth });
         return;
       }
-      finishUnlock(matchedOtherUser, true);
+      finishUnlock(matchedOtherUser, true, auth);
+      return;
+    }
+
+    // 3. Bu qurilmada avval kirmagan xodim: PIN serverda tekshiriladi (internet bo'lsa)
+    const remote = await verifyStaffPin({ users: allUsers, pin: cleanPin, mode: 'login', group: null });
+    if (remote.ok) {
+      resetPinGuard('autolock');
+      setPinInput('');
+      setPinError('');
+      const isSwitch = !currentUser || String(remote.user.id) !== String(currentUser.id);
+      const auth = { pin: cleanPin, group: null, serverVerified: true };
+      if (remote.needCode) {
+        setTwoFactorUnlock({ user: remote.user, isSwitch, auth, checkCode: remote.checkCode });
+        return;
+      }
+      finishUnlock(remote.user, isSwitch, auth);
+      return;
+    }
+    if (remote.reason !== 'wrong') {
+      setPinError(remote.message);
+      setPinInput('');
       return;
     }
 
@@ -599,7 +623,11 @@ export default function AutoLockControl({
         <TwoFactorCodeModal
           user={twoFactorUnlock.user}
           title="🔒 Qulfni ochish: 2-bosqich"
-          onVerified={(user) => finishUnlock(user, twoFactorUnlock.isSwitch)}
+          checkCode={twoFactorUnlock.checkCode}
+          onVerified={(user, codeInfo) => finishUnlock(user, twoFactorUnlock.isSwitch, twoFactorUnlock.auth
+            ? { ...twoFactorUnlock.auth, code: codeInfo?.code || null, codeKind: codeInfo?.kind || 'totp',
+              serverVerified: Boolean(twoFactorUnlock.auth.serverVerified || twoFactorUnlock.checkCode) }
+            : undefined)}
           onCancel={() => setTwoFactorUnlock(null)}
           onAudit={onAudit}
         />

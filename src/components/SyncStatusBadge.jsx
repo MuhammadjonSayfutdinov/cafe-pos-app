@@ -6,9 +6,13 @@ export default function SyncStatusBadge() {
   const [status, setStatus] = useState(getSyncStatus());
   useEffect(() => subscribeSyncStatus(setStatus), []);
 
-  if (status.state === 'disabled' || status.state === 'auth') return null;
+  if (status.state === 'disabled' || status.state === 'auth' || status.state === 'device') return null;
 
   const pending = status.pending > 0 ? ` (${status.pending})` : '';
+  // Server ruxsat bermagan o'zgarishlar (supabase/security.sql): Tizim sozlamalari -> Qurilmalar
+  const heldNote = status.held > 0
+    ? `\n⏸ ${status.held} ta o'zgarish serverga qabul qilinmadi (ruxsat yo'q). Huquqi bor xodim internet bilan kirsa, qayta yuboriladi.`
+    : '';
   // Server javob beradi, lekin sekin (src/sync/engine.js -> timed): ish to'xtamaydi, faqat ogohlantirish
   const slowView = { text: `Sekin internet${pending}`, icon: '🐢', cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800' };
   const view = status.slow && (status.state === 'online' || status.state === 'syncing') ? slowView : {
@@ -47,11 +51,17 @@ export default function SyncStatusBadge() {
     ? `Oxirgi sinxron: ${new Date(status.lastSyncAt).toLocaleTimeString()}`
     : 'Bulut sinxronlash';
 
+  if (status.held > 0 && (status.state === 'online' || status.state === 'syncing')) {
+    view.icon = '⏸';
+    view.text = `Kutmoqda (${status.held})`;
+    view.cls = 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800';
+  }
+
   return (
     <button
       type="button"
       onClick={syncNow}
-      title={title}
+      title={`${title}${heldNote}`}
       data-sync-state={status.state}
       data-sync-slow={status.slow ? 'true' : undefined}
       data-sync-upstream={hub && up ? up.state : undefined}

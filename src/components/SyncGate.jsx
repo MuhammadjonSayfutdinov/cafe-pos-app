@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getSyncStatus, subscribeSyncStatus, signIn, isFirstSyncPending, syncNow } from '../sync/engine';
+import DeviceApprovalScreen from './DeviceApprovalScreen';
 
 // Bulut sinxronlash yoqilgan bo'lsa: qurilma kafe hisobiga ulanmaguncha ilovani ko'rsatmaydi.
 // Sinxronlash o'chiq bo'lsa (.env.local bo'sh) - darhol ilovani ko'rsatadi.
@@ -17,6 +18,9 @@ export default function SyncGate({ children }) {
   }, [status.state]);
 
   if (status.state === 'auth') return <DeviceLogin hub={status.transport === 'hub'} />;
+
+  // Server xavfsizligi (supabase/security.sql): qurilma hali tasdiqlanmagan yoki bloklangan
+  if (status.state === 'device') return <DeviceApprovalScreen security={status.security} />;
 
   // Yangi qurilma: bulut ma'lumoti kelmaguncha ilova ochilmaydi. Aks holda namuna xodimlar
   // (777777, 2222...) bilan kirish mumkin bo'lardi va ular bulutdagi ma'lumotni buzardi.

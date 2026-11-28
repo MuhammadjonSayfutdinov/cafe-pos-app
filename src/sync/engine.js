@@ -16,6 +16,12 @@
 //  7. Cheklar (pos_orders) - 5-banddan istisno: har versiyada kelib chiqish belgisi (_rev, _revs).
 //     Ikki qurilma bir chekni bir vaqtda o'zgartirsa, chek taom darajasida birlashtiriladi va qayta
 //     yuboriladi (src/sync/mergeOrder.ts); eskirgan (kechikkan) versiya yangisini bosib ketmaydi.
+//  8. Server xavfsizligi (supabase/security.sql, bo'lsa): ishga tushishda qurilma o'zini tanitadi
+//     (pos_device_hello). Tasdiqlanmagan qurilma sinxronlanmaydi (holat 'device', SyncGate tasdiqlash
+//     oynasini ko'rsatadi). Server aytgan yashirin to'plamlar (mijozlar, xarajatlar...) qurilmadan
+//     o'chiriladi, ochilganlari to'liq yuklanadi. Yozish pos_push_records / pos_push_kv orqali: ruxsat
+//     yo'q yozuv navbatni to'xtatmaydi, "kutmoqda" (held) ro'yxatiga o'tadi va xodim kirgach qayta
+//     yuboriladi. Xodim yozuviga shu qurilmaning PIN keshi qo'shiladi (src/utils/verifierCache.ts).
 
 import {
   SAME_TAB_EVENT, RECORD_COLLECTIONS, KV_KEYS,
@@ -26,6 +32,10 @@ import { withTimeout } from './timeouts';
 import { isAuthRequiredError } from './types';
 import { ancestorsOf, commonAncestor, mergeOrder3, relationOf, revOf, sameContent, stampRev } from './mergeOrder';
 import { newId } from '../utils/ids';
+import {
+  VERIFIER_SEEDED_KEY, decorateUsers, pruneVerifiers, readVerifierCache, refreshFromOwnWrite,
+  seedFromUsers, writeVerifierCache
+} from '../utils/verifierCache';
 
 const FLUSH_DEBOUNCE_MS = 300;
 const RETRY_MIN_MS = 2000;
@@ -44,6 +54,14 @@ const FILE_UPLOAD_TIMEOUT_MS = 60000;
 const SLOW_MS = 4000;
 // Dastur ochilganda butun bazani qayta tekshirish oralig'i (qolgan paytda faqat o'zgarishlar)
 const FULL_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+// Server xavfsizligi (supabase/security.sql): qurilma holati va ruxsat yozuvi faqat shu qurilmada
+const SECURITY_KEY = 'pos_sync_security';
+const HELD_KEY = 'pos_sync_held';
+// Qurilma holatini (bloklanmaganmi, xodim sessiyasi) tekshirish oralig'i
+const HELLO_INTERVAL_MS = 5 * 60 * 1000;
+// Tasdiqlanmagan qurilma: boshqa qurilmada tasdiqlanganini bilish uchun
+const DEVICE_POLL_MS = 15000;
+const USERS_KEY = 'pos_users';
 
 // ---------- yordamchilar ----------
 export const recordId = (r) =>
@@ -101,6 +119,14 @@ let catchupTimer = null;
 let subscribedOnce = false;
 const shadow = new Map(); // har bir kalitning sinxronlangan oxirgi holati
 let outbox = new Map();   // opKey -> op
+// Server rad etgan (ruxsat yo'q) yozuvlar: opKey -> { op, reason, at }. Xodim kirgach qayta yuboriladi
+let held = new Map();
+// Server xavfsizligi: installed - security.sql bormi (null - hali noma'lum), status - qurilma holati,
+// staff - serverda PIN bilan kirgan xodim, hidden - bu qurilmaga ko'rinmaydigan to'plamlar
+const EMPTY_SECURITY = Object.freeze({ installed: null, status: null, staff: null, hidden: null, label: '', lockedS: 0 });
+let security = { ...EMPTY_SECURITY };
+let helloTimer = null;
+let devicePollTimer = null;
 
 // ---------- cheklarni birlashtirish (7-band, src/sync/mergeOrder.ts) ----------
 const MERGE_COLLECTIONS = new Set(['pos_orders']);
@@ -214,11 +240,14 @@ function applyRemoteMerge(collection, id, incoming) {
 }
 
 // transport: 'supabase' | 'hub' | 'fake'; upstream: mahalliy serverning bulut bilan aloqasi (faqat hub)
-let status = { state: 'disabled', pending: 0, lastSyncAt: null, error: null, email: null, slow: false, transport: null, upstream: null };
+let status = {
+  state: 'disabled', pending: 0, held: 0, lastSyncAt: null, error: null, email: null, slow: false,
+  transport: null, upstream: null, security: EMPTY_SECURITY
+};
 const statusListeners = new Set();
 
 function setStatus(patch) {
-  status = { ...status, ...patch, pending: outbox.size };
+  status = { ...status, ...patch, pending: outbox.size, held: held.size, security };
   statusListeners.forEach(fn => {
     try {
       fn(status);
@@ -284,13 +313,43 @@ function saveOutbox() {
 }
 
 function enqueue(op) {
-  outbox.set(opKey(op), op);
+  const k = opKey(op);
+  outbox.set(k, op);
+  // Yangi o'zgarish kutayotgan (rad etilgan) eskisining o'rnini egallaydi
+  if (held.delete(k)) saveHeld();
 }
+
+function loadHeld() {
+  const list = readLocal(HELD_KEY);
+  const map = new Map();
+  (Array.isArray(list) ? list : []).forEach(h => {
+    if (h && h.op && (h.op.kind === 'kv' || h.op.kind === 'rec')) map.set(opKey(h.op), h);
+  });
+  return map;
+}
+
+function saveHeld() {
+  try {
+    if (held.size === 0) storage()?.removeItem(HELD_KEY);
+    else storage()?.setItem(HELD_KEY, JSON.stringify([...held.values()]));
+  } catch (e) {
+    console.error("Rad etilgan o'zgarishlarni saqlab bo'lmadi:", e);
+  }
+}
+
+const isHeld = (kind, a, b) => held.has(kind === 'kv' ? `kv:${a}` : `rec:${a}:${b}`);
 
 const hasPending = (kind, a, b) => outbox.has(kind === 'kv' ? `kv:${a}` : `rec:${a}:${b}`);
 
 // ---------- mahalliy yozuv ----------
-function writeLocalFromRemote(key, value) {
+// Xodim yozuviga shu qurilmaning PIN keshi qo'shiladi: internetsiz ham kirish mumkin
+function decorateLocal(key, value) {
+  if (key !== USERS_KEY || !Array.isArray(value)) return value;
+  return decorateUsers(value, readVerifierCache());
+}
+
+function writeLocalFromRemote(key, rawValue) {
+  const value = decorateLocal(key, rawValue);
   try {
     storage()?.setItem(key, JSON.stringify(value));
   } catch (e) {
@@ -365,6 +424,272 @@ function scheduleRetry(fn) {
   retryDelay = Math.min(RETRY_MAX_MS, retryDelay * 2);
 }
 
+// ---------- server xavfsizligi (8-band, supabase/security.sql) ----------
+const secureWrites = () => Boolean(transport?.secure) && security.installed === true;
+
+const errText = (e) => `${e?.code || ''} ${e?.message || e || ''}`;
+/** Server funksiyasi yo'q: security.sql ishga tushirilmagan */
+const isMissingFunction = (e) => /PGRST202|could not find the function|function .* does not exist/i.test(errText(e));
+/** Ruxsat yo'q (RLS / huquq): to'g'ridan-to'g'ri yozish yopilgan yoki qurilma tasdiqlanmagan */
+const isPermissionError = (e) => /42501|permission denied|pos_device_not_trusted/i.test(errText(e));
+
+function saveSecurity() {
+  try {
+    storage()?.setItem(SECURITY_KEY, JSON.stringify(security));
+  } catch {
+    // ignore
+  }
+}
+
+function setSecurityState(patch) {
+  security = { ...security, ...patch };
+  saveSecurity();
+  setStatus({});
+}
+
+/** Rad etilgan yozuvlar: kalit -> sabab */
+function rejectedKeys(res, kind) {
+  const map = new Map();
+  (Array.isArray(res?.rejected) ? res.rejected : []).forEach(r => {
+    if (!r) return;
+    const k = kind === 'kv' ? `kv:${r.key}` : `rec:${r.collection}:${r.id}`;
+    map.set(k, String(r.reason || 'rejected'));
+  });
+  return map;
+}
+
+function holdOps(ops, reasons) {
+  if (!ops.length) return;
+  ops.forEach(o => {
+    const k = opKey(o);
+    if (outbox.get(k) !== o) return; // yuborish paytida yana o'zgardi: yangisi navbatda qoladi
+    outbox.delete(k);
+    held.set(k, { op: o, reason: reasons.get(k) || 'rejected', at: Date.now() });
+  });
+  saveHeld();
+  saveOutbox();
+  setStatus({});
+  console.warn(`Server ${ops.length} ta o'zgarishni qabul qilmadi (ruxsat yo'q):`, [...new Set(reasons.values())].join(', '));
+}
+
+/** Server o'zi saqlagan ko'rinish (masalan, PIN xeshisiz xodim yozuvi) shu qurilmaga ham yoziladi */
+function applyServerRecord(collection, id, data) {
+  if (!isRecordCollection(collection) || !id || hasPending('rec', collection, id)) return;
+  const list = Array.isArray(readLocal(collection)) ? readLocal(collection) : [];
+  const idx = list.findIndex(r => recordId(r) === id);
+  const next = idx === -1
+    ? (RECORD_COLLECTIONS[collection] === 'prepend' ? [data, ...list] : [...list, data])
+    : list.map((r, i) => (i === idx ? data : r));
+  writeLocalFromRemote(collection, next);
+}
+
+function applyChanged(res, rows) {
+  const list = Array.isArray(res?.changed) ? res.changed : [];
+  if (list.length === 0) return;
+  // Shu qurilma o'zi yangi PIN bergan xodim keshda bo'lsa, kesh ham yangilanadi
+  let cache = readVerifierCache();
+  const before = cache;
+  list.forEach(c => {
+    if (!c || c.collection !== USERS_KEY) return;
+    const sent = rows.find(r => r.collection === USERS_KEY && r.id === String(c.id));
+    if (sent) cache = refreshFromOwnWrite(cache, sent.data);
+  });
+  if (cache !== before) writeVerifierCache(cache);
+  list.forEach(c => {
+    if (c && c.id !== undefined && c.id !== null) applyServerRecord(c.collection, String(c.id), c.data);
+  });
+}
+
+function removeLocal(key) {
+  try {
+    storage()?.removeItem(key);
+  } catch {
+    // ignore
+  }
+  shadow.set(key, undefined);
+  window.dispatchEvent(new CustomEvent(SAME_TAB_EVENT, { detail: { key, newValue: undefined, source: 'remote' } }));
+}
+
+/** Bu qurilmaga ko'rinmaydigan to'plamlar qurilmadan o'chadi (yuborilmagan o'zgarishlar qoladi) */
+function purgeHidden(hiddenSet) {
+  const incomplete = new Set(Array.isArray(security.incomplete) ? security.incomplete : []);
+  let marked = false;
+  Object.keys(RECORD_COLLECTIONS).forEach(key => {
+    if (!hiddenSet.has(key) && !hiddenSet.has('*')) return;
+    if (!incomplete.has(key)) {
+      incomplete.add(key);
+      marked = true;
+    }
+    const list = readLocal(key);
+    if (!Array.isArray(list)) {
+      // Kalit yo'q: bo'sh ro'yxat yoziladi (komponent namuna ma'lumotni qo'yib, yubormasin)
+      if (list === undefined) writeLocalFromRemote(key, []);
+      return;
+    }
+    if (list.length === 0) return;
+    const keep = list.filter(r => {
+      const id = recordId(r);
+      return id && (hasPending('rec', key, id) || isHeld('rec', key, id));
+    });
+    if (keep.length !== list.length) writeLocalFromRemote(key, keep);
+  });
+  if (marked) setSecurityState({ incomplete: [...incomplete] });
+}
+
+/** Endi ko'rinadigan to'plamlarni serverdan to'liq yuklash (avval yashirin edi) */
+let loadingCollections = null;
+async function loadIncomplete() {
+  const hidden = new Set(Array.isArray(security.hidden) ? security.hidden : []);
+  const keys = (Array.isArray(security.incomplete) ? security.incomplete : [])
+    .filter(k => isRecordCollection(k) && !hidden.has(k) && !hidden.has('*'));
+  if (keys.length === 0 || !transport || typeof transport.fetchSome !== 'function' || loadingCollections) return;
+  loadingCollections = (async () => {
+    try {
+      const { records } = await timed(transport.fetchSome({ collections: keys }), FETCH_TIMEOUT_MS, 'Yuklash');
+      mergeInitial(records, [], { firstTime: true, onlyKeys: keys });
+      records.forEach(r => noteServerTs(r.updated_at));
+      const left = (Array.isArray(security.incomplete) ? security.incomplete : []).filter(k => !keys.includes(k));
+      setSecurityState({ incomplete: left });
+    } catch (e) {
+      console.warn("Ochilgan ma'lumotni yuklab bo'lmadi (keyinroq qayta urinadi):", e);
+    } finally {
+      loadingCollections = null;
+    }
+  })();
+  return loadingCollections;
+}
+
+/** Bloklangan qurilma: maxfiy ma'lumot va PIN keshi qurilmadan o'chadi */
+function wipeRevoked() {
+  purgeHidden(new Set(['*']));
+  ['pos_telegram_config', 'pos_qr_secret'].forEach(removeLocal);
+  writeVerifierCache({});
+  try {
+    storage()?.removeItem(LAST_SERVER_TS_KEY);
+    storage()?.removeItem(LAST_FULL_SYNC_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function stopDevicePoll() {
+  if (devicePollTimer) clearTimeout(devicePollTimer);
+  devicePollTimer = null;
+}
+
+/** Qurilma tasdiqlanmagan yoki bloklangan: sinxron to'xtaydi, tasdiqlash oynasi chiqadi */
+function enterDeviceState() {
+  started = false;
+  subscribedOnce = false;
+  if (unsubscribe) unsubscribe();
+  unsubscribe = null;
+  if (catchupTimer) clearInterval(catchupTimer);
+  if (helloTimer) clearInterval(helloTimer);
+  setStatus({ state: 'device', error: null });
+  stopDevicePoll();
+  devicePollTimer = setTimeout(() => {
+    devicePollTimer = null;
+    if (status.state === 'device') startWithRetry();
+  }, security.status === 'revoked' ? 60000 : DEVICE_POLL_MS);
+}
+
+/**
+ * Server qurilma holatini yubordi (pos_device_hello, xodim kirishi/chiqishi): ruxsatni qo'llash.
+ * Yashirin bo'lgan to'plam qurilmadan o'chadi, ochilgani yuklanadi, xodim almashsa rad etilgan
+ * yozuvlar qayta yuboriladi.
+ */
+export function applyDeviceState(state) {
+  if (!state || typeof state !== 'object' || state.installed !== true) return;
+  const prevStaff = security.staff?.id || null;
+  const hidden = Array.isArray(state.hidden) ? state.hidden.map(String) : [];
+  const staff = state.staff && state.staff.id !== undefined && state.staff.id !== null
+    ? { id: String(state.staff.id), name: String(state.staff.name || ''), until: state.staff.until || null }
+    : null;
+  setSecurityState({
+    installed: true,
+    status: String(state.status || ''),
+    staff,
+    hidden,
+    label: String(state.label || ''),
+    lockedS: Number(state.locked_s) || 0
+  });
+  if (security.status !== 'trusted') {
+    if (security.status === 'revoked') wipeRevoked();
+    if (started) enterDeviceState();
+    return;
+  }
+  if (!started) return; // ishga tushish (initialSync) o'zi o'chiradi va yuklaydi
+  purgeHidden(new Set(hidden));
+  loadIncomplete();
+  if ((staff?.id || null) !== prevStaff) retryHeld();
+}
+
+async function deviceHello() {
+  if (!transport?.secure || typeof transport.rpc !== 'function') return null;
+  let res;
+  try {
+    res = await timed(transport.rpc('pos_device_hello', {
+      p_device_key: deviceId || '',
+      p_label: '',
+      p_user_agent: typeof navigator !== 'undefined' ? String(navigator.userAgent || '').slice(0, 300) : ''
+    }), RPC_TIMEOUT_MS, 'Server');
+  } catch (e) {
+    if (isMissingFunction(e)) {
+      if (security.installed !== false) setSecurityState({ ...EMPTY_SECURITY, installed: false });
+      return null;
+    }
+    throw e;
+  }
+  applyDeviceState(res);
+  return res;
+}
+
+/** Rad etilgan yozuvlarni qayta yuborish (xodim kirdi - endi ruxsat bo'lishi mumkin) */
+export function retryHeld() {
+  if (held.size === 0) return;
+  held.forEach((h, k) => {
+    if (!outbox.has(k)) outbox.set(k, h.op);
+  });
+  held.clear();
+  saveHeld();
+  saveOutbox();
+  setStatus({});
+  scheduleFlush();
+}
+
+/** Rad etilgan yozuvlar ro'yxati (sozlamalarda ko'rsatish uchun) */
+export const getHeldChanges = () => [...held.values()].map(h => ({
+  kind: h.op.kind,
+  collection: h.op.collection || null,
+  id: h.op.id || null,
+  key: h.op.key || null,
+  reason: h.reason,
+  at: h.at
+}));
+
+/** Rad etilgan o'zgarishlardan voz kechish: qurilmada serverdagi holat tiklanadi */
+export async function discardHeldChanges() {
+  const items = [...held.values()];
+  held.clear();
+  saveHeld();
+  setStatus({});
+  if (!transport || typeof transport.fetchSome !== 'function') return;
+  const collections = [...new Set(items.filter(h => h.op.kind === 'rec').map(h => h.op.collection))];
+  const kvKeys = [...new Set(items.filter(h => h.op.kind === 'kv').map(h => h.op.key))];
+  if (collections.length === 0 && kvKeys.length === 0) return;
+  const { records, kv } = await timed(transport.fetchSome({ collections, kvKeys }), FETCH_TIMEOUT_MS, 'Yuklash');
+  if (collections.length) mergeInitial(records, [], { firstTime: true, onlyKeys: collections });
+  (Array.isArray(kv) ? kv : []).forEach(r => {
+    if (!hasPending('kv', r.key)) writeLocalFromRemote(r.key, r.value);
+  });
+}
+
+export const getSecurity = () => security;
+
+/** Server PIN tekshiruvi bormi (security.sql o'rnatilgan, qurilma ishonchli) */
+export const isServerSecurityActive = () =>
+  Boolean(transport?.secure) && security.installed === true && security.status === 'trusted';
+
 // Yuborilgan op larni navbatdan olib tashlaymiz (yuborish paytida qayta o'zgarganlari qoladi)
 function settleOps(ops) {
   ops.forEach(o => {
@@ -395,9 +720,15 @@ export async function flush() {
         }
         return { collection: o.collection, id: o.id, data, deleted: Boolean(o.deleted), updated_by: deviceId };
       });
-      await timed(transport.pushRecords(rows), PUSH_TIMEOUT_MS, 'Yuborish');
-      settleOps(batch);
-      rows.forEach(r => {
+      const res = secureWrites()
+        ? await timed(transport.pushRecordsSecure(rows), PUSH_TIMEOUT_MS, 'Yuborish')
+        : await timed(transport.pushRecords(rows), PUSH_TIMEOUT_MS, 'Yuborish');
+      // Server ruxsat bermagan yozuvlar navbatni to'xtatmaydi: "kutmoqda" ro'yxatiga o'tadi
+      const rejected = rejectedKeys(res, 'rec');
+      holdOps(batch.filter(o => rejected.has(opKey(o))), rejected);
+      settleOps(batch.filter(o => !rejected.has(opKey(o))));
+      rows.forEach((r, i) => {
+        if (rejected.has(opKey(batch[i]))) return;
         if (r.deleted) {
           serverCopy.delete(mergeKey(r.collection, r.id));
           return;
@@ -407,20 +738,27 @@ export async function flush() {
         const next = MERGE_COLLECTIONS.has(r.collection) ? outbox.get(`rec:${r.collection}:${r.id}`) : null;
         if (next && !next.deleted) next.base = r.data;
       });
+      // Server yozuvni o'zgartirib saqladi (xodim yozuvidan PIN xeshi olindi): shu qurilmada ham
+      applyChanged(res, rows);
       saveOutbox();
     }
     if (kvs.length) {
-      await timed(
-        transport.pushKv(kvs.map(o => ({ key: o.key, value: o.value ?? null, updated_by: deviceId }))),
-        PUSH_TIMEOUT_MS, 'Yuborish'
-      );
-      settleOps(kvs);
+      const kvRows = kvs.map(o => ({ key: o.key, value: o.value ?? null, updated_by: deviceId }));
+      const res = secureWrites()
+        ? await timed(transport.pushKvSecure(kvRows), PUSH_TIMEOUT_MS, 'Yuborish')
+        : await timed(transport.pushKv(kvRows), PUSH_TIMEOUT_MS, 'Yuborish');
+      const rejected = rejectedKeys(res, 'kv');
+      holdOps(kvs.filter(o => rejected.has(opKey(o))), rejected);
+      settleOps(kvs.filter(o => !rejected.has(opKey(o))));
     }
     retryDelay = RETRY_MIN_MS;
     setStatus({ state: 'online', lastSyncAt: Date.now(), error: null });
   } catch (e) {
     if (!requireAuth(e)) {
       setStatus({ state: 'offline', error: String(e?.message || e) });
+      // Serverda security.sql endi o'rnatilgan (to'g'ridan-to'g'ri yozish yopildi) yoki qurilma
+      // bloklangan: holatni qayta so'raymiz (keyingi urinish server funksiyasi orqali)
+      if (isPermissionError(e)) deviceHello().catch(() => {});
       scheduleRetry(flush);
     }
   } finally {
@@ -489,11 +827,14 @@ function applyRemote(ev) {
   }
 }
 
-// Boshlang'ich birlashtirish: server + mahalliy ma'lumot
-function mergeInitial(records, kvRows, { firstTime }) {
-  const serverEmpty = records.length === 0 && kvRows.length === 0;
+// Boshlang'ich birlashtirish: server + mahalliy ma'lumot.
+// hidden - bu qurilmaga ko'rinmaydigan to'plamlar (tegilmaydi, purgeHidden o'chiradi);
+// onlyKeys - faqat shu to'plamlar (yangi ochilgan yoki serverdan qayta olingan), sozlamalarsiz
+function mergeInitial(records, kvRows, { firstTime, hidden = null, onlyKeys = null }) {
+  const serverEmpty = !onlyKeys && records.length === 0 && kvRows.length === 0;
 
-  Object.keys(RECORD_COLLECTIONS).forEach(key => {
+  (onlyKeys || Object.keys(RECORD_COLLECTIONS)).forEach(key => {
+    if (hidden && (hidden.has(key) || hidden.has('*'))) return;
     const local = Array.isArray(readLocal(key)) ? readLocal(key) : [];
     const rows = records
       .filter(r => r.collection === key)
@@ -515,8 +856,8 @@ function mergeInitial(records, kvRows, { firstTime }) {
         const id = recordId(r);
         if (!id || seen.has(id)) return;
         seen.add(id);
-        if (hasPending('rec', key, id)) {
-          merged.push(r); // yuborilmagan mahalliy o'zgarish
+        if (hasPending('rec', key, id) || isHeld('rec', key, id)) {
+          merged.push(r); // yuborilmagan (yoki server rad etgan, qayta yuboriladigan) mahalliy o'zgarish
           return;
         }
         const s = serverMap.get(id);
@@ -547,6 +888,12 @@ function mergeInitial(records, kvRows, { firstTime }) {
     else shadow.set(key, local);
   });
 
+  if (onlyKeys) {
+    records.forEach(r => noteServerTs(r.updated_at));
+    saveOutbox();
+    return;
+  }
+
   const kvMap = new Map(kvRows.map(r => [r.key, r]));
   KV_KEYS.forEach(key => {
     const local = readLocal(key);
@@ -571,6 +918,14 @@ function mergeInitial(records, kvRows, { firstTime }) {
 }
 
 async function initialSync() {
+  // 8-band: qurilma o'zini tanitadi. Tasdiqlanmagan/bloklangan bo'lsa - sinxron yo'q, tasdiqlash oynasi
+  await deviceHello();
+  if (security.installed === true && security.status !== 'trusted') {
+    enterDeviceState();
+    return;
+  }
+  stopDevicePoll();
+  const hidden = new Set(security.installed === true && Array.isArray(security.hidden) ? security.hidden : []);
   buffering = [];
   if (!unsubscribe) {
     unsubscribe = transport.subscribe(applyRemote, handleRealtimeStatus);
@@ -592,13 +947,16 @@ async function initialSync() {
       ];
     } else {
       const { records, kv } = await timed(transport.fetchAll(null), FETCH_TIMEOUT_MS, 'Yuklash');
-      mergeInitial(records, kv, { firstTime });
+      mergeInitial(records, kv, { firstTime, hidden });
       try {
         storage()?.setItem(LAST_FULL_SYNC_KEY, String(Date.now()));
       } catch {
         // ignore
       }
+      // To'liq yuklandi: ko'rinadigan to'plamlar endi to'liq
+      if (security.installed === true) setSecurityState({ incomplete: [] });
     }
+    if (security.installed === true) purgeHidden(hidden);
     try {
       storage()?.setItem(INIT_IDENTITY_KEY, identity);
     } catch {
@@ -613,6 +971,7 @@ async function initialSync() {
   retryDelay = RETRY_MIN_MS;
   setStatus({ state: 'online', lastSyncAt: Date.now(), error: null });
   scheduleCatchup();
+  loadIncomplete();
   flush();
 }
 
@@ -625,6 +984,7 @@ export async function catchUp() {
     records.forEach(r => applyRemote({ type: 'record', ...r }));
     kv.forEach(r => applyRemote({ type: 'kv', ...r }));
     if (status.state === 'offline' && outbox.size === 0) setStatus({ state: 'online', error: null });
+    loadIncomplete();
   } catch (e) {
     if (requireAuth(e)) return;
     setStatus({ state: 'offline', error: String(e?.message || e) });
@@ -635,6 +995,13 @@ export async function catchUp() {
 function scheduleCatchup() {
   if (catchupTimer) clearInterval(catchupTimer);
   catchupTimer = setInterval(catchUp, CATCHUP_INTERVAL_MS);
+  // Qurilma holati: boshqa qurilmada bloklanmadimi, xodim sessiyasi uzaytiriladi
+  if (helloTimer) clearInterval(helloTimer);
+  helloTimer = transport?.secure
+    ? setInterval(() => {
+      if (started) deviceHello().catch(() => {});
+    }, HELLO_INTERVAL_MS)
+    : null;
 }
 
 function handleRealtimeStatus(s) {
@@ -663,6 +1030,35 @@ async function startWithRetry() {
     }
   })();
   return initialRunning;
+}
+
+// ---------- PIN keshi (src/utils/verifierCache.ts) ----------
+/**
+ * Bir marta: yangilanishdan oldin qurilmadagi xodim yozuvlarida PIN xeshi bor edi - u keshga o'tadi,
+ * server xeshni yozuvdan olib tashlagach ham shu qurilmada internetsiz kirish ishlayveradi.
+ */
+function seedVerifierCache() {
+  try {
+    const users = readLocal(USERS_KEY);
+    let cache = readVerifierCache();
+    const before = cache;
+    if (!storage()?.getItem(VERIFIER_SEEDED_KEY)) {
+      cache = seedFromUsers(cache, Array.isArray(users) ? users : []);
+      storage()?.setItem(VERIFIER_SEEDED_KEY, String(Date.now()));
+    }
+    cache = pruneVerifiers(cache, Array.isArray(users) ? users : []);
+    if (cache !== before) writeVerifierCache(cache);
+  } catch {
+    // kesh ishlamasa ham dastur ochilsin
+  }
+}
+
+/** Kesh o'zgardi (xodim serverda kirdi): xodim yozuvlari qayta bezaladi, serverga yuborilmaydi */
+export function refreshUserVerifiers() {
+  const list = readLocal(USERS_KEY);
+  if (!Array.isArray(list)) return;
+  const next = decorateUsers(list, readVerifierCache());
+  if (next !== list) writeLocalFromRemote(USERS_KEY, next);
 }
 
 // ---------- tashqi API ----------
@@ -695,8 +1091,12 @@ export function configureSync(transportInstance) {
       // ignore
     }
   }
-  setStatus({ transport: transport.kind || null });
   outbox = loadOutbox();
+  held = loadHeld();
+  const savedSecurity = readLocal(SECURITY_KEY);
+  security = { ...EMPTY_SECURITY, ...(savedSecurity && typeof savedSecurity === 'object' ? savedSecurity : {}) };
+  seedVerifierCache();
+  setStatus({ transport: transport.kind || null });
   [...Object.keys(RECORD_COLLECTIONS), ...KV_KEYS].forEach(key => shadow.set(key, readLocal(key)));
 
   window.addEventListener('storage', handleStorageEvent);
@@ -767,6 +1167,17 @@ export async function signOut({ force = false } = {}) {
   subscribedOnce = false;
   outbox.clear();
   saveOutbox();
+  held.clear();
+  saveHeld();
+  security = { ...EMPTY_SECURITY };
+  try {
+    storage()?.removeItem(SECURITY_KEY);
+  } catch {
+    // ignore
+  }
+  writeVerifierCache({});
+  stopDevicePoll();
+  if (helloTimer) clearInterval(helloTimer);
   try {
     storage()?.removeItem(INIT_IDENTITY_KEY);
     storage()?.removeItem(LAST_SERVER_TS_KEY);

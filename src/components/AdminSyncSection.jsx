@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getSyncStatus, subscribeSyncStatus, syncNow, signOut, getDeviceId } from '../sync/engine';
 import { confirmAsync, notify } from '../utils/notify';
+import AdminDevicesSection from './AdminDevicesSection';
 
 const STATE_LABEL = {
   online: '🟢 Ulangan',
@@ -99,7 +100,17 @@ export default function AdminSyncSection() {
       {hub && up?.error && up.state !== 'online' && (
         <p className="text-xs font-bold text-amber-700 dark:text-amber-300 break-words">Bulut xatosi: {up.error}</p>
       )}
+      {!hub && (
+        <p className={`text-xs font-bold ${status.security?.installed === true ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}>
+          {status.security?.installed === true
+            ? "🔐 Server xavfsizligi yoqilgan: PIN serverda tekshiriladi, har bir xodim faqat ruxsat berilgan ma'lumotni ko'radi."
+            : status.security?.installed === false
+            ? "⚠️ Server xavfsizligi o'rnatilmagan: Supabase'da supabase/security.sql ni ishga tushiring (SUPABASE.md, 6-qadam)."
+            : '🔐 Server xavfsizligi tekshirilmoqda...'}
+        </p>
+      )}
       <p className="text-[11px] font-bold text-gray-400 break-all">Qurilma ID: {getDeviceId()}</p>
+      {!hub && status.security?.installed === true && <AdminDevicesSection status={status} />}
       <div className="flex flex-col sm:flex-row gap-3">
         <button
           type="button"

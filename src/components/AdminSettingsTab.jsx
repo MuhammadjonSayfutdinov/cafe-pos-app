@@ -50,11 +50,12 @@ const validateBackup = (data) => {
     }
     const withPins = users.filter(u => isPlainObject(u) && u.pin !== undefined);
     if (withPins.length > 0) {
+      // Eski fayllar: admin/omborchi - 6 xonali, qolganlar - 4 yoki (yangi) 6 xonali
       const badPin = withPins.some(u => {
-        const len = ['admin', 'warehouse'].includes(u.role) ? 6 : 4;
-        return !new RegExp(`^\\d{${len}}$`).test(String(u.pin));
+        const pattern = ['admin', 'warehouse'].includes(u.role) ? /^\d{6}$/ : /^(\d{4}|\d{6})$/;
+        return !pattern.test(String(u.pin));
       });
-      if (badPin) errors.push("Xodim PIN kodi formati noto'g'ri (admin/ombor 6, qolganlar 4 xonali)");
+      if (badPin) errors.push("Xodim PIN kodi formati noto'g'ri (admin/ombor 6, qolganlar 4 yoki 6 xonali)");
       const pins = withPins.map(u => String(u.pin));
       if (new Set(pins).size !== pins.length) errors.push("Ikki xodimda bir xil PIN kod bor");
     }

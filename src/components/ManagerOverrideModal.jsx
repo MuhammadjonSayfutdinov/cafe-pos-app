@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { findUserByPin, hasPin } from '../utils/pinHash';
-import { hasTwoFactor } from '../utils/twoFactor';
+import { hasPin } from '../utils/pinHash';
+import { verifyStaffPin } from '../sync/staffAuth';
 import TwoFactorCodeModal from './TwoFactorCodeModal';
 
 export default function ManagerOverrideModal({ 
@@ -56,6 +56,9 @@ export default function ManagerOverrideModal({
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
   // PIN to'g'ri, admin ikki bosqichli kirishni yoqqan: telefondagi kod kutilmoqda
   const [twoFactorAdmin, setTwoFactorAdmin] = useState(null);
+  // Kod serverda tekshiriladi (shu qurilmada admin siri yo'q): src/sync/staffAuth.ts
+  const [twoFactorCheck, setTwoFactorCheck] = useState(null);
+  const [checking, setChecking] = useState(false);
 
   // Blokirovka taymeri (5 marta xato terilganda 15 soniya kutish)
   useEffect(() => {
@@ -69,25 +72,45 @@ export default function ManagerOverrideModal({
   // ==========================================
   // 3. PAROLNI TEKSHIRISH MANTIG'I
   // ==========================================
-  const verifyPinCode = useCallback((pinToVerify) => {
-    if (lockoutSeconds > 0) return;
+  // Avval shu qurilmada, topilmasa serverda (admin bu qurilmada avval kirmagan bo'lsa)
+  const verifyPinCode = useCallback(async (pinToVerify) => {
+    if (lockoutSeconds > 0 || checking) return;
 
     const cleanPin = String(pinToVerify || '').trim();
     if (!cleanPin) return;
 
-    const validAdmin = findUserByPin(adminUsers, cleanPin);
+    const approverIds = new Set(adminUsers.map(a => String(a.id)));
+    setChecking(true);
+    let result;
+    try {
+      result = await verifyStaffPin({
+        users: adminUsers,
+        pin: cleanPin,
+        filter: u => approverIds.has(String(u.id)),
+        mode: 'verify',
+        group: 'management'
+      });
+    } finally {
+      setChecking(false);
+    }
 
-    if (validAdmin) {
+    if (result.ok) {
+      const validAdmin = result.user;
       setErrorMsg('');
       setFailedAttempts(0);
       setAdminPin('');
-      if (hasTwoFactor(validAdmin)) {
+      if (result.needCode) {
+        setTwoFactorCheck(() => result.checkCode || null);
         setTwoFactorAdmin(validAdmin);
         return;
       }
       if (typeof resolvedOnSuccess === 'function') {
         resolvedOnSuccess(validAdmin);
       }
+    } else if (result.reason !== 'wrong') {
+      setAdminPin('');
+      setErrorMsg(result.message);
+      if (Number(result.waitS) > 0) setLockoutSeconds(Math.ceil(Number(result.waitS)));
     } else {
       const nextAttempts = failedAttempts + 1;
       setFailedAttempts(nextAttempts);
@@ -101,7 +124,7 @@ export default function ManagerOverrideModal({
         setErrorMsg(`❌ Xato PIN-kod! Tasdiqlanmadi (${nextAttempts}/5)`);
       }
     }
-  }, [adminUsers, failedAttempts, lockoutSeconds, resolvedOnSuccess]);
+  }, [adminUsers, checking, failedAttempts, lockoutSeconds, resolvedOnSuccess]);
 
   // ==========================================
   // 4. RAQAMLAR KLAVIATURASI VA FIZIK KLAVIATURA
@@ -326,13 +349,18 @@ export default function ManagerOverrideModal({
           user={twoFactorAdmin}
           title={ownerOnly ? "👑 Ega tasdig'i: 2-bosqich" : "🛡️ Rahbar tasdig'i: 2-bosqich"}
           actionLabel={resolvedActionName}
+          checkCode={twoFactorCheck || undefined}
           onVerified={(admin) => {
             setTwoFactorAdmin(null);
+            setTwoFactorCheck(null);
             if (typeof resolvedOnSuccess === 'function') {
               resolvedOnSuccess(admin);
             }
           }}
-          onCancel={() => setTwoFactorAdmin(null)}
+          onCancel={() => {
+            setTwoFactorAdmin(null);
+            setTwoFactorCheck(null);
+          }}
           onAudit={onAudit}
         />
       )}

@@ -42,8 +42,17 @@ export interface SyncSession {
   offline?: boolean;
 }
 
+/** Serverning yozish javobi (supabase/security.sql -> pos_push_records / pos_push_kv) */
+export interface SecurePushResult {
+  ok: number;
+  rejected: { collection?: string; id?: string; key?: string; reason: string }[];
+  changed?: { collection: string; id: string; data: unknown }[];
+}
+
 export interface SyncTransport {
   kind: TransportKind;
+  /** Server xavfsizligini qo'llaydi (qurilma tasdig'i, PIN serverda): faqat Supabase */
+  secure?: boolean;
   /** Qaysi server va hisob: o'zgarsa, qurilma birinchi marta ulangandek to'liq sinxronlanadi */
   identity(): Promise<string>;
   getSession(): Promise<SyncSession | null>;
@@ -61,6 +70,10 @@ export interface SyncTransport {
   uploadPublicFile?(path: string, file: Blob): Promise<string>;
   /** Ombordagi fayllarni o'chirish (taom yoki rasm o'chirilganda) */
   removePublicFiles?(paths: string[]): Promise<void>;
+  /** Tanlangan to'plamlar va sozlamalarni to'liq olish */
+  fetchSome?(what: { collections?: string[]; kvKeys?: string[] }): Promise<{ records: RecordRow[]; kv: KvRow[] }>;
+  pushRecordsSecure?(rows: RecordRow[]): Promise<SecurePushResult>;
+  pushKvSecure?(rows: KvRow[]): Promise<SecurePushResult>;
 }
 
 /** Server qurilmani tanimadi (parol o'zgargan yoki qurilma uzilgan): qayta ulash kerak */

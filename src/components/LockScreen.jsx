@@ -2,8 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { getPinLockRemainingMs, registerPinFailure, resetPinGuard } from '../utils/pinGuard';
 import { CLOSED_ORDER_STATUSES } from '../constants/orderStatus';
 import { APP_BUILD, APP_BUILD_TIME } from '../pwa/update';
-import { findUserByPin } from '../utils/pinHash';
-import { hasTwoFactor } from '../utils/twoFactor';
+import { pinLengthOf } from '../utils/pinHash';
+import { verifyStaffPin } from '../sync/staffAuth';
 import TwoFactorCodeModal from './TwoFactorCodeModal';
 
 // Qurilmadagi dastur versiyasi: telefon va kompyuter bir xil versiyadami, solishtirish uchun
@@ -33,14 +33,30 @@ export default function LockScreen({
   const [selectedGroup, setSelectedGroup] = useState(null); // 'management' | 'staff' | null
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
-  // PIN to'g'ri, ikki bosqichli kirish yoqilgan xodim: Authenticator kodini kutyapmiz
-  const [twoFactorUser, setTwoFactorUser] = useState(null);
+  // PIN to'g'ri, ikki bosqichli kirish yoqilgan xodim: Authenticator kodini kutyapmiz.
+  // { user, pin, checkCode } - checkCode bo'lsa kod serverda tekshiriladi (shu qurilmada sir yo'q)
+  const [twoFactorState, setTwoFactorState] = useState(null);
+  const twoFactorUser = twoFactorState?.user || null;
+  // Server tekshiruvi kutilmoqda (internet sekin bo'lsa)
+  const [checking, setChecking] = useState(false);
   
   // Mijoz QR-Menyusi uchun Stol tanlash modali state'i
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [tableFilter, setTableFilter] = useState('free'); // 'free' (Bo'shlar) | 'all' (Barchasi)
 
-  const requiredPinLength = selectedGroup === 'management' ? 6 : 4;
+  // Yangi PIN'lar 6 xonali (6-bosqich, 2-qadam). Eski 4 xonali PIN'li xodim bo'lsa, u 4 raqamni terib
+  // "✓ Kirish" ni bosadi (avtomatik 4 da tekshirilmaydi: 6 xonali PIN'ning boshi bilan adashmasin)
+  const requiredPinLength = 6;
+  const isManagementUser = (u) => {
+    const role = String(u?.role || '').toLowerCase();
+    return role === 'admin' || role === 'warehouse' || role === 'omborchi';
+  };
+  const shortestPin = useMemo(() => {
+    const group = (Array.isArray(users) ? users : []).filter(u => u && (selectedGroup === 'management') === isManagementUser(u));
+    const lens = group.map(u => pinLengthOf(u, 6)).filter(n => n >= 4 && n < 6);
+    return lens.length ? Math.min(...lens) : 6;
+  }, [users, selectedGroup]);
+  const canSubmitShort = shortestPin < 6 && pin.length >= shortestPin && pin.length < requiredPinLength;
 
   // Xato urinishlar cheklovi (B6): 5 marta xato -> 30 soniya, keyin har safar 2 baravar
   const [lockRemainingMs, setLockRemainingMs] = useState(() => getPinLockRemainingMs(PIN_GUARD_SCOPE));
@@ -118,7 +134,7 @@ export default function LockScreen({
   };
 
   const handleNumberClick = (num) => {
-    if (isLocked || getPinLockRemainingMs(PIN_GUARD_SCOPE) > 0) return;
+    if (isLocked || checking || getPinLockRemainingMs(PIN_GUARD_SCOPE) > 0) return;
     if (pin.length >= requiredPinLength) return;
     const nextPin = pin + num;
     setPin(nextPin);
@@ -134,44 +150,69 @@ export default function LockScreen({
     setError('');
   };
 
-  const verifyPin = (enteredPin) => {
-    const safeUsers = Array.isArray(users) ? users : [];
-    const matchedUser = findUserByPin(safeUsers, enteredPin, u => {
-      const role = String(u.role || '').toLowerCase();
-      const isManagementRole = role === 'admin' || role === 'warehouse' || role === 'omborchi';
-      return selectedGroup === 'management' ? isManagementRole : !isManagementRole;
-    });
+  // Avval shu qurilmada (internetsiz ham), topilmasa serverda (src/sync/staffAuth.ts)
+  const verifyPin = async (enteredPin) => {
+    const group = selectedGroup;
+    setChecking(true);
+    let result;
+    try {
+      result = await verifyStaffPin({
+        users,
+        pin: enteredPin,
+        filter: u => (group === 'management' ? isManagementUser(u) : !isManagementUser(u)),
+        mode: 'login',
+        group
+      });
+    } finally {
+      setChecking(false);
+    }
 
-    if (matchedUser) {
+    if (result.ok) {
       resetPinGuard(PIN_GUARD_SCOPE);
-      if (hasTwoFactor(matchedUser)) {
+      const auth = { pin: enteredPin, group, serverVerified: result.source === 'server' };
+      if (result.needCode) {
         // PIN yolg'iz yetmaydi: telefondagi kod ham so'raladi (src/utils/twoFactor.ts)
-        setTwoFactorUser(matchedUser);
+        setTwoFactorState({ user: result.user, auth, checkCode: result.checkCode });
         setPin('');
         return;
       }
       if (typeof onLogin === 'function') {
-        onLogin(matchedUser);
+        onLogin(result.user, auth);
       }
       handleClosePinModal();
-    } else {
+      return;
+    }
+
+    if (result.reason === 'wrong' && !(Number(result.waitS) > 0)) {
+      // Qurilmadagi cheklov (server ham o'zi alohida cheklaydi)
       const { attemptsLeft, lockedMs } = registerPinFailure(PIN_GUARD_SCOPE);
       if (lockedMs > 0) {
         setLockRemainingMs(lockedMs);
         setError(`⛔️ Juda ko'p xato urinish! ${Math.ceil(lockedMs / 1000)} soniya kuting.`);
       } else {
-        setError(`❌ PIN-kod noto'g'ri! Yana ${attemptsLeft} ta urinish qoldi.`);
+        setError(result.attemptsLeft !== undefined
+          ? result.message
+          : `❌ PIN-kod noto'g'ri! Yana ${attemptsLeft} ta urinish qoldi.`);
       }
-      setTimeout(() => {
-        setPin('');
-      }, 400);
+    } else {
+      setError(result.message);
     }
+    setTimeout(() => {
+      setPin('');
+    }, 400);
   };
 
-  const handleTwoFactorVerified = (verifiedUser) => {
-    setTwoFactorUser(null);
+  const handleTwoFactorVerified = (verifiedUser, codeInfo) => {
+    const auth = twoFactorState?.auth || {};
+    setTwoFactorState(null);
     if (typeof onLogin === 'function') {
-      onLogin(verifiedUser);
+      onLogin(verifiedUser, {
+        ...auth,
+        code: codeInfo?.code || null,
+        codeKind: codeInfo?.kind || 'totp',
+        // Kod serverda tekshirilgan bo'lsa, server kirishni o'zi yozdi
+        serverVerified: Boolean(auth.serverVerified || twoFactorState?.checkCode)
+      });
     }
     handleClosePinModal();
   };
@@ -295,6 +336,7 @@ export default function LockScreen({
                 </h3>
                 <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">
                   {requiredPinLength} xonali maxfiy PIN-kodni kiriting
+                  {shortestPin < 6 ? ` (eski ${shortestPin} xonali PIN bo'lsa - "✓ Kirish")` : ''}
                 </p>
               </div>
               <button
@@ -326,6 +368,10 @@ export default function LockScreen({
             {isLocked ? (
               <p className="text-center text-xs font-bold text-red-500 mb-4">
                 ⛔️ Kirish vaqtincha bloklandi: {Math.ceil(lockRemainingMs / 1000)} soniya kuting
+              </p>
+            ) : checking ? (
+              <p className="text-center text-xs font-bold text-gray-500 dark:text-gray-400 mb-4">
+                🔄 Server tekshirmoqda...
               </p>
             ) : error && (
               <p className="text-center text-xs font-bold text-red-500 mb-4 animate-bounce">
@@ -371,6 +417,17 @@ export default function LockScreen({
               </button>
             </div>
 
+            {shortestPin < 6 && (
+              <button
+                type="button"
+                disabled={!canSubmitShort || checking || isLocked}
+                onClick={() => verifyPin(pin)}
+                className="mt-3 w-full h-12 rounded-2xl bg-brand-600 hover:bg-brand-700 disabled:opacity-40 text-white font-bold text-sm transition active:scale-95"
+              >
+                ✓ Kirish ({shortestPin} xonali eski PIN)
+              </button>
+            )}
+
           </div>
         </div>
       )}
@@ -379,8 +436,9 @@ export default function LockScreen({
         <TwoFactorCodeModal
           user={twoFactorUser}
           title={selectedGroup === 'management' ? '👔 Boshqaruv: 2-bosqich' : '🔐 Ikkinchi bosqich'}
+          checkCode={twoFactorState?.checkCode}
           onVerified={handleTwoFactorVerified}
-          onCancel={() => setTwoFactorUser(null)}
+          onCancel={() => setTwoFactorState(null)}
           onAudit={onAudit}
         />
       )}

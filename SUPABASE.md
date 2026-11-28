@@ -35,6 +35,8 @@ bitta bazaga ulashni tushuntiradi. Sozlanmasa ham dastur avvalgidek bitta qurilm
    rasmlarni hamma ko'ra oladi (mijoz menyusi uchun), yuklash va o'chirish faqat ulangan qurilmadan.
    Tekshirish: chap menyu **Storage** → `menu-images` papkasi ko'rinadi. Ishga tushirilmasa, admin
    rasm qo'shganda "Rasm ombori yo'q: supabase/storage.sql ni ishga tushiring" xabari chiqadi.
+6. Server xavfsizligi uchun: yana **New query**, [`supabase/security.sql`](supabase/security.sql) → **Run**
+   ("Success. No rows returned"). Nima qilishi va tartibi: pastda "6. Server xavfsizligi".
 
 ## 3. Kafe hisobini yarating va ro'yxatdan o'tishni yoping (MUHIM)
 
@@ -90,6 +92,41 @@ Planshet va telefonlar dasturni oddiy havola orqali ochishi uchun:
 
 GitHub'ga yangi commit push qilinganda Vercel saytni avtomatik yangilaydi.
 
+## 6. Server xavfsizligi (`security.sql`)
+
+Shu fayl ishga tushirilgach:
+
+- **Yangi qurilma tasdiqlanadi.** Kafe hisobiga (email + parol) ulangan yangi qurilmada "🔐 Qurilma tasdiqlanmagan"
+  oynasi chiqadi: Ega yoki "Tizim sozlamalari" huquqli admin shu yerda PIN'ini kiritadi (qurilmaga nom beradi) yoki
+  boshqa qurilmada Boshqaruv → Tizim sozlamalari → **📱 Qurilmalar** → ✅ Tasdiqlash. Tasdiqlanmagan qurilma hech
+  narsa o'qiy olmaydi va yoza olmaydi: kafe paroli tarqalib ketsa ham ma'lumot himoyalangan. Yo'qolgan planshetni
+  shu ro'yxatda **⛔️ Bloklash** mumkin (undagi maxfiy ma'lumot o'chadi).
+- **PIN va Authenticator siri faqat serverda.** Xodimlar ro'yxatida endi PIN xeshi yo'q, PIN serverda tekshiriladi:
+  5 marta xato - qurilma 30 soniya, keyin har safar 2 baravar ko'proq (15 daqiqagacha) bloklanadi. Internetsiz kirish:
+  qurilma faqat o'zida (internet bor paytda) kirgan xodimlarning PIN'ini eslab qoladi (30 kun).
+- **Har bir xodim faqat o'ziga ruxsat berilgan ma'lumotni ko'radi.** Mijozlar (telefon raqamlari), xarajatlar,
+  smenalar, ombor tarixi va audit jurnali ofitsiant, oshpaz va kuryer qurilmasiga umuman kelmaydi; kassirga - mijoz,
+  xarajat va smena; adminga - huquqlariga qarab (Ega - hammasi). Xodim chiqqach bu ma'lumot qurilmadan o'chadi.
+- **O'zgartirish huquq bo'yicha.** Xodimlar, taom narxi va sozlamalarni faqat huquqi bor admin o'zgartiradi (oshxona
+  faqat "tugadi" belgisini qo'yadi), audit jurnaliga faqat yoziladi (tozalash - faqat Ega), taom rasmini faqat
+  "Taomlar" huquqli admin yuklaydi. Ruxsat yo'q o'zgarish sarlavhada `⏸ Kutmoqda` bo'lib turadi: huquqi bor xodim
+  shu qurilmada internet bilan kirsa, o'zi qayta yuboriladi (yoki Tizim sozlamalarida "Voz kechish").
+- **Yangi PIN - 6 xonali** (hamma uchun). Eski 4 xonali PIN'lar ishlayveradi: kirish oynasida 4 raqamni terib
+  "✓ Kirish" bosiladi.
+
+**Tartib (muhim):**
+
+1. Avval dasturning yangi versiyasi barcha qurilmalarga yetib borsin: `master` ga push → Vercel joylaydi →
+   qurilmalar 5 daqiqa ichida o'zi yangilanadi (kirish oynasining pastidagi versiya hamma qurilmada bir xil bo'lsin).
+2. Keyin `security.sql` ni ishga tushiring. Shu paytda ulangan barcha qurilmalar avtomatik **ishonchli** bo'ladi.
+3. Har bir qurilmada xodimlar bir marta chiqib, PIN bilan qayta kirsin (sarlavhada `🔑 Qayta kiring` chiqsa - bosing):
+   server ularning rolini shunda biladi.
+4. Tekshirish: Boshqaruv → Tizim sozlamalari → "☁️ Bulut sinxronlash" da yashil
+   **"🔐 Server xavfsizligi yoqilgan"** va pastda "📱 Qurilmalar" ro'yxati.
+
+Eski versiyadagi qurilma (yangilanmagan) `security.sql` dan keyin yoza olmaydi (sarlavhada `📴 Oflayn`): sahifani
+yangilang. `schema.sql`, `qr.sql`, `storage.sql` ni keyin qayta ishga tushirish xavfsizlikni bekor qilmaydi.
+
 ## Mijoz telefonidan QR-buyurtma
 
 1. Admin → Tizim Sozlamalari → "🖨️ QR stikerlar" (yoki ofitsiant ekranidagi 📱) → chop eting va stolga yopishtiring.
@@ -123,7 +160,7 @@ GitHub'ga yangi commit push qilinganda Vercel saytni avtomatik yangilaydi.
 Mijozga faqat sotuvdagi taomlar nomi va narxi ko'rinadi. Xodimlar, PIN kodlar, mijozlar ro'yxati va boshqa
 stollarning buyurtmalari ko'rinmaydi.
 
-## 6. Pilot oldidan tekshiruv ro'yxati
+## 7. Pilot oldidan tekshiruv ro'yxati
 
 - [ ] Admin va barcha xodimlarning PIN kodlari almashtirilgan ("Xodimlar va Parollar")
 - [ ] Menyu, narxlar, stollar va kategoriyalar kiritilgan
@@ -133,6 +170,8 @@ stollarning buyurtmalari ko'rinmaydi.
 - [ ] Telefondan "🔔 Ofitsiant" bosildi → kassa/ofitsiant ekranida qizil chaqiruv chiqdi
 - [ ] "🛡️ QR-buyurtma himoyasi": kafe joylashuvi kiritilgan, "Faqat kafe ichidan" yoqilgan (ixtiyoriy)
 - [ ] Har bir qurilma ulangan, sarlavhada `☁️ Bulut` belgisi ko'rinadi
+- [ ] `supabase/security.sql` ishga tushirilgan; "📱 Qurilmalar" da barcha qurilmalar 🟢 va nomlangan; yangi
+  qurilma (masalan, boshqa brauzer) ulanganda tasdiqlash oynasi chiqdi
 - [ ] Sinov: ofitsiant planshetidan buyurtma → oshxona ekranida chiqdi → kassada to'landi
 - [ ] Sinov: Wi-Fi o'chirildi → buyurtma berildi (`📴 Oflayn`) → Wi-Fi yoqildi → boshqa qurilmaga yetib keldi
 - [ ] Har kuni ish oxirida zaxira nusxa: Boshqaruv → Tizim Sozlamalari → zaxira nusxani yuklab olish
@@ -142,14 +181,17 @@ stollarning buyurtmalari ko'rinmaydi.
 - **QR-buyurtma ofitsiant tasdig'idan o'tadi.** Mijoz telefonidan kelgan buyurtma ofitsiant/kassir/admin
   ekranida "📱 QR-buyurtma" bo'lib chiqadi va "Qabul qilish" bosilgandan keyingina oshxonaga tushadi.
   Bitta stoldan daqiqasiga 3 tadan ortiq so'rov qabul qilinmaydi. Narx telefondan emas, serverdagi menyudan olinadi.
-- **PIN tekshiruvi qurilmada** bajariladi (internetsiz ham kirish uchun). PIN'lar ochiq matnda emas, xesh
-  ko'rinishida saqlanadi (`src/utils/pinHash.ts`). Lekin 4-6 xonali PIN'da variant oz: bulutdagi ma'lumotni
-  o'qiy olgan odam xeshni terib topishi mumkin. Shuning uchun asosiy himoya - ro'yxatdan o'tish yopiq
-  bo'lishi (3-qadam). Ulangan qurilmani qo'lga kiritgan odam ma'lumotlarni ko'ra oladi: planshetlarni qulflang.
+- **PIN tekshiruvi** (`security.sql` dan keyin): serverda; internetsiz - qurilmada, faqat shu qurilmada avval
+  (internet bilan) kirgan xodimlar uchun. Qurilmadagi PIN keshini terib topish mumkin (6 xonali PIN'da 1 000 000
+  variant), shuning uchun planshetlarni qulflang va yo'qolganini "📱 Qurilmalar" da bloklang. `security.sql`
+  bo'lmasa - PIN avvalgidek faqat qurilmada tekshiriladi va xeshlar bulutdagi xodimlar ro'yxatida turadi.
 - **Ikki bosqichli kirish (admin):** Admin → "Xodimlar va Parollar" → "🔐 Ikki bosqichli kirishni yoqish".
   Shundan keyin PIN'dan keyin telefondagi Authenticator kodi so'raladi (kirish, avto-qulf, rahbar tasdig'i).
-  Kod ham qurilmada tekshiriladi (internetsiz ham ishlaydi), sir xodimlar ro'yxati bilan bulutda turadi:
-  PIN'ni bilib olgan xodimdan himoya qiladi, bazani o'qiy olgan odamdan emas. Zaxira faylga sir yozilmaydi.
+  `security.sql` dan keyin sir faqat serverda (va admin o'zi kirgan qurilmada) turadi, kod serverda tekshiriladi.
+  Zaxira faylga sir yozilmaydi.
+- **Bir xil qurilmada bir nechta xodim:** server qurilmaga oxirgi kirgan xodimning ruxsatini beradi. Internetsiz
+  kirgan xodim serverga internet qaytganda bildiriladi; shu orada uning "faqat admin" o'zgarishlari `⏸ Kutmoqda`
+  bo'lib turadi.
 - **PIN xeshiga o'tish:** yangi versiya ochilganda eski ochiq PIN'lar o'zi xeshga o'tadi. Shundan keyin
   eski versiyada qolgan qurilmada xodimlar kira olmaydi. Qurilmalar yangi versiyaga o'zi o'tadi (avtomatik
   yangilanish); o'tmagan bo'lsa, sahifani yangilang.
@@ -173,7 +215,10 @@ stollarning buyurtmalari ko'rinmaydi.
 | Doim `📴 Oflayn` | Internetni tekshiring. Supabase loyihasi uxlab qolgan bo'lishi mumkin (Dashboard → Restore) |
 | Boshqa qurilmaga o'zgarish kelmayapti | SQL'dagi 5-qism (Realtime) bajarilganini tekshiring. Belgini bosing: "Hozir sinxronlash" |
 | Qurilmani boshqa kafe hisobiga ulash kerak | Tizim Sozlamalari → "Qurilmani bulutdan uzish" |
-| Admin telefoni ham, zaxira kodlari ham yo'qoldi | Boshqa admin: "Xodimlar va Parollar" → shu admin kartasida "O'chirish (tiklash)". Yagona admin bo'lsa: Supabase → SQL Editor → `update public.pos_records set data = data - 'twoFactor', updated_by = 'sql' where collection = 'pos_users' and data ? 'twoFactor';` → Run. Bir daqiqadan keyin admin faqat PIN bilan kiradi va telefonni qayta ulaydi |
+| Admin telefoni ham, zaxira kodlari ham yo'qoldi | Boshqa admin: "Xodimlar va Parollar" → shu admin kartasida "O'chirish (tiklash)". Yagona admin bo'lsa: Supabase → SQL Editor → `update public.pos_staff_secrets set two_factor = null, two_factor_at = (extract(epoch from now()) * 1000)::bigint where two_factor is not null; update public.pos_records set data = public.pos_public_user(id, data), updated_by = 'sql' where collection = 'pos_users';` → Run. Bir daqiqadan keyin admin faqat PIN bilan kiradi va telefonni qayta ulaydi. (`security.sql` o'rnatilmagan bo'lsa: `update public.pos_records set data = data - 'twoFactor', updated_by = 'sql' where collection = 'pos_users' and data ? 'twoFactor';`) |
+| "🔐 Qurilma tasdiqlanmagan" | Ega yoki admin shu oynada PIN'ini kiritadi, yoki boshqa qurilmada Tizim sozlamalari → 📱 Qurilmalar → ✅ Tasdiqlash. Oyna 15 soniyada o'zi yangilanadi |
+| Barcha qurilmalar bloklandi / Ega PIN'ini unutdi | Supabase → SQL Editor. Qurilmalarni ochish: `update public.pos_devices set status = 'trusted' where status = 'revoked';`. Ega PIN'ini almashtirish (`'1'` - Ega id si, `'123456'` - yangi PIN): `update public.pos_staff_secrets set pin_hash = public.pos_make_pin_hash('123456'), pin_length = 6, pin_set_at = (extract(epoch from now()) * 1000)::bigint where user_id = '1'; update public.pos_records set data = public.pos_public_user(id, data), updated_by = 'sql' where collection = 'pos_users';` → Run, keyin darhol yangi PIN'ni dasturda o'zgartiring |
+| Sarlavhada `⏸ Kutmoqda (n)` | Server bu o'zgarishni qabul qilmadi (ruxsat yo'q). Huquqi bor xodim shu qurilmada internet bilan kirsa, o'zi yuboriladi. Ro'yxat va "Voz kechish": Tizim sozlamalari → Bulut sinxronlash |
 
 ## Dasturchilar uchun: avtomatik sinov
 

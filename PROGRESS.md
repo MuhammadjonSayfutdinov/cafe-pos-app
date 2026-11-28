@@ -1,6 +1,6 @@
 # PROGRESS — cafe-pos-app
 
-Oxirgi yangilanish: 2026-11-27
+Oxirgi yangilanish: 2026-11-28
 Joriy bosqich: **pilot**. 3-bosqich (Supabase) va 4-bosqichning asosiy funksiyalari `tortinchi-bosqich` branch'ida. Sozlash: `SUPABASE.md`.
 
 > Bu fayl Claude uchun yozilgan. Barcha kodni faqat Claude yozadi (Gemini ishlatilmaydi).
@@ -42,6 +42,17 @@ Ixtiyoriy tekshiruv: commit havolasini `.diff` bilan yuborsa, Claude faqat o'zga
 `https://github.com/MuhammadjonSayfutdinov/cafe-pos-app/commit/<hash>.diff`
 
 ## Joriy vazifa
+
+**Server xavfsizligi (6-bosqich, 2-qadam, foydalanuvchi tanlovi "B", 2026-11-28):** bajarildi (kod `master` da).
+Yangi fayl `supabase/security.sql`: ishonchli qurilmalar (yangi qurilma Ega/admin PIN'i yoki "📱 Qurilmalar"
+ro'yxati bilan tasdiqlanadi, bloklash mumkin), PIN va Authenticator siri faqat serverda (`pos_staff_secrets`),
+PIN serverda tekshiriladi (5 xato - blok), rol bo'yicha o'qish (RLS) va yozish (`pos_push_records/kv`) qoidalari,
+rasm yuklash faqat "Taomlar" huquqli adminga, yangi PIN - 6 xonali. Batafsil: pastda "6-bosqich", 2-qadam va
+"Qarorlar". **Foydalanuvchi qilishi kerak:** yangi versiya barcha qurilmalarga yetgach (versiya bir xil),
+Supabase'da `supabase/security.sql` ni ishga tushirish; har qurilmada xodimlar bir marta chiqib qayta kirishi;
+"📱 Qurilmalar" ga nom berish (SUPABASE.md, 6-bo'lim). Navbatdagi ish: foydalanuvchi tanlaydi (A: yorug' rejim,
+chap menyu, buyurtma turi, promo-kod; C: pul/chegirma/bonus/ombor hisobi tekshiruvlari; 2-qadamning qolgani:
+xodimga smena boshida Telegram kodi, admin passkey, shubhali amallar hisoboti, chegirma chegarasi rol bo'yicha).
 
 **Ega va admin huquqlari (foydalanuvchi so'rovi, 2026-11-27, 7-bosqich rejasidan oldin):** admin tayinlagan ikkinchi
 admin asosiy adminni o'chira olardi (B34). Endi Telegram guruhidagi kabi 👑 Ega: uni hech kim o'zgartira olmaydi, Ega
@@ -88,7 +99,10 @@ qilma va eslatma. Davom ettirilganda: kafeda sinash - kassa kompyuterida `MAHALL
 Keyin pilot natijasiga qarab: Click/Payme, fiskal chek, Vitest, TypeScript'ga o'tishni davom ettirish
 (navbatdagi: `src/sync/engine.js`, `src/utils/dates.js`, `inventoryCalc.js`, keyin komponentlar `.tsx`).
 Mahalliy server uchun keyingi qadamlar: server o'chsa ham sahifa ochilishi (https yoki o'rnatiladigan ilova),
-serverni avtomatik yangilash.
+serverni avtomatik yangilash. `security.sql` dan keyin server bulutga to'g'ridan-to'g'ri yoza olmaydi va xodim
+yozuvlari PIN xeshisiz keladi: davom ettirilganda `server/upstream-adapters.mjs` ni `pos_push_records/kv` ga o'tkazish,
+server sessiyasini "📱 Qurilmalar" da tasdiqlash va `pos_devices.full_access = true` qilish (hamma ma'lumot), hub
+qurilmalari uchun PIN tekshiruvini serverga (hub orqali) ulash kerak.
 Kichik ishlar (istalgan vaqtda): `barcha-kodlar.txt` (eskirgan kod nusxasi) va `preview.html` kerakmi, ko'rib chiqish.
 
 ## Vazifa → kerakli fayllar
@@ -104,6 +118,7 @@ Qator raqamlari 2026-10-26 holatiga ko'ra, kod o'zgargach siljiydi.
 | 4 Xavfsizlik (B5, B6) | `LockScreen.jsx`, `ManagerOverrideModal.jsx`, `AdminSettingsTab.jsx`: `handleExportBackup` (254), `handleImportBackup` (284), `handleClearOrdersOnly` (318) |
 | 5 Dozakaz va bo'lish (B3, B9) | `App.jsx`: `handleOrderSubmit`, `handleUpdateStatus` (366), `handleSplitOrder`. `KitchenMode.jsx`, `WaiterTableGrid.jsx` |
 | Ega va huquqlar (B34-B40) | Mantiq: `src/utils/adminRights.ts`, `src/utils/pinRules.ts` (tekshiruv: `npm run test:access`). `App.jsx` (`requireAdminOverride`, `requireOwnerConfirm`, `handleChangePinRules`, menyu va ekranlar), `AdminUsersTab.jsx`, `AdminRightsModal.jsx`, `PinRulesPanel.jsx`, `ManagerOverrideModal.jsx`. PIN qoidasi kalitlari: `WaiterMode`, `CashierMode`, `KitchenMode`, `WarehouseStockTab`, `WarehouseHistoryTab`, `AdminSettingsTab` |
+| Server xavfsizligi (6-bosqich, 2-qadam) | SQL: `supabase/security.sql` (sinov: `npm run test:sql`, `scripts/sql-test/`). Ilova: `src/sync/engine.js` (8-band: `deviceHello`, `applyDeviceState`, `purgeHidden`, `loadIncomplete`, `holdOps`/`retryHeld`), `src/sync/staffAuth.ts` (`verifyStaffPin`, `ensureServerLogin`, `serverLogout`, qurilmalar), `src/utils/verifierCache.ts`, `supabaseTransport.js` (`pushRecordsSecure`, `fetchSome`). Ekran: `DeviceApprovalScreen.jsx`, `AdminDevicesSection.jsx`, `ServerSessionHint.jsx`, `LockScreen.jsx`, `TwoFactorCodeModal.jsx` (`checkCode`), `ManagerOverrideModal.jsx`, `AutoLockControl.jsx`, `WaiterMode.jsx` (admin PIN), `AdminUsersTab.jsx`. Tekshiruv: `npm run test:security` |
 | 7 Oshxona oqimi (B19-B33) | Mantiq: `src/utils/kitchenFlow.ts` (tekshiruv: `npm run test:kitchen`). Ekran: `KitchenMode.jsx`, `KitchenRejectModal.jsx`, `KitchenNoticesPanel.jsx`. Ofitsiant: `WaiterMode.jsx` (`applyToCurrentOrder`, `handleSubmitOrder`, `handleMarkAsDelivered`, `handleConfirmSplit`), `WaiterCart.jsx`, `WaiterTableGrid.jsx`. Kassa: `CashierMode.jsx` (`handlePaymentSubmit`, `handleDeleteOrder`) |
 
 ## Ma'lum xatolar
@@ -215,8 +230,8 @@ Manba: foydalanuvchi xabari (admin tayinlagan ikkinchi admin asosiy adminni o'ch
 - [x] Faqat Ega (Ega PIN'i bilan): zaxiradan tiklash, zavod holati, audit jurnalini tozalash, Telegram sozlamasi (B39)
 - [x] O'chirilgan xodim boshqa qurilmada ham darhol chiqariladi, huquq o'zgarsa darhol kuchga kiradi (B37);
   band PIN javobi kimniki ekanini aytmaydi va urinishlar cheklangan (B38)
-- [ ] Serverda tekshirish (RLS): hozir tekshiruv qurilmada - bazaga to'g'ridan-to'g'ri yoza oladigandan himoya
-  6-bosqich, 2-qadamda ("PIN serverda", rol bo'yicha RLS)
+- [x] Serverda tekshirish (RLS): `supabase/security.sql` - xodim yozuvini kim o'zgartirishi (Ega, tayinlagan admin,
+  huquqlar), sozlamalar, menyu narxi, audit jurnali serverda tekshiriladi (6-bosqich, 2-qadam)
 
 ### 7-bosqich. Oshxona va buyurtma oqimi (foydalanuvchi so'rovi, 2026-11-27)
 Manba: foydalanuvchi xabari (oshxonada belgilanganlar emas, hamma taom tayyor bo'lib ketadi; oshxona uchun
@@ -281,14 +296,24 @@ Tartib: xavfsizlik yangi eshiklardan (mijoz ilovasi, kiosk) OLDIN.
    - [ ] Yorug' rejimni Dribbble uslubida pardozlash, admin/kassa uchun chap menyu
    - [ ] Buyurtma turi bitta joyda (zalda / olib ketish / yetkazish), qoralamalar ro'yxati, promo-kod/kupon
 2. Xavfsizlik poydevori
-   - [ ] Har bir xodim va qurilmaga alohida server hisobi, ishonchli qurilmalar, qurilma ulash kodi
-   - [ ] PIN serverda tekshiriladi, 6 xonali PIN; rol bo'yicha RLS (ofitsiant hisobotni o'qimaydi)
+   - [x] Ishonchli qurilmalar (2026-11-28, `supabase/security.sql`): har bir ulangan brauzer sessiyasi alohida
+     qurilma (`pos_devices`, JWT `session_id`). Yangi qurilma "tasdiqlanmagan": Ega yoki "Tizim sozlamalari" huquqli
+     admin shu qurilmada PIN'ini kiritadi (ulash kodi o'rniga) yoki "📱 Qurilmalar" ro'yxatida tasdiqlaydi; bloklash
+     (qurilmadagi maxfiy ma'lumot va PIN keshi o'chadi), nom berish. Fayl birinchi ishga tushganda ulangan qurilmalar
+     ishonchli; yangi kafe - birinchi qurilma 1 soat to'liq huquqli. Xodimning server hisobi = qurilmadagi server
+     sessiyasi (PIN bilan kirganda yoziladi, 12 soat, faol bo'lsa uzayadi), alohida Supabase hisoblari ochilmadi
+   - [x] PIN serverda tekshiriladi (`pos_pin_check`: 5 xato - 30 s, keyin 2 baravar, 15 daqiqagacha; tasdiqlanmagan
+     qurilmalardan umumiy cheklov), Authenticator kodi va zaxira kod ham serverda. Xesh va sir xodimlar ro'yxatidan
+     olindi (`pos_staff_secrets`). Internetsiz: faqat shu qurilmada avval kirgan xodim (`src/utils/verifierCache.ts`).
+     Yangi PIN - 6 xonali (hamma rol), eski 4 xonali ishlaydi ("✓ Kirish"). Rol bo'yicha RLS: mijozlar, xarajatlar,
+     smenalar, ombor tarixi, audit - faqat ruxsati borlarga (ofitsiant/oshpaz/kuryer ko'rmaydi)
    - [x] Admin: PIN + Authenticator (TOTP), 10 ta zaxira kod; kod kirishda, avto-qulfda va xavfli amalda
      (rahbar tasdig'i, ofitsiant ekranidagi admin tasdig'i) so'raladi. `src/utils/totp.ts`, `twoFactor.ts`,
      `TwoFactorCodeModal.jsx`, `TwoFactorSetupModal.jsx`; yoqish: Admin → Xodimlar va Parollar
    - [ ] Xodim: PIN + smena boshida Telegram bot kodi (2 bosqich). Admin uchun 3-bosqich: passkey/barmoq izi
-   - [ ] Shubhali amallar hisoboti Telegramga, chegirma chegarasi rol bo'yicha, jurnal o'chirilmaydi
-   - [ ] Rasm yuklashni faqat adminga cheklash (hozir: har qanday ulangan qurilma)
+   - [ ] Shubhali amallar hisoboti Telegramga, chegirma chegarasi rol bo'yicha (jurnalga endi faqat qo'shiladi:
+     o'zgartirish/o'chirish - faqat Ega, serverda)
+   - [x] Rasm yuklashni faqat adminga cheklash: ishonchli qurilmada "Taomlar" huquqli admin (`pos_storage_write_ok`)
 3. Mijoz ilovasi (mijoz eshigi)
    - [ ] Telefonni tasdiqlash: kafening o'z Telegram boti (bepul), "📱 Raqamimni yuborish" tugmasi
      (request_contact; contact.user_id == from.id tekshiriladi). Ilova bir martalik token bilan
@@ -358,6 +383,10 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | Admin huquqlari | `user.adminRights` (14 ta boolean) va `user.appointedBy`. Yangi admin: Telegram kabi ko'pi ochiq, "Yangi admin tayinlash" va "PIN himoyasini boshqarish" yopiq. Huquqi yozilmagan eski admin: avvalgidek barcha bo'limlar + tasdiqlash (yangilanishda hech kim ishsiz qolmasin). Admin o'zida yo'q huquqni bera olmaydi, faqat o'zi tayinlagan adminni o'zgartiradi. "Boshqaruv" ekrani har adminga ochiq: u yerda o'z PIN'i, ikki bosqichli kirishi va PIN himoyasi ro'yxati (o'qish) | qabul qilindi |
 | PIN himoyasi har amal uchun | KV `pos_pin_rules` (11 ta amal). Yozilmagan amal: avval umumiy tugma bilan himoyalangan bo'lsa - eski `pos_override_enabled` qiymati, yangi amal (qarz, rad etish, ombor chiqimi, mahsulotni o'chirish) - o'chiq: yangilanishdan keyin ish o'zgarmaydi. `pos_override_enabled` eski versiyadagi qurilmalar uchun "kamida bitta amal himoyalangan" deb yoziladi. Tasdiqlaydi: Ega va "tasdiqlash" huquqli admin (o'zlari bajarganda PIN so'ralmaydi). Faqat Ega amallari Ega PIN'i (+ Authenticator) bilan | qabul qilindi |
 | Tekshiruvlar (Vitest) | Foydalanuvchi ruxsati bilan (2026-11-28). Vitest 4.1 (5-versiya Node 22.12+ talab qiladi, 4.1 Node 20 da ham ishlaydi). Alohida `vitest.config.js`: asosiy vite.config.js dagi PWA/versiya plaginlari tekshiruvga aralashmaydi. Faqat mantiq (src/utils, src/sync, src/qr), node muhitida. O'rnatishda npm ichki xatosi (`edgesOut`) - bir marta `--legacy-peer-deps` bilan o'rnatildi; lockfile bilan oddiy `npm install` / `npm ci` flagsiz ishlaydi (tekshirildi) | qabul qilindi |
+| Server xavfsizligi (security.sql) | Qurilma = Supabase sessiyasi (JWT `session_id`): kafe hisobi bitta qoladi, qurilmalar ro'yxati va tasdiq serverda. Xodim ruxsati = qurilma yozuvidagi `staff_*` (PIN serverda to'g'ri bo'lganda yoziladi), RLS va yozish qoidalari shundan. Alohida xodim hisoblari (Supabase Auth) ochilmadi: oflayn ishlash va bitta qurilmada ko'p xodim uchun. Yozish faqat `pos_push_records/kv` (security definer, har qator: rad etilgani javobda, navbat to'xtamaydi); jadvalga to'g'ridan-to'g'ri yozish yopiq. Ish jarayoni yozuvlari (chek, chaqiruv, ombor, xarajat, mijoz, smena) har qanday ishonchli qurilmadan qabul qilinadi (oflayn navbat boshqa xodim kirgandan keyin yuborilishi mumkin); xodimlar - huquq bo'yicha (`pos_user_write_reason`, adminRights.ts bilan bir xil), menyu - "Taomlar"/"Ombor" (boshqalar faqat `is_available`), audit - faqat qo'shish, chekni o'chirish - "Tizim sozlamalari", KV - kalit bo'yicha (`pos_kv_write_reason`). Yangi qurilma tashqi kalitni ham ko'rmaydi (`'*'`). Eski versiyadagi qurilma fayldan keyin yoza olmaydi (avval versiya, keyin SQL) | qabul qilindi |
+| PIN va sir serverda | Server push paytida xodim yozuvidan `pinHash`/`pin`/`twoFactor` ni `pos_staff_secrets` ga oladi va belgilar qo'yadi (`pinOn`, `pinLength`, `pinSetAt`, `pinSample`, `twoFactorOn`, `twoFactorAt`, `backupCodesLeft`), qurilmaga o'zgartirilgan yozuv `changed` bilan qaytadi. PIN faqat `pinSetAt` serverdagidan katta bo'lsa (yoki PIN yo'q bo'lsa) almashadi: keshdagi eski xesh PIN'ni qaytara olmaydi (`withPin` -> `nextPinSetAt`). 2FA ham `twoFactorAt` bilan (o'chirish: `twoFactor: null` + yangi vaqt). PIN bandligi - `pos_pin_available` (10 urinish / 10 daqiqa) | qabul qilindi |
+| Internetsiz kirish (PIN keshi) | Qurilma faqat o'zida serverda kirgan xodimning tekshiruv ma'lumotini saqlaydi (`cafe_pin_cache`, `pos_` emas - favqulodda nusxaga tushmaydi), dvigatel uni xodim yozuviga qo'shadi (yuborilmaydi), shuning uchun eski `checkPin/findUserByPin` o'zgarmadi. Kesh eskiradi: yozuvdagi `pinSetAt`/`twoFactorAt` farq qilsa yoki 30 kun shu qurilmada kirilmasa. Yangilanishdan oldingi qurilmada xeshlar bir marta keshga ko'chiriladi (`cafe_pin_cache_seeded`). Qurilmada tekshirilgan kirish orqa fonda serverga bildiriladi (`ensureServerLogin`); server "noto'g'ri" desa - xodim chiqariladi | qabul qilindi |
+| Ruxsat o'zgarganda qurilmadagi ma'lumot | Yashirin bo'lgan to'plam qurilmadan o'chadi (yuborilmagan/rad etilgan yozuvlar qoladi) va `incomplete` deb belgilanadi; ochilganda to'liq yuklanadi (`fetchSome`). Chiqishda `pos_staff_logout`. Bloklangan qurilma: barcha to'plamlar, Telegram/QR siri va PIN keshi o'chadi | qabul qilindi |
 | TypeScript | Bosqichma-bosqich: `allowJs`, faqat `.ts` fayllar strict tekshiriladi. Yangi util/modul `.ts` da. Komponentlar keyinroq (`@types/react` kerak bo'ladi) | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
@@ -397,6 +426,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | 28 | Kassada mijozga qaytarish: pul, xarajat, ombor (7-bosqich, 3-qism, 5-qadam) | "7: kassada mijozga pul qaytarish..." commiti | [x] |
 | 29 | Olib ketish: bir vaqtda bir nechta ochiq chek (7-bosqich, 3-qism, 6-qadam) | "7: olib ketish uchun bir nechta ochiq chek..." commiti | [x] |
 | 30 | Vitest: tekshiruvlar tests/ papkasida (7-bosqich, 3-qism, 7-qadam) | "7: Vitest..." commiti | [x] |
+| 31 | Server xavfsizligi: ishonchli qurilmalar, PIN serverda, rol bo'yicha RLS, 6 xonali PIN (6-bosqich, 2-qadam) | "6: server xavfsizligi..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

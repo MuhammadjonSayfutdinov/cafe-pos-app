@@ -18,7 +18,9 @@
     "test:merge": "vitest run tests/merge-order",
     "test:stations": "vitest run tests/kitchen-stations",
     "test:refund": "vitest run tests/refunds",
-    "test:takeaway": "vitest run tests/takeaway"
+    "test:takeaway": "vitest run tests/takeaway",
+    "test:security": "vitest run tests/security tests/sync-security",
+    "test:sql": "bash scripts/sql-test/run.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

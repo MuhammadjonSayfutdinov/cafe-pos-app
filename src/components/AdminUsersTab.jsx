@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { notify, confirmAsync } from '../utils/notify';
 import { newId } from '../utils/ids';
-import { ROLE_OPTIONS, TITLE_SUGGESTIONS, getRequiredPinLength } from '../constants/roles';
+import { ROLE_OPTIONS, TITLE_SUGGESTIONS, getRequiredPinLength, minKeptPinLength } from '../constants/roles';
 import { findPinOwner, hasPin, pinLengthOf, withPin } from '../utils/pinHash';
-import { BACKUP_CODE_COUNT, backupCodesLeft, hasTwoFactor, stripTwoFactor, withTwoFactor } from '../utils/twoFactor';
+import { BACKUP_CODE_COUNT, backupCodesLeft, disableTwoFactor, hasTwoFactor, withTwoFactor } from '../utils/twoFactor';
+import { isPinFreeOnServer } from '../sync/staffAuth';
 import TwoFactorSetupModal from './TwoFactorSetupModal';
 import TwoFactorCodeModal from './TwoFactorCodeModal';
 import AdminRightsModal, { AdminRightsEditor } from './AdminRightsModal';
@@ -60,10 +61,13 @@ export default function AdminUsersTab({
   const [twoFactorDisableUser, setTwoFactorDisableUser] = useState(null);
 
   // PIN ochiq matnda saqlanmaydi (src/utils/pinHash.ts): tahrirlashda maydon bo'sh turadi.
-  // Bo'sh qoldirilsa eski PIN qoladi (agar yangi rol ham shu uzunlikdagi PIN talab qilsa).
+  // Bo'sh qoldirilsa eski PIN qoladi (yangi PIN - 6 xonali; eski 4 xonali PIN faqat xodimlar
+  // guruhida qoladi, boshqaruvga o'tkazilsa 6 xonali PIN kerak).
   const editingUser = editingId ? safeUsers.find(u => u && u.id === editingId) : null;
   const canKeepPin = Boolean(editingUser) && hasPin(editingUser) &&
-    pinLengthOf(editingUser, getRequiredPinLength(editingUser.role)) === getRequiredPinLength(formData.role);
+    pinLengthOf(editingUser, 6) >= minKeptPinLength(formData.role);
+  // PIN bandligi serverda tekshirilayotgan payt (tugma qayta bosilmasin)
+  const [saving, setSaving] = useState(false);
   // O'zini tahrirlash: faqat ism, lavozim nomi va PIN (o'z rolini va huquqini o'zgartira olmaydi)
   const isSelfEdit = Boolean(editingUser) && userIdOf(editingUser) === actorId;
   const showForm = canStaff || canAdmins || isSelfEdit;
@@ -155,8 +159,9 @@ export default function AdminUsersTab({
   // ==========================================
   // 3. SAQLASH, TAHRIRLASH VA O'CHIRISH (CRUD)
   // ==========================================
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (saving) return;
     
     const cleanName = (formData.name || '').trim();
     const cleanTitle = (formData.title || '').trim();
@@ -183,7 +188,7 @@ export default function AdminUsersTab({
     // 1. Validatsiya: Bo'sh maydonlarni tekshirish
     if (!cleanName || (!cleanPin && !canKeepPin)) {
       notify(target && hasPin(target)
-        ? "Lavozim o'zgargani uchun PIN uzunligi ham o'zgaradi: yangi PIN-kod kiriting!"
+        ? "Bu xodimda eski qisqa PIN: Boshqaruv guruhi uchun yangi 6 xonali PIN-kod kiriting!"
         : "Iltimos, xodim ismini va PIN-kodni to'liq kiriting!");
       return;
     }
@@ -213,6 +218,19 @@ export default function AdminUsersTab({
         return;
       }
       if (findPinOwner(safeUsers, cleanPin, editingId)) {
+        registerPinFailure(PIN_ASSIGN_SCOPE);
+        notify("⛔️ Bu PIN-kod band (boshqa xodimda bor). Boshqa PIN kiriting yoki \"🎲 Avto-PIN\" ni bosing.");
+        return;
+      }
+      // Server barcha xodimlar orasida tekshiradi (PIN xeshlari faqat serverda, supabase/security.sql)
+      setSaving(true);
+      const free = await isPinFreeOnServer(cleanPin, editingId);
+      setSaving(false);
+      if (free && 'error' in free) {
+        notify(`⛔️ Juda ko'p urinish: ${Math.max(1, Math.ceil(free.waitS || 0))} soniya kuting.`);
+        return;
+      }
+      if (free && free.available === false) {
         registerPinFailure(PIN_ASSIGN_SCOPE);
         notify("⛔️ Bu PIN-kod band (boshqa xodimda bor). Boshqa PIN kiriting yoki \"🎲 Avto-PIN\" ni bosing.");
         return;
@@ -436,7 +454,7 @@ export default function AdminUsersTab({
 
   const removeTwoFactor = (target, details) => {
     if (!target || typeof setUsers !== 'function') return;
-    setUsers(prev => prev.map(u => (u && u.id === target.id ? stripTwoFactor(u) : u)));
+    setUsers(prev => prev.map(u => (u && u.id === target.id ? disableTwoFactor(u) : u)));
     if (typeof addAuditLog === 'function') {
       addAuditLog("Ikki bosqichli kirish o'chirildi", details);
     }
@@ -587,16 +605,16 @@ export default function AdminUsersTab({
               {isSelfEdit ? "Mening ma'lumotlarim" : editingId ? "Xodim ma'lumotlarini tahrirlash" : "Yangi Xodim Qo'shish"}
             </h2>
             <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">
-              Boshqaruv (Admin/Omborchi) uchun 6 xonali, qolgan xodimlar uchun 4 xonali noyob PIN-kod beriladi.
+              Har bir xodimga 6 xonali noyob PIN-kod beriladi (eski 4 xonali PIN'lar ishlayveradi, o'zgartirilganda - 6 xonali).
             </p>
           </div>
 
           <span className={`text-xs font-black px-3 py-1.5 rounded-xl uppercase ${
-            requiredLenForForm === 6
+            formData.role === 'admin' || formData.role === 'warehouse'
               ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
               : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
           }`}>
-            {requiredLenForForm === 6 ? '👔 Boshqaruv guruhi (6 xonali)' : '👥 Xodimlar guruhi (4 xonali)'}
+            {formData.role === 'admin' || formData.role === 'warehouse' ? '👔 Boshqaruv guruhi (6 xonali)' : '👥 Xodimlar guruhi (6 xonali)'}
           </span>
         </div>
         
@@ -743,9 +761,10 @@ export default function AdminUsersTab({
               )}
               <button 
                 type="submit" 
-                className="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-700 text-white px-8 py-3.5 rounded-xl font-black shadow-lg shadow-brand-600/30 transition active:scale-95 whitespace-nowrap"
+                disabled={saving}
+                className="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white px-8 py-3.5 rounded-xl font-black shadow-lg shadow-brand-600/30 transition active:scale-95 whitespace-nowrap"
               >
-                {editingId ? 'Saqlash 💾' : formData.role === 'admin' ? 'Admin tayinlash 👑' : "Xodimni Qo'shish ➕"}
+                {saving ? 'Tekshirilmoqda...' : editingId ? 'Saqlash 💾' : formData.role === 'admin' ? 'Admin tayinlash 👑' : "Xodimni Qo'shish ➕"}
               </button>
             </div>
           </div>
@@ -808,7 +827,8 @@ export default function AdminUsersTab({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredUsers.map(user => {
-              const isLongPin = getRequiredPinLength(user.role) === 6;
+              const shownPinLength = pinLengthOf(user, 6);
+              const isLongPin = shownPinLength >= 6;
               const roleMeta = getRoleMeta(user.role);
               const safeName = String(user.name || 'Xodim');
               const isCurrentUser = currentUser && user.id === currentUser.id;
@@ -871,14 +891,15 @@ export default function AdminUsersTab({
                     {/* PIN Kodni yashirish va ko'rsatish mantig'i */}
                     <div className="flex items-center gap-2 mt-2 bg-white dark:bg-gray-800 p-2.5 rounded-xl border border-gray-100 dark:border-gray-700 w-max">
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                        PIN ({isLongPin ? '6' : '4'}):
+                        PIN ({shownPinLength}):
                       </span>
                       {hasPin(user) ? (
                         <span
                           className="font-black text-sm text-gray-900 dark:text-white tracking-[0.25em]"
                           title="PIN shifrlangan holda saqlanadi. Unutilgan bo'lsa, tahrirlab yangisini bering"
                         >
-                          {'•'.repeat(isLongPin ? 6 : 4)} 🔒
+                          {'•'.repeat(shownPinLength)} 🔒
+                          {!isLongPin && <span className="ml-1 text-[10px] tracking-normal font-black text-amber-600"> eski: 6 xonaliga almashtiring</span>}
                         </span>
                       ) : (
                         <span className="font-black text-xs text-rose-600">O'rnatilmagan</span>

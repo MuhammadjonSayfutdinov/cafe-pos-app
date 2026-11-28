@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 // MAXSUS HOOK
 import useSticky from './hooks/useSticky';
@@ -20,10 +20,12 @@ import PrintReceiptModal from './components/PrintReceiptModal';
 import CustomerMode from './components/CustomerMode';
 import AutoLockControl from './components/AutoLockControl';
 import SyncStatusBadge from './components/SyncStatusBadge';
+import ServerSessionHint from './components/ServerSessionHint';
 import QrRequestsPanel from './components/QrRequestsPanel';
 import WaiterCallsPanel from './components/WaiterCallsPanel';
 import KitchenNoticesPanel from './components/KitchenNoticesPanel';
 import { callRpc } from './sync/engine';
+import { ensureServerLogin, onDeferredServerLogin, serverLogout } from './sync/staffAuth';
 import { notify } from './utils/notify';
 import { CLOSED_ORDER_STATUSES, DELIVERY_STATUS, ORDER_STATUS, TAKEAWAY_TABLE, isDeliveryOrder } from './constants/orderStatus';
 import { getRoleMeta, getUserTitle } from './constants/roles';
@@ -86,7 +88,8 @@ const findStaffWithSamplePin = (users) =>
   (Array.isArray(users) ? users : []).filter(u => {
     if (!u) return false;
     const len = pinLengthOf(u, 0);
-    return SAMPLE_PINS.some(p => (!len || p.length === len) && checkPin(u, p));
+    // pinSample - server belgisi (PIN xeshi faqat serverda bo'lsa)
+    return u.pinSample === true || SAMPLE_PINS.some(p => (!len || p.length === len) && checkPin(u, p));
   });
 
 export default function App() {
@@ -305,19 +308,54 @@ export default function App() {
   // ==========================================
   // 4. KIRISH VA CHIQISH (AUTH & QR MENU)
   // ==========================================
-  const handleLogin = (user) => {
+  // Serverda PIN boshqa (boshqa qurilmada o'zgartirilgan): shu qurilmadagi eski PIN bilan ishlanmasin
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+  const handleServerLoginResult = useCallback((result, userId) => {
+    if (result === 'wrong') {
+      const active = currentUserRef.current;
+      if (!active || String(active.id) !== String(userId)) return;
+      notify("⛔️ PIN-kodingiz boshqa qurilmada o'zgartirilgan: yangi PIN bilan qayta kiring.", 'error');
+      setCurrentUser(null);
+      setView('login');
+    } else if (result === 'code') {
+      notify("🔐 Server ikki bosqichli kodni qabul qilmadi: to'liq ma'lumot uchun chiqib, qayta kiring.", 'warning');
+    }
+  }, []);
+
+  // Internet qaytgach serverga bildirilgan kirish natijasi (src/sync/staffAuth.ts)
+  useEffect(() => {
+    onDeferredServerLogin((result, args) => handleServerLoginResult(result, args.userId));
+    return () => onDeferredServerLogin(null);
+  }, [handleServerLoginResult]);
+
+  // auth: { pin, group, code, codeKind, serverVerified } - kirish oynasi, avto-qulf (src/sync/staffAuth.ts).
+  // Qurilmada tekshirilgan kirish serverga orqa fonda bildiriladi: server xodimning ruxsatiga mos
+  // ma'lumotni beradi va o'zgarishlarini qabul qiladi
+  const handleLogin = (user, auth) => {
     setCurrentUser(user);
     if (user.role === 'admin') {
       setAdminActiveView('admin');
     }
     setView('app');
     addAuditLog("Tizimga kirish", `${user.name} (${user.role}) tizimga kirdi`, user);
+    if (auth?.pin && !auth.serverVerified) {
+      ensureServerLogin({
+        userId: String(user.id),
+        pin: auth.pin,
+        group: auth.group ?? null,
+        code: auth.code || null,
+        codeKind: auth.codeKind || 'totp'
+      }).then(result => handleServerLoginResult(result, user.id)).catch(() => {});
+    }
   };
 
   const handleLogout = () => {
     if (currentUser) {
       addAuditLog("Tizimdan chiqish", `${currentUser.name} tizimdan chiqdi`);
     }
+    // Server qurilmani umumiy ruxsatga qaytaradi: xodimning maxfiy ma'lumoti qurilmadan o'chadi
+    serverLogout();
     setCurrentUser(null);
     setView('login');
   };
@@ -695,6 +733,7 @@ export default function App() {
         {/* O'ng taraf: Avto-Qulf sozlamasi (Telefon/Kompyuter uslubida), Tungi rejim va Chiqish */}
         <div className="flex items-center gap-2">
           <SyncStatusBadge />
+          <ServerSessionHint currentUser={currentUser} onRelogin={handleLogout} />
 
           <AutoLockControl
             currentUser={currentUser}

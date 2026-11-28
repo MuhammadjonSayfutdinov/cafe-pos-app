@@ -93,8 +93,17 @@ Ega, admin huquqlari va PIN himoyasi qoidalarini tekshirish:
 npm run test:access
 ```
 
+Server xavfsizligi (PIN keshi, qurilma tasdig'i, rad etilgan o'zgarishlar):
+
+```bash
+npm run test:security
+```
+
+`supabase/security.sql` ning o'zini mahalliy PostgreSQL'da sinash (faqat dasturchi kompyuterida, PostgreSQL kerak):
+`scripts/sql-test/run.sh` faylining boshidagi izohga qarang.
+
 Barcha tekshiruvlar bittada (oshxona, huquqlar, mijoz ekrani, yo'qotish hisoboti, cheklarni birlashtirish,
-sexlar va KOT, qaytarish, olib ketish):
+sexlar va KOT, qaytarish, olib ketish, server xavfsizligi):
 
 ```bash
 npm test
@@ -110,7 +119,8 @@ npm test
 | Oshpaz | Oshpaz | `3333` |
 | Omborchi | Omborchi | `444444` |
 
-Admin va omborchi "BOSHQARUV" orqali (6 xonali PIN), qolganlar "XODIMLAR" orqali (4 xonali PIN) kiradi.
+Admin va omborchi "BOSHQARUV" orqali, qolganlar "XODIMLAR" orqali kiradi. Yangi PIN - hamma uchun 6 xonali;
+namunadagi 4 xonali PIN'lar ishlaydi (4 raqamni terib "✓ Kirish"), almashtirilganda 6 xonali bo'ladi.
 Kuryer namunada yo'q: Boshqaruv → "Xodimlar va Parollar" → "Qaysi bo'limda ishlaydi" = "🛵 Kuryer".
 **Birinchi kirishdan keyin barcha PIN kodlarni almashtiring:** Boshqaruv → "Xodimlar va Parollar".
 Admin standart PIN bilan ishlasa, ekranning tepasida ogohlantirish chiqib turadi.

@@ -59,7 +59,9 @@ haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
 12b. TypeScript (bosqichma-bosqich): yangi util/modul .ts da yoziladi (strict).
     Kichik .js util'ni o'zgartirayotganda .ts ga ko'chiring (git mv). Komponentlar
     (.jsx) hozircha JS. Tekshiruv: npm run typecheck (npm run build ham tekshiradi).
-12c. PIN: ochiq matnda saqlamang va solishtirmang (u.pin === x emas). Faqat
+12c. PIN: ochiq matnda saqlamang va solishtirmang (u.pin === x emas). Yangi joyda PIN tekshirsangiz -
+    src/sync/staffAuth.ts -> verifyStaffPin (avval qurilmada, topilmasa serverda; natijada needCode bo'lsa
+    TwoFactorCodeModal ga checkCode bering). Yangi PIN - 6 xonali (getRequiredPinLength). Qolgan hollarda
     src/utils/pinHash.ts: checkPin, findUserByPin, findPinOwner, withPin, stripPin.
 12d. Tarmoq: yangi server so'rovi vaqt bilan cheklanadi (src/sync/timeouts.ts),
     internet yo'qda ish to'xtamasligi kerak (ma'lumot qurilmada, keyin yuboriladi).
@@ -89,6 +91,15 @@ haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
     Xavfli amal (rahbar tasdig'i): requireAdminOverride(matn, fn, kalit) - kalit src/utils/pinRules.ts da
     (yangi amal bo'lsa PIN_RULE_GROUPS ga qo'shing). PIN kerakmi va kim tasdiqlaydi - App hal qiladi (o'zingiz
     role tekshirmang). Faqat Ega amali: requireOwnerConfirm(matn, fn). Tekshiruv: npm run test:access.
+12j. Server xavfsizligi (supabase/security.sql, 6-bosqich 2-qadam): qurilma tasdig'i (pos_devices), PIN va
+    Authenticator siri faqat serverda (pos_staff_secrets), xodim yozuvida belgilar: pinOn, pinLength, pinSetAt,
+    pinSample, twoFactorOn, twoFactorAt, backupCodesLeft. Qurilmadagi PIN keshi: src/utils/verifierCache.ts
+    (kalit 'cafe_pin_cache', dvigatel xodim yozuviga qo'shadi). Yozish - pos_push_records / pos_push_kv
+    (har qator tekshiriladi, rad etilgani engine.js da "held"). O'qish - RLS: pos_hidden_collections().
+    YANGI TO'PLAM yoki KV KALIT qo'shsangiz security.sql ni ham ko'ring: maxfiy to'plam -> v_hidden ro'yxati;
+    ofitsiant/oshxona yozadigan KV -> pos_kv_write_reason dagi umumiy ro'yxat (aks holda faqat "Tizim
+    sozlamalari" huquqli admin yoza oladi). Admin huquqi SQL'da ham: pos_has_right (adminRights.ts bilan bir xil).
+    Tekshiruv: npm run test:security, SQL: npm run test:sql (mahalliy PostgreSQL, scripts/sql-test/run.sh).
 12i. Tekshiruvlar: Vitest (vitest.config.js), fayllar tests/*.test.js, mantiq modullarini import qiladi
     (src/utils, src/sync, src/qr; brauzer kerak emas). Yangi util/mantiq yozsangiz tekshiruv qo'shing.
     Ishga tushirish: npm test (hammasi), npm run test:watch, npm run test:kitchen va h.k.
@@ -115,7 +126,10 @@ src/pwa/                register.js (service worker, oflayn kesh), update.js (ya
 src/utils/telegramNotifier.js  Telegram xabarlari (hozir ishlatilmaydi!)
 
 Avtorizatsiya va umumiy:
-  LockScreen (408)            PIN orqali kirish
+  LockScreen (408)            PIN orqali kirish (6 xonali; eski 4 xonali - "✓ Kirish"), sync/staffAuth.ts
+  DeviceApprovalScreen        Tasdiqlanmagan/bloklangan qurilma (SyncGate, 'device' holati)
+  AdminDevicesSection         Tizim sozlamalari -> Bulut: "📱 Qurilmalar" va rad etilgan (kutayotgan) o'zgarishlar
+  ServerSessionHint           Sarlavhada "🔑 Qayta kiring": server xodimni tanimaydi (internetsiz kirgan)
   ManagerOverrideModal (306)  Xavfli amal uchun admin PIN (approvers: tasdiqlay oladiganlar; ownerOnly: Ega tasdig'i)
   utils/adminRights.ts        Ega va admin huquqlari (bo'limlar, admin tayinlash, kim kimni o'zgartiradi)
   utils/pinRules.ts           PIN himoyasi har amal uchun (ofitsiant, kassa, oshxona, ombor, boshqaruv)

@@ -443,17 +443,30 @@ as $$
      and r.id = any (p_ids[1:20]);
 $$;
 
--- 5) Xodim so'rovni qabul qiladi yoki rad etadi (faqat ulangan qurilmalar).
+-- 5) Xodim so'rovni qabul qiladi yoki rad etadi (faqat ulangan va ishonchli qurilmalar).
 --    Atomik: ikki xodim bir vaqtda bossa, faqat birinchisi oladi (buyurtma ikki marta tushmaydi).
+--    Qurilma ishonchliligi: security.sql (pos_staff_device_ok). U hali ishga tushirilmagan bo'lsa -
+--    avvalgidek har bir ulangan qurilma.
+do $$
+begin
+  if to_regprocedure('public.pos_staff_device_ok()') is null then
+    create function public.pos_staff_device_ok() returns boolean language sql stable as 'select true';
+  end if;
+end;
+$$;
+
 create or replace function public.qr_claim_request(p_id text, p_status text, p_by text default '')
 returns jsonb
-language plpgsql volatile security invoker set search_path = public
+language plpgsql volatile security definer set search_path = public
 as $$
 declare
   v_data jsonb;
 begin
   if p_status not in ('accepted', 'rejected') then
     raise exception 'Noto''g''ri holat: %', p_status;
+  end if;
+  if not public.pos_staff_device_ok() then
+    return jsonb_build_object('ok', false, 'error', 'Qurilma tasdiqlanmagan');
   end if;
   update pos_records
      set data = data || jsonb_build_object(

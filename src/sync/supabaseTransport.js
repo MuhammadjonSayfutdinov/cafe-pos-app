@@ -42,6 +42,31 @@ export function createSupabaseTransport({ url, anonKey }) {
     return rows;
   }
 
+  // Ruxsat bo'yicha o'qilgan to'plamlar (supabase/security.sql: yangi ochilgan yoki qayta olinadigan)
+  async function fetchWhere(table, column, values) {
+    const rows = [];
+    if (!values.length) return rows;
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data, error } = await client.from(table).select('*').in(column, values)
+        .order('updated_at', { ascending: true }).range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < PAGE_SIZE) break;
+    }
+    return rows;
+  }
+
+  async function rpcRaw(fn, args) {
+    const { data, error } = await client.rpc(fn, args);
+    if (error) {
+      // Kod saqlanadi: dvigatel "funksiya yo'q" (PGRST202) va "ruxsat yo'q" (42501) ni ajratadi
+      const err = new Error(error.message || String(error));
+      err.code = error.code;
+      throw err;
+    }
+    return data;
+  }
+
   async function upsertChunks(table, rows, onConflict) {
     for (let i = 0; i < rows.length; i += PUSH_CHUNK) {
       const { error } = await client.from(table).upsert(rows.slice(i, i + PUSH_CHUNK), { onConflict });
@@ -51,6 +76,8 @@ export function createSupabaseTransport({ url, anonKey }) {
 
   return {
     kind: 'supabase',
+    // Server xavfsizligi funksiyalarini qo'llaydi (pos_device_hello, pos_push_records...): supabase/security.sql
+    secure: true,
     async identity() {
       const { data } = await client.auth.getSession();
       return `${url}|${data.session?.user?.id || 'anon'}`;
@@ -83,10 +110,13 @@ export function createSupabaseTransport({ url, anonKey }) {
       const [records, kv] = await Promise.all([fetchTable('pos_records', since), fetchTable('pos_kv', since)]);
       return { records, kv };
     },
-    async rpc(fn, args) {
-      const { data, error } = await client.rpc(fn, args);
-      if (error) throw new Error(error.message);
-      return data;
+    rpc: rpcRaw,
+    async fetchSome({ collections = [], kvKeys = [] } = {}) {
+      const [records, kv] = await Promise.all([
+        fetchWhere('pos_records', 'collection', collections),
+        fetchWhere('pos_kv', 'key', kvKeys)
+      ]);
+      return { records, kv };
     },
     async uploadPublicFile(path, file) {
       const bucket = client.storage.from(IMAGE_BUCKET);
@@ -114,6 +144,9 @@ export function createSupabaseTransport({ url, anonKey }) {
     },
     pushRecords: (rows) => upsertChunks('pos_records', rows, 'collection,id'),
     pushKv: (rows) => upsertChunks('pos_kv', rows, 'key'),
+    // security.sql: har bir qator serverda tekshiriladi, ruxsat yo'qlari { rejected } da qaytadi
+    pushRecordsSecure: (rows) => rpcRaw('pos_push_records', { p_rows: rows }),
+    pushKvSecure: (rows) => rpcRaw('pos_push_kv', { p_rows: rows }),
     subscribe(onEvent, onStatus) {
       const channel = client
         .channel('pos-sync')

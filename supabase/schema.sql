@@ -45,16 +45,24 @@ create trigger pos_kv_touch before insert or update on public.pos_kv
 
 -- 4) Xavfsizlik (RLS): faqat tizimga kirgan qurilmalar o'qiy va yoza oladi.
 --    Saytdagi "anon" kalit bilan, kirmasdan, hech narsa o'qib bo'lmaydi.
+--    supabase/security.sql ishga tushirilgan bo'lsa, uning qat'iyroq qoidalari qoladi
+--    (shu faylni qayta ishga tushirish ularni bekor qilmaydi).
 alter table public.pos_records enable row level security;
 alter table public.pos_kv enable row level security;
 
-drop policy if exists "pos_records_authenticated" on public.pos_records;
-create policy "pos_records_authenticated" on public.pos_records
-  for all to authenticated using (true) with check (true);
+do $$
+begin
+  if to_regclass('public.pos_devices') is null then
+    drop policy if exists "pos_records_authenticated" on public.pos_records;
+    create policy "pos_records_authenticated" on public.pos_records
+      for all to authenticated using (true) with check (true);
 
-drop policy if exists "pos_kv_authenticated" on public.pos_kv;
-create policy "pos_kv_authenticated" on public.pos_kv
-  for all to authenticated using (true) with check (true);
+    drop policy if exists "pos_kv_authenticated" on public.pos_kv;
+    create policy "pos_kv_authenticated" on public.pos_kv
+      for all to authenticated using (true) with check (true);
+  end if;
+end;
+$$;
 
 -- 5) Real vaqt (Realtime): o'zgarishlar boshqa qurilmalarga darhol yetib borishi uchun
 do $$

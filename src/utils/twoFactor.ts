@@ -4,10 +4,10 @@
 // Zaxira kodlar (10 ta, har biri 10 raqam, bir martalik) faqat xeshi bilan saqlanadi: ochiq ko'rinishi
 // faqat yoqish paytida bir marta ko'rsatiladi.
 //
-// Tekshiruv hozircha qurilmada (internetsiz ham kirish kerak, PIN kabi). Cheklov: sir xodimlar
-// ro'yxati bilan qurilmada va bulutda turadi, bazani o'qiy oladigan odam uni ko'chirib olishi mumkin.
-// Himoya qiladi: admin PIN'ini bilib olgan xodim telefon (kod) siz kira olmaydi. Keyingi qadam -
-// PIN va kodni serverda tekshirish (PROGRESS.md, 6-bosqich, 2-qadam). Zaxira faylga sir yozilmaydi.
+// supabase/security.sql dan keyin sir bulutdagi yozuvda YO'Q: serverda saqlanadi va kod serverda
+// tekshiriladi (pos_pin_check). Yozuvda belgilar: twoFactorOn, twoFactorAt (yoqilgan/o'chirilgan
+// vaqt), backupCodesLeft. Internetsiz kirish uchun sir faqat admin o'zi kirgan qurilmada keshda
+// (src/utils/verifierCache.ts). Zaxira faylga sir yozilmaydi.
 
 import { sha256Hex, toHex, randomBytes } from './sha256';
 import { base32Decode, newTotpSecret, verifyTotp } from './totp';
@@ -27,6 +27,12 @@ export interface TwoFactorRecord {
 export interface TwoFactorFields {
   id?: unknown;
   twoFactor?: unknown;
+  /** Server belgisi: yoqilgan (sir serverda) */
+  twoFactorOn?: unknown;
+  /** Yoqilgan yoki o'chirilgan vaqt (ms): server yangi o'zgarishni shu bo'yicha ajratadi */
+  twoFactorAt?: unknown;
+  /** Server belgisi: qolgan zaxira kodlar soni */
+  backupCodesLeft?: unknown;
 }
 
 export type SecondFactorMode = 'totp' | 'backup';
@@ -52,12 +58,26 @@ export function readTwoFactor(user: TwoFactorFields | null | undefined): TwoFact
   };
 }
 
-/** Xodimga ikki bosqichli kirish yoqilganmi */
-export const hasTwoFactor = (user: TwoFactorFields | null | undefined): boolean => readTwoFactor(user) !== null;
+/** Xodimga ikki bosqichli kirish yoqilganmi (sir shu qurilmada bo'lmasa ham) */
+export const hasTwoFactor = (user: TwoFactorFields | null | undefined): boolean =>
+  readTwoFactor(user) !== null || (Boolean(user) && user?.twoFactorOn === true);
+
+/** Kodni shu qurilmada tekshirish mumkinmi (sir yozuvda yoki keshdan qo'shilgan) */
+export const hasLocalTwoFactor = (user: TwoFactorFields | null | undefined): boolean => readTwoFactor(user) !== null;
 
 /** Ishlatilmagan zaxira kodlar soni */
-export const backupCodesLeft = (user: TwoFactorFields | null | undefined): number =>
-  readTwoFactor(user)?.backupCodes.length ?? 0;
+export const backupCodesLeft = (user: TwoFactorFields | null | undefined): number => {
+  const record = readTwoFactor(user);
+  if (record) return record.backupCodes.length;
+  const n = Number(user?.backupCodesLeft);
+  return Number.isInteger(n) && n > 0 ? n : 0;
+};
+
+/** Yangi o'zgarish vaqti: eskisidan doim katta */
+function nextTwoFactorAt(user: TwoFactorFields | null | undefined, now: number = Date.now()): number {
+  const prev = Number(user?.twoFactorAt);
+  return Math.max(now, Number.isFinite(prev) && prev > 0 ? prev + 1 : 0);
+}
 
 /** Yangi sir (Authenticator ilovasiga QR orqali beriladi) */
 export const createTwoFactorSecret = (): string => newTotpSecret();
@@ -106,12 +126,19 @@ export function findBackupCode(user: TwoFactorFields | null | undefined, code: u
   return found;
 }
 
-type WithoutTwoFactor<T> = Omit<T, 'twoFactor'>;
+type WithoutTwoFactor<T> = Omit<T, 'twoFactor' | 'twoFactorOn' | 'backupCodesLeft'>;
 
-/** Ikki bosqichli kirishsiz nusxa (o'chirish va zaxira faylga eksport uchun) */
+/** Ikki bosqichli kirishsiz nusxa (zaxira faylga eksport uchun) */
 export function stripTwoFactor<T extends TwoFactorFields>(user: T): WithoutTwoFactor<T> {
-  const { twoFactor: _twoFactor, ...rest } = user;
+  const { twoFactor: _twoFactor, twoFactorOn: _on, backupCodesLeft: _left, ...rest } = user;
   return rest;
+}
+
+/** O'chirilgan nusxa: server ham o'chiradi (twoFactor: null va yangi twoFactorAt) */
+export function disableTwoFactor<T extends TwoFactorFields>(
+  user: T
+): WithoutTwoFactor<T> & { twoFactor: null; twoFactorAt: number } {
+  return { ...stripTwoFactor(user), twoFactor: null, twoFactorAt: nextTwoFactorAt(user) };
 }
 
 /** Yoqilgan nusxa. backupCodes - ochiq kodlar (saqlashda xeshlanadi) */
@@ -119,7 +146,7 @@ export function withTwoFactor<T extends TwoFactorFields>(
   user: T,
   secret: string,
   backupCodes: readonly string[]
-): WithoutTwoFactor<T> & { twoFactor: TwoFactorRecord } {
+): WithoutTwoFactor<T> & { twoFactor: TwoFactorRecord; twoFactorAt: number } {
   return {
     ...stripTwoFactor(user),
     twoFactor: {
@@ -127,7 +154,8 @@ export function withTwoFactor<T extends TwoFactorFields>(
       secret,
       enabledAt: Date.now(),
       backupCodes: backupCodes.map(hashBackupCode)
-    }
+    },
+    twoFactorAt: nextTwoFactorAt(user)
   };
 }
 
@@ -147,7 +175,11 @@ export function keepTwoFactorFrom<T extends TwoFactorFields>(
   source: TwoFactorFields | null | undefined
 ): WithoutTwoFactor<T> & TwoFactorFields {
   const base: WithoutTwoFactor<T> & TwoFactorFields = stripTwoFactor(user);
-  return source && hasTwoFactor(source) ? { ...base, twoFactor: source.twoFactor } : base;
+  if (!source || !hasTwoFactor(source)) return base;
+  const out: WithoutTwoFactor<T> & TwoFactorFields = { ...base, twoFactorAt: source.twoFactorAt };
+  if (isObject(source.twoFactor)) out.twoFactor = source.twoFactor;
+  if (source.twoFactorOn === true) out.twoFactorOn = true;
+  return out;
 }
 
 // Bir marta ishlatilgan kod shu qurilmada qayta qabul qilinmaydi (yonidan ko'rib olgan odam

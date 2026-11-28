@@ -4,10 +4,13 @@
 // Eski ma'lumotda user.pin (yoki undan ham eski user.password) ochiq matnda turadi: ular ham
 // tekshiriladi, App.jsx ishga tushganda migrateUserPins() bilan xeshga o'tkaziladi.
 //
-// Nega qurilmada: dastur internetsiz ham ishlashi kerak, PIN serverga yuborilmay tekshiriladi.
-// Cheklov: 4-6 xonali PIN'da variant oz (10 000 / 1 000 000). Bazani o'qiy oladigan odam xeshni
-// baribir terib topishi mumkin, xesh PIN'ni ko'z bilan o'qib olishdan va zaxira/eksportga
-// tushishidan himoya qiladi. Asosiy himoya - Supabase RLS va yopiq ro'yxatdan o'tish (SUPABASE.md).
+// supabase/security.sql dan keyin: xesh bulutdagi xodim yozuvida YO'Q (serverda, pos_staff_secrets),
+// PIN serverda tekshiriladi (src/sync/staffAuth.ts). Yozuvda faqat belgilar: pinOn, pinLength,
+// pinSetAt (PIN qachon o'rnatilgani: server yangisini shu bo'yicha ajratadi). Internetsiz kirish
+// uchun qurilma o'zida kirgan xodimlarning xeshini saqlaydi (src/utils/verifierCache.ts) va sinxron
+// dvigateli uni yozuvga qo'shib qo'yadi: shu fayldagi funksiyalar avvalgidek ishlaydi.
+// Cheklov: 4-6 xonali PIN'da variant oz (10 000 / 1 000 000): qurilmadagi xeshni terib topish mumkin,
+// shuning uchun yangi PIN - 6 xonali va server urinishlarni cheklaydi.
 
 import { sha256Bytes, utf8, toHex, randomBytes } from './sha256';
 
@@ -23,6 +26,12 @@ export interface PinFields {
   password?: unknown;
   pinHash?: unknown;
   pinLength?: unknown;
+  /** Server belgisi: xodimda PIN bor (xeshning o'zi serverda) */
+  pinOn?: unknown;
+  /** PIN o'rnatilgan vaqt (ms): yangi PIN eskisidan katta bo'ladi */
+  pinSetAt?: unknown;
+  /** Server belgisi: PIN namuna (777777, 1111...) */
+  pinSample?: unknown;
 }
 
 interface ParsedHash {
@@ -97,8 +106,12 @@ export function hashPin(pin: unknown, iterations: number = PIN_HASH_ITERATIONS):
 
 export const isPinHash = (value: unknown): boolean => parseHash(value) !== null;
 
-/** Xodimda PIN bormi (xesh yoki eski ochiq matn) */
+/** Xodimda PIN bormi (xesh, server belgisi yoki eski ochiq matn) */
 export const hasPin = (user: PinFields | null | undefined): boolean =>
+  Boolean(user) && (isPinHash(user?.pinHash) || user?.pinOn === true || plainPin(user).length > 0);
+
+/** Xodimning PIN'i shu qurilmada tekshirilishi mumkinmi (xesh yozuvda yoki keshdan qo'shilgan) */
+export const hasLocalPin = (user: PinFields | null | undefined): boolean =>
   Boolean(user) && (isPinHash(user?.pinHash) || plainPin(user).length > 0);
 
 /** Xodim kiritgan PIN to'g'rimi */
@@ -119,25 +132,40 @@ export function pinLengthOf(user: PinFields | null | undefined, fallback = 4): n
   return legacy.length > 0 ? legacy.length : fallback;
 }
 
-type WithoutPinFields<T> = Omit<T, 'pin' | 'password' | 'pinHash' | 'pinLength'>;
+type WithoutPinFields<T> = Omit<T, 'pin' | 'password' | 'pinHash' | 'pinLength' | 'pinOn' | 'pinSetAt' | 'pinSample'>;
 
 /** PIN bilan bog'liq barcha maydonlarsiz nusxa (zaxira faylga eksport uchun) */
 export function stripPin<T extends PinFields>(user: T): WithoutPinFields<T> {
-  const { pin: _pin, password: _password, pinHash: _pinHash, pinLength: _pinLength, ...rest } = user;
+  const {
+    pin: _pin, password: _password, pinHash: _pinHash, pinLength: _pinLength,
+    pinOn: _pinOn, pinSetAt: _pinSetAt, pinSample: _pinSample, ...rest
+  } = user;
   return rest;
 }
 
+/** Yangi PIN vaqti: eskisidan doim katta (qurilma soati orqada bo'lsa ham server yangi deb qabul qiladi) */
+export function nextPinSetAt(user: PinFields | null | undefined, now: number = Date.now()): number {
+  const prev = Number(user?.pinSetAt);
+  return Math.max(now, Number.isFinite(prev) && prev > 0 ? prev + 1 : 0);
+}
+
 /** Yangi PIN o'rnatilgan nusxa: ochiq matn saqlanmaydi */
-export function withPin<T extends PinFields>(user: T, pin: unknown): WithoutPinFields<T> & { pinHash: string; pinLength: number } {
+export function withPin<T extends PinFields>(
+  user: T,
+  pin: unknown
+): WithoutPinFields<T> & { pinHash: string; pinLength: number; pinSetAt: number } {
   const clean = cleanPin(pin);
-  return { ...stripPin(user), pinHash: hashPin(clean), pinLength: clean.length };
+  return { ...stripPin(user), pinHash: hashPin(clean), pinLength: clean.length, pinSetAt: nextPinSetAt(user) };
 }
 
 /** Boshqa yozuvdagi PIN'ni ko'chirish (zaxiradan tiklashda: fayldagi xodim + hozirgi PIN) */
 export function copyPinFrom<T extends PinFields>(user: T, source: PinFields | null | undefined): WithoutPinFields<T> & PinFields {
   const base: WithoutPinFields<T> & PinFields = stripPin(user);
   if (!source) return base;
-  if (isPinHash(source.pinHash)) return { ...base, pinHash: source.pinHash, pinLength: pinLengthOf(source) };
+  // PIN vaqti ham ko'chadi: server buni yangi PIN deb qabul qilmaydi (tiklash PIN'ni o'zgartirmaydi)
+  const meta: PinFields = source.pinSetAt !== undefined ? { pinSetAt: source.pinSetAt } : {};
+  if (isPinHash(source.pinHash)) return { ...base, ...meta, pinHash: source.pinHash, pinLength: pinLengthOf(source) };
+  if (source.pinOn === true) return { ...base, ...meta, pinOn: true, pinLength: source.pinLength };
   const legacy = plainPin(source);
   return legacy ? { ...base, pinHash: hashPin(legacy), pinLength: legacy.length } : base;
 }
