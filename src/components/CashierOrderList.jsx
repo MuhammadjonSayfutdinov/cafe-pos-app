@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DELIVERY_STATUS, ORDER_STATUS, isDeliveryOrder } from '../constants/orderStatus';
 import { kitchenSummary } from '../utils/kitchenFlow';
+import { orderLabel } from '../utils/takeaway';
 
 const DEBT_PAY_METHODS = ['Naqd', 'Plastik', 'Click', 'Payme'];
 
@@ -162,7 +163,7 @@ export default function CashierOrderList({
                     <h3 className={`font-black text-lg ${
                       isSelected ? 'text-brand-700 dark:text-brand-400' : 'text-gray-900 dark:text-white'
                     }`}>
-                      {order.table || 'Stol'}
+                      {orderLabel(order) || 'Stol'}
                     </h3>
 
                     {order.status && (

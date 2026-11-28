@@ -28,6 +28,7 @@ import { notify } from './utils/notify';
 import { CLOSED_ORDER_STATUSES, DELIVERY_STATUS, ORDER_STATUS, TAKEAWAY_TABLE, isDeliveryOrder } from './constants/orderStatus';
 import { getRoleMeta, getUserTitle } from './constants/roles';
 import { newId } from './utils/ids';
+import { nextTakeawayNo } from './utils/takeaway';
 import { getUpdateResume, setUpdateSession } from './pwa/update';
 import { checkPin, migrateUserPins, pinLengthOf } from './utils/pinHash';
 import { isNetworkError } from './sync/timeouts';
@@ -460,7 +461,9 @@ export default function App() {
         items: normalizedItems,
         status: ORDER_STATUS.NEW,
         time: nowTime,
-        date: new Date(nowMs).toLocaleDateString()
+        date: new Date(nowMs).toLocaleDateString(),
+        // Olib ketish: kunlik raqam ("Olib ketish #3"), bir vaqtda bir nechta ochiq chek
+        ...(targetTable === TAKEAWAY_TABLE ? { takeawayNo: nextTakeawayNo(safeOrders, nowMs) } : {})
       };
       targetOrderId = newOrder.id;
 

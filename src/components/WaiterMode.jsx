@@ -26,6 +26,7 @@ import { findUserByPin } from '../utils/pinHash';
 import { hasTwoFactor } from '../utils/twoFactor';
 import { OWNER_KEY, canApproveOverride, resolveOwnerId } from '../utils/adminRights';
 import { LEGACY_OVERRIDE_KEY, PIN_RULES_KEY, isPinRuleOn, resolvePinRules } from '../utils/pinRules';
+import { isTakeawayTable, nextTakeawayNo, orderLabel } from '../utils/takeaway';
 import TwoFactorCodeModal from './TwoFactorCodeModal';
 import {
   applyWaiterCart,
@@ -179,6 +180,8 @@ export default function WaiterMode({
   // 2. OFITSIANT ISHCHI VA XAVFSIZLIK STATE'LARI
   // =========================================================
   const [selectedTable, setSelectedTable] = useState(null);
+  // "Olib ketish": bir vaqtda bir nechta ochiq chek - qaysi biri tanlangan (null - yangi chek)
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [cart, setCart] = useState([]);
   // Savatchada yuborilmagan taom bor ekan, dastur yangilanishi kutadi (src/pwa/update.js)
   useEffect(() => {
@@ -228,6 +231,13 @@ export default function WaiterMode({
 
   const currentTableOrder = useMemo(() => {
     if (!selectedTable) return null;
+    if (isTakeawayTable(selectedTable)) {
+      // Olib ketish: chek id si bo'yicha (bir nechta ochiq chek bo'lishi mumkin)
+      if (!selectedOrderId) return null;
+      return safeOrders.find(
+        o => o && String(o.id) === String(selectedOrderId) && !CLOSED_ORDER_STATUSES.includes(o.status)
+      ) || null;
+    }
     return (
       safeOrders.find(
         o =>
@@ -236,7 +246,7 @@ export default function WaiterMode({
           !CLOSED_ORDER_STATUSES.includes(o.status)
       ) || null
     );
-  }, [safeOrders, selectedTable]);
+  }, [safeOrders, selectedTable, selectedOrderId]);
 
   // =========================================================
   // 3. CHEKNI ENG SO'NGGI HOLATIDAN O'ZGARTIRISH
@@ -359,18 +369,25 @@ export default function WaiterMode({
   // =========================================================
   // 5. STOL TANLASH VA SAVATCHA HARAKATLARI
   // =========================================================
-  const handleSelectTable = (tableName) => {
+  const handleSelectTable = (tableName, orderId) => {
     setSelectedTable(tableName);
+    // Olib ketish: kartadagi chek (yoki yangi chek). Boshqa stol: stolning ochiq cheki
+    const takeawayId = isTakeawayTable(tableName) && orderId ? String(orderId) : null;
+    setSelectedOrderId(takeawayId);
     setSelectedCategory('Barchasi');
     setSearchQuery('');
     setMobilePanel('menu');
 
-    const existing = safeOrders.find(
-      o =>
-        o &&
-        o.table === tableName &&
-        !CLOSED_ORDER_STATUSES.includes(o.status)
-    );
+    const existing = isTakeawayTable(tableName)
+      ? (takeawayId
+        ? safeOrders.find(o => o && String(o.id) === takeawayId && !CLOSED_ORDER_STATUSES.includes(o.status))
+        : null)
+      : safeOrders.find(
+        o =>
+          o &&
+          o.table === tableName &&
+          !CLOSED_ORDER_STATUSES.includes(o.status)
+      );
 
     // Savatcha = chekdagi qatorlar (sentQty = chekdagi porsiya). Qator kaliti chek yozuvidagi bilan
     // bir xil (lineIdOf): yuborilganda eski taom yangi qator bo'lib ikkilanib qolmaydi
@@ -380,6 +397,7 @@ export default function WaiterMode({
   // Stol ekranidan chiqish (yetkazish uchun kiritilgan, lekin yuborilmagan ma'lumot ham tozalanadi)
   const closeSelectedTable = () => {
     setSelectedTable(null);
+    setSelectedOrderId(null);
     setCart([]);
     setPendingDelivery(null);
   };
@@ -823,6 +841,8 @@ export default function WaiterMode({
         customerName: delivery ? delivery.customerName : (activeBooking?.customerName || ''),
         customerPhone: delivery ? delivery.phone : (activeBooking?.customerPhone || ''),
         depositPaid: Number(activeBooking?.depositAmount || 0),
+        // Olib ketish: kunlik raqam (bir vaqtda bir nechta ochiq chek, "Olib ketish #3")
+        ...(isTakeawayTable(selectedTable) ? { takeawayNo: nextTakeawayNo(safeOrders, nowMs) } : {}),
         ...(delivery ? {
           orderType: ORDER_TYPE.DELIVERY,
           delivery: {
@@ -846,7 +866,8 @@ export default function WaiterMode({
       let mergedInto = null;
       updateOrders(prev => {
         const list = Array.isArray(prev) ? prev : [];
-        const idx = delivery
+        // Yetkazish va olib ketish: har buyurtma alohida chek (stol band bo'lmaydi)
+        const idx = delivery || isTakeawayTable(selectedTable)
           ? -1
           : list.findIndex(o => o && o.table === selectedTable && !CLOSED_ORDER_STATUSES.includes(o.status));
         if (idx === -1) return [newOrder, ...list];
@@ -1253,6 +1274,7 @@ export default function WaiterMode({
           reservations={reservations}
           tableTimers={tableTimers}
           selectedTable={selectedTable}
+          selectedOrderId={selectedOrderId}
           onSelectTable={handleSelectTable}
           calledTables={calledTables}
           onClearTableCall={handleClearTableCall}
@@ -1288,7 +1310,8 @@ export default function WaiterMode({
             <div className="text-right min-w-0">
               <span className="text-xs font-bold text-gray-400 block">Tanlangan joy:</span>
               <span className={`font-black text-lg ${isDeliveryTable(selectedTable) ? 'text-orange-600 dark:text-orange-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                {isDeliveryTable(selectedTable) ? '🛵' : '🪑'} {selectedTable}
+                {isDeliveryTable(selectedTable) ? '🛵' : isTakeawayTable(selectedTable) ? '🛍️' : '🪑'}{' '}
+                {currentTableOrder ? orderLabel(currentTableOrder) : isTakeawayTable(selectedTable) ? `${selectedTable} • yangi chek` : selectedTable}
               </span>
             </div>
           </div>

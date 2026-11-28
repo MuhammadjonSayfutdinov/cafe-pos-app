@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CLOSED_ORDER_STATUSES, KITCHEN_ORDER_STATUSES, ORDER_STATUS } from '../constants/orderStatus';
 import { kitchenSummary, unackedRejections } from '../utils/kitchenFlow';
+import { openTakeawayOrders, orderLabel } from '../utils/takeaway';
 import { notify } from '../utils/notify';
 
 // =========================================================
@@ -19,6 +20,8 @@ export default function WaiterTableGrid({
   reservations = {},
   tableTimers = {},
   selectedTable,
+  // "Olib ketish": tanlangan chek id si (bir vaqtda bir nechta ochiq chek)
+  selectedOrderId,
   onSelectTable,
   // Mijoz chaqirgan stollar (Set): telefondan yoki mijoz ekranidan, bo'sh stol bo'lsa ham
   calledTables,
@@ -117,13 +120,24 @@ export default function WaiterTableGrid({
   // 3. HAR BIR STOL HOLATINI BIRLASHTIRISH
   // =========================================================
   const tableCardsData = useMemo(() => {
-    return safeTables.map(tableName => {
-      const activeOrder = safeOrders.find(
-        o =>
-          o &&
-          o.table === tableName &&
-          !CLOSED_ORDER_STATUSES.includes(o.status)
-      );
+    // "Olib ketish": har bir ochiq chek alohida karta + yangi chek kartasi (bir vaqtda bir nechta mijoz)
+    const takeawayOpen = openTakeawayOrders(safeOrders);
+    const slots = safeTables.flatMap(tableName => (tableName === 'Olib ketish'
+      ? [
+        ...takeawayOpen.map(o => ({ tableName, order: o, key: `${tableName}#${o.id}`, orderId: String(o.id) })),
+        { tableName, order: null, key: `${tableName}#new`, orderId: null }
+      ]
+      : [{ tableName, order: undefined, key: tableName, orderId: undefined }]));
+
+    return slots.map(({ tableName, order, key, orderId }) => {
+      const activeOrder = order !== undefined
+        ? order
+        : safeOrders.find(
+          o =>
+            o &&
+            o.table === tableName &&
+            !CLOSED_ORDER_STATUSES.includes(o.status)
+        );
 
       const reservation = safeReservations[tableName] || null;
       const timerRaw = safeTimers[tableName] || null;
@@ -147,6 +161,9 @@ export default function WaiterTableGrid({
 
       return {
         tableName,
+        key,
+        orderId,
+        label: activeOrder ? orderLabel(activeOrder) : tableName,
         isTakeaway: tableName === 'Olib ketish',
         activeOrder,
         reservation,
@@ -339,6 +356,9 @@ export default function WaiterTableGrid({
         {filteredTables.map(card => {
           const {
             tableName,
+            key,
+            orderId,
+            label,
             isTakeaway,
             activeOrder,
             reservation,
@@ -353,12 +373,13 @@ export default function WaiterTableGrid({
             isTimed
           } = card;
 
-          const isSelected = selectedTable === tableName;
+          const isSelected = selectedTable === tableName && (orderId === undefined || String(selectedOrderId ?? '') === String(orderId ?? ''));
 
           return (
             <div
-              key={tableName}
-              onClick={() => typeof onSelectTable === 'function' && onSelectTable(tableName)}
+              key={key}
+              data-testid={isTakeaway ? 'takeaway-card' : undefined}
+              onClick={() => typeof onSelectTable === 'function' && onSelectTable(tableName, orderId)}
               className={`rounded-3xl p-4 border-2 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden group ${
                 hasCall
                   ? 'bg-red-50 dark:bg-red-950/40 border-red-500 ring-4 ring-red-500/20 animate-pulse'
@@ -394,7 +415,7 @@ export default function WaiterTableGrid({
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-black text-base sm:text-lg text-gray-900 dark:text-white leading-tight truncate">
-                        {tableName}
+                        {label}
                       </h3>
                       <span className="text-[11px] font-bold text-gray-400 block">
                         {isBusy
@@ -403,6 +424,8 @@ export default function WaiterTableGrid({
                           ? `🕒 Bron: ${reservation.time}`
                           : isTimed
                           ? '⏱️ Soatbay tarif faol'
+                          : isTakeaway
+                          ? '➕ Yangi mijoz uchun chek'
                           : "🟢 Bo'sh stol"}
                       </span>
                     </div>

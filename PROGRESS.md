@@ -52,8 +52,9 @@ o'zgartiradi (B35-B40). Batafsil: pastda "Ega va admin huquqlari". Hozirgi ma'lu
 Navbatdagi ish: 7-bosqichning "Keyingi qadamlar" ro'yxati (7 ta) tartib bilan. 1-qadam (mijoz telefonida rad
 etilgan taom) tayyor: foydalanuvchi `supabase/qr.sql` ni Supabase'da yana bir marta ishga tushirishi kerak.
 2-qadam (rad etilgan va bekor qilingan taomlar hisoboti) va 3-qadam (ikki qurilma bir chekni bir vaqtda
-o'zgartirsa birlashtirish), 4-qadam (taom taymeri, sexlar, oshxona cheki) va 5-qadam (kassada qaytarish) tayyor.
-Keyingisi: 6-qadam ("Olib ketish" uchun bir vaqtda bir nechta ochiq chek).
+o'zgartirsa birlashtirish), 4-qadam (taom taymeri, sexlar, oshxona cheki), 5-qadam (kassada qaytarish) va
+6-qadam (olib ketish uchun bir nechta ochiq chek) tayyor. Keyingisi: 7-qadam (Vitest - yangi kutubxona,
+foydalanuvchi ruxsati kerak; hozircha kutubxonasiz `npm test` - 8 ta to'plam).
 
 **Oshxona va buyurtma oqimi (7-bosqich, foydalanuvchi so'rovi, 2026-11-27):** oshpaz bir nechta taomni
 belgilab "Tayyor" bossa butun chek tayyor bo'lib ketardi (B19) - tuzatildi; oshxonaga "Rad etish" oynasi
@@ -261,7 +262,10 @@ rad etish oynasi) va namunalar (RestroBit POS, iiko, Dribbble POS). Tamoyil: hol
      o'zgarmaydi), kassa xarajati "Qaytarish" (naqd - smena hisobotida chiqim), masalliq "Kirim (Qaytarish)" bilan
      omborga, audit va Telegram. PIN: "Mijozga pul qaytarish" (standart yoqiq). `src/utils/refunds.ts`,
      `CashierRefundsPanel.jsx`, `npm run test:refund`
-   - [ ] "Olib ketish" uchun ofitsiant ekranida bir vaqtda bir nechta ochiq chek
+   - [x] "Olib ketish" uchun bir vaqtda bir nechta ochiq chek: har chek kunlik raqam oladi (#1, #2...), ofitsiant
+     stollar xaritasida har biri alohida karta + "➕ Yangi mijoz uchun chek" kartasi, chek id si bo'yicha tanlanadi
+     (dozakaz to'g'ri chekka tushadi). Oshxona va kassada "Olib ketish #3". Stol nomi o'zgarmadi: xizmat haqi,
+     QR server, statistika avvalgidek (`src/utils/takeaway.ts`, `npm run test:takeaway`)
    - [ ] Vitest (yangi kutubxona: ruxsat kerak); hozircha `scripts/test-kitchen-flow.mjs` (kutubxonasiz)
 
 ### 6-bosqich. Kafe POS 2.0 (foydalanuvchi qarori, 2026-11-27)
@@ -386,6 +390,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | 26 | Ikki qurilma bir chekni bir vaqtda o'zgartirsa birlashtirish (7-bosqich, 3-qism, 3-qadam) | "7: bir chekni ikki qurilma bir vaqtda..." commiti | [x] |
 | 27 | Har taom taymeri, oshxona sexlari, oshxona cheki KOT (7-bosqich, 3-qism, 4-qadam) | "7: har taom taymeri, sexlar va oshxona cheki..." commiti | [x] |
 | 28 | Kassada mijozga qaytarish: pul, xarajat, ombor (7-bosqich, 3-qism, 5-qadam) | "7: kassada mijozga pul qaytarish..." commiti | [x] |
+| 29 | Olib ketish: bir vaqtda bir nechta ochiq chek (7-bosqich, 3-qism, 6-qadam) | "7: olib ketish uchun bir nechta ochiq chek..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

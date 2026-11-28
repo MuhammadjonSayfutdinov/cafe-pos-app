@@ -20,6 +20,7 @@ import KitchenStationsModal from './KitchenStationsModal';
 import useSticky from '../hooks/useSticky';
 import { notify } from '../utils/notify';
 import { sendTelegramLines, escapeHtml } from '../utils/telegramNotifier';
+import { orderLabel } from '../utils/takeaway';
 import {
   AUTO_PRINT_KEY, DEVICE_STATION_KEY, PRINTED_KEY, STATIONS_KEY, formatTimer, kotDocument, lineCategory,
   lineSentMs, normalizeStations, printHtml, prunePrinted, selectionCategories, selectionLabel, slaLevelOf,
@@ -670,7 +671,7 @@ export default function KitchenMode({
   }));
   const kotBaseOf = (order) => ({
     cafeName: String(cafeName || ''),
-    table: String(order.table || ''),
+    table: orderLabel(order) || String(order.table || ''),
     waiter: String(order.waiterName || order.waiter || ''),
     orderId: String(order.id),
     station: selectionLabel(stationSelection, stations),
@@ -1128,7 +1129,7 @@ export default function KitchenMode({
                           <div>
                             <div className="flex items-center gap-2">
                               <h3 className="text-xl font-black tracking-tight">
-                                {isDeliveryOrder(order) ? '🛵' : '🪑'} {order.table}
+                                {isDeliveryOrder(order) ? '🛵' : '🪑'} {orderLabel(order)}
                               </h3>
                               {isCritical && (
                                 <span className="px-2 py-0.5 rounded-md bg-white text-red-600 text-[10px] font-black uppercase animate-bounce">

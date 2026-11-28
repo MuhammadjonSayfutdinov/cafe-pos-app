@@ -236,6 +236,9 @@ pos_orders (buyurtma):
     'Kirim (Qaytarish)' bilan qaytadi (rad etish yozuvida restockedAt).
     _rev, _revs - sinxron versiya belgisi (src/sync/engine.js qo'yadi, src/sync/mergeOrder.ts):
     ikki qurilma bir chekni bir vaqtda o'zgartirsa birlashtirish uchun. Qo'lda yozmang va o'chirmang.
+  Olib ketish: table har doim 'Olib ketish' (TAKEAWAY_TABLE), takeawayNo - kunlik raqam ("Olib ketish #3",
+    src/utils/takeaway.ts: nextTakeawayNo, orderLabel). Bir vaqtda bir nechta ochiq chek: ofitsiant chekni
+    id si bo'yicha tanlaydi (stol nomi bilan qidirmang: isTakeawayTable bo'lsa order.id).
   Yetkazish buyurtmasi: table "Yetkazish #N", orderType 'delivery',
     delivery: { customerName, phone, address, landmark, note, fee, status
     ('kutilmoqda' | "yo'lda" | 'yetkazildi'), courier, courierId, assignedAt,
