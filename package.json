@@ -9,15 +9,16 @@
     "build": "tsc -p . && tsc -p server && vite build",
     "preview": "vite preview",
     "hub": "node server/hub.mjs",
-    "test:kitchen": "node scripts/test-kitchen-flow.mjs",
-    "test:access": "node scripts/test-access.mjs",
-    "test:qr": "node scripts/test-customer-lines.mjs",
-    "test:loss": "node scripts/test-loss-report.mjs",
-    "test:merge": "node scripts/test-merge-order.mjs",
-    "test:stations": "node scripts/test-kitchen-stations.mjs",
-    "test:refund": "node scripts/test-refunds.mjs",
-    "test:takeaway": "node scripts/test-takeaway.mjs",
-    "test": "node scripts/test-kitchen-flow.mjs && node scripts/test-access.mjs && node scripts/test-customer-lines.mjs && node scripts/test-loss-report.mjs && node scripts/test-merge-order.mjs && node scripts/test-kitchen-stations.mjs && node scripts/test-refunds.mjs && node scripts/test-takeaway.mjs"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:kitchen": "vitest run tests/kitchen-flow",
+    "test:access": "vitest run tests/access",
+    "test:qr": "vitest run tests/customer-lines",
+    "test:loss": "vitest run tests/loss-report",
+    "test:merge": "vitest run tests/merge-order",
+    "test:stations": "vitest run tests/kitchen-stations",
+    "test:refund": "vitest run tests/refunds",
+    "test:takeaway": "vitest run tests/takeaway"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",
@@ -30,7 +31,8 @@
     "@vitejs/plugin-react": "^5.0.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "vitest": "^4.1.12"
   },
   "allowScripts": {
     "esbuild@0.28.2": true

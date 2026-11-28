@@ -89,6 +89,9 @@ haqiqatan ishlaydi (PROGRESS.md, 3-bosqich).
     Xavfli amal (rahbar tasdig'i): requireAdminOverride(matn, fn, kalit) - kalit src/utils/pinRules.ts da
     (yangi amal bo'lsa PIN_RULE_GROUPS ga qo'shing). PIN kerakmi va kim tasdiqlaydi - App hal qiladi (o'zingiz
     role tekshirmang). Faqat Ega amali: requireOwnerConfirm(matn, fn). Tekshiruv: npm run test:access.
+12i. Tekshiruvlar: Vitest (vitest.config.js), fayllar tests/*.test.js, mantiq modullarini import qiladi
+    (src/utils, src/sync, src/qr; brauzer kerak emas). Yangi util/mantiq yozsangiz tekshiruv qo'shing.
+    Ishga tushirish: npm test (hammasi), npm run test:watch, npm run test:kitchen va h.k.
 13. Vazifa oxirida qisqa hisobot bering: o'zgargan fayllar, nima qilindi,
     qanday sinab ko'rish kerak.
 
@@ -119,7 +122,7 @@ Avtorizatsiya va umumiy:
   AdminRightsModal            Admin huquqlari ro'yxati (Telegram uslubi) va AdminRightsEditor (xodim formasida ham)
   PinRulesPanel               Boshqaruv -> "🔐 PIN himoyasi" (soha "n/m" bilan ochiladi, har amalga tugma)
   ToggleSwitch                Telegram uslubidagi tugma (✓ yashil / ✕ qizil / 🔒)
-  scripts/test-access.mjs     Ega, huquqlar, PIN qoidalari tekshiruvi (npm run test:access)
+  tests/access.test.js        Ega, huquqlar, PIN qoidalari tekshiruvi (npm run test:access)
   TwoFactorCodeModal          PIN'dan keyin Authenticator kodi yoki zaxira kod (ikkinchi bosqich)
   TwoFactorSetupModal         Ikki bosqichli kirishni yoqish: QR, tasdiq, 10 ta zaxira kod
   utils/totp.ts, twoFactor.ts TOTP (SHA-1, HMAC, base32) va xodim darajasidagi yordamchilar
@@ -166,7 +169,7 @@ Oshxona:
   KitchenNoticesPanel         Ofitsiant/kassa/admin ekrani tepasida: oshxona rad etdi, to'langan chek tayyor
   KitchenStationsModal        Sexlar (bar, issiq sex), shu planshet sexi, avtomatik oshxona cheki (KOT)
   utils/kitchenStations.ts    Sex tanlovi, taom taymeri, KOT cheki (kotDocument, printHtml); npm run test:stations
-  utils/kitchenFlow.ts        Taom darajasidagi holat va amallar (yagona joy), scripts/test-kitchen-flow.mjs
+  utils/kitchenFlow.ts        Taom darajasidagi holat va amallar (yagona joy), tests/kitchen-flow.test.js
 
 Ombor:
   WarehouseMode (502), WarehouseStockTab (1136), WarehousePrepTab (583),

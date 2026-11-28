@@ -53,8 +53,9 @@ Navbatdagi ish: 7-bosqichning "Keyingi qadamlar" ro'yxati (7 ta) tartib bilan. 1
 etilgan taom) tayyor: foydalanuvchi `supabase/qr.sql` ni Supabase'da yana bir marta ishga tushirishi kerak.
 2-qadam (rad etilgan va bekor qilingan taomlar hisoboti) va 3-qadam (ikki qurilma bir chekni bir vaqtda
 o'zgartirsa birlashtirish), 4-qadam (taom taymeri, sexlar, oshxona cheki), 5-qadam (kassada qaytarish) va
-6-qadam (olib ketish uchun bir nechta ochiq chek) tayyor. Keyingisi: 7-qadam (Vitest - yangi kutubxona,
-foydalanuvchi ruxsati kerak; hozircha kutubxonasiz `npm test` - 8 ta to'plam).
+6-qadam (olib ketish uchun bir nechta ochiq chek) va 7-qadam (Vitest, foydalanuvchi ruxsati bilan) tayyor:
+7-bosqichning "Keyingi qadamlar" ro'yxati to'liq bajarildi. Navbatdagi ish: foydalanuvchi tanlaydi (6-bosqich
+qolgan qadamlari yoki pilot natijalari).
 
 **Oshxona va buyurtma oqimi (7-bosqich, foydalanuvchi so'rovi, 2026-11-27):** oshpaz bir nechta taomni
 belgilab "Tayyor" bossa butun chek tayyor bo'lib ketardi (B19) - tuzatildi; oshxonaga "Rad etish" oynasi
@@ -266,7 +267,9 @@ rad etish oynasi) va namunalar (RestroBit POS, iiko, Dribbble POS). Tamoyil: hol
      stollar xaritasida har biri alohida karta + "➕ Yangi mijoz uchun chek" kartasi, chek id si bo'yicha tanlanadi
      (dozakaz to'g'ri chekka tushadi). Oshxona va kassada "Olib ketish #3". Stol nomi o'zgarmadi: xizmat haqi,
      QR server, statistika avvalgidek (`src/utils/takeaway.ts`, `npm run test:takeaway`)
-   - [ ] Vitest (yangi kutubxona: ruxsat kerak); hozircha `scripts/test-kitchen-flow.mjs` (kutubxonasiz)
+   - [x] Vitest (foydalanuvchi ruxsati, 2026-11-28): `vitest` 4.1 (devDependency, faqat dasturchi kompyuterida),
+     `vitest.config.js`, tekshiruvlar `tests/*.test.js` (8 to'plam, 74 tekshiruv, ~1 s). `npm test`, `npm run test:watch`,
+     har to'plam alohida: `npm run test:kitchen` ... Eski kutubxonasiz `scripts/test-*.mjs` olib tashlandi
 
 ### 6-bosqich. Kafe POS 2.0 (foydalanuvchi qarori, 2026-11-27)
 Manba: foydalanuvchi bilan kelishilgan taklif (Dribbble'dagi RestroBit POS tahlili + uch eshik).
@@ -315,7 +318,8 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 - [x] TypeScript boshlandi: `tsconfig.json` (strict, allowJs), `npm run typecheck`, build avval tekshiradi.
   `.ts`: `sync/config`, `sync/timeouts`, `utils/ids`, `utils/pinGuard`, `utils/orderTotals`, `utils/pinHash`, `utils/sha256`
 - [x] Saytning xavfsizlik sarlavhalari (`vercel.json`: CSP, X-Frame-Options, nosniff, Referrer/Permissions-Policy)
-- [ ] `Vitest`: summa, chegirma, bonus, ombor hisobi
+- [x] `Vitest` o'rnatildi (7-bosqich, 3-qism, 7-qadam)
+- [ ] `Vitest`: summa, chegirma, bonus, ombor hisobi uchun tekshiruvlar (`orderTotals`, `inventoryCalc`)
 - [ ] Joylashtirish (Vercel/Netlify + backend)
 
 ## Qarorlar
@@ -353,6 +357,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | Ega (kafe egasi) | Telegram guruhidagi Ega kabi. Saqlash: KV `pos_owner = {id, at, by}` (bulut orqali). Ega - shu yozuvdagi admin, bo'lmasa (yoki u admin bo'lmasa) eng birinchi qo'shilgan admin: id dan (1, 2... yoki "user_<vaqt>"), ro'yxat tartibidan emas - barcha qurilmada bir xil, ilova ochilganda hech narsa yozilmaydi (qurilmalar bir-birini bosib ketmaydi). Asosiy admin eski versiyadagi qurilmada o'chirilgan bo'lsa ham Ega o'zi keyingi eng eski adminga o'tadi. Egani hech kim tahrirlay/o'chira olmaydi, o'z rolini o'zi ham o'zgartirmaydi (avval egalikni topshiradi) | qabul qilindi |
 | Admin huquqlari | `user.adminRights` (14 ta boolean) va `user.appointedBy`. Yangi admin: Telegram kabi ko'pi ochiq, "Yangi admin tayinlash" va "PIN himoyasini boshqarish" yopiq. Huquqi yozilmagan eski admin: avvalgidek barcha bo'limlar + tasdiqlash (yangilanishda hech kim ishsiz qolmasin). Admin o'zida yo'q huquqni bera olmaydi, faqat o'zi tayinlagan adminni o'zgartiradi. "Boshqaruv" ekrani har adminga ochiq: u yerda o'z PIN'i, ikki bosqichli kirishi va PIN himoyasi ro'yxati (o'qish) | qabul qilindi |
 | PIN himoyasi har amal uchun | KV `pos_pin_rules` (11 ta amal). Yozilmagan amal: avval umumiy tugma bilan himoyalangan bo'lsa - eski `pos_override_enabled` qiymati, yangi amal (qarz, rad etish, ombor chiqimi, mahsulotni o'chirish) - o'chiq: yangilanishdan keyin ish o'zgarmaydi. `pos_override_enabled` eski versiyadagi qurilmalar uchun "kamida bitta amal himoyalangan" deb yoziladi. Tasdiqlaydi: Ega va "tasdiqlash" huquqli admin (o'zlari bajarganda PIN so'ralmaydi). Faqat Ega amallari Ega PIN'i (+ Authenticator) bilan | qabul qilindi |
+| Tekshiruvlar (Vitest) | Foydalanuvchi ruxsati bilan (2026-11-28). Vitest 4.1 (5-versiya Node 22.12+ talab qiladi, 4.1 Node 20 da ham ishlaydi). Alohida `vitest.config.js`: asosiy vite.config.js dagi PWA/versiya plaginlari tekshiruvga aralashmaydi. Faqat mantiq (src/utils, src/sync, src/qr), node muhitida. O'rnatishda npm ichki xatosi (`edgesOut`) - bir marta `--legacy-peer-deps` bilan o'rnatildi; lockfile bilan oddiy `npm install` / `npm ci` flagsiz ishlaydi (tekshirildi) | qabul qilindi |
 | TypeScript | Bosqichma-bosqich: `allowJs`, faqat `.ts` fayllar strict tekshiriladi. Yangi util/modul `.ts` da. Komponentlar keyinroq (`@types/react` kerak bo'ladi) | qabul qilindi |
 | Autosync / GitDoc | O'chirilgan: ish jarayonida avtomatik commit va push qilib, `git am` ni buzdi | qabul qilindi |
 
@@ -391,6 +396,7 @@ Ochiq savollar: kiosk qurilmasi (Windows tavsiya), videolardan skrinshot.
 | 27 | Har taom taymeri, oshxona sexlari, oshxona cheki KOT (7-bosqich, 3-qism, 4-qadam) | "7: har taom taymeri, sexlar va oshxona cheki..." commiti | [x] |
 | 28 | Kassada mijozga qaytarish: pul, xarajat, ombor (7-bosqich, 3-qism, 5-qadam) | "7: kassada mijozga pul qaytarish..." commiti | [x] |
 | 29 | Olib ketish: bir vaqtda bir nechta ochiq chek (7-bosqich, 3-qism, 6-qadam) | "7: olib ketish uchun bir nechta ochiq chek..." commiti | [x] |
+| 30 | Vitest: tekshiruvlar tests/ papkasida (7-bosqich, 3-qism, 7-qadam) | "7: Vitest..." commiti | [x] |
 
 ## Yangi chatning birinchi xabari
 

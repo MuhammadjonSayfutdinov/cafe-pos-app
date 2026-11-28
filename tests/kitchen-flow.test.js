@@ -1,23 +1,7 @@
-// Oshxona oqimi (src/utils/kitchenFlow.ts) uchun tekshiruvlar. Ishga tushirish: npm run test:kitchen
-// Qo'shimcha kutubxonasiz: TypeScript faylni Vite (loyihada bor) bitta modulga yig'adi, node:assert tekshiradi.
+// Oshxona oqimi (src/utils/kitchenFlow.ts) uchun tekshiruvlar. Ishga tushirish: npm test (yoki npm run test:kitchen)
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { build } from 'vite';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const out = await build({
-  configFile: false,
-  root,
-  logLevel: 'silent',
-  build: {
-    write: false,
-    minify: false,
-    lib: { entry: path.join(root, 'src/utils/kitchenFlow.ts'), formats: ['es'], fileName: 'kitchenFlow' }
-  }
-});
-const chunk = (Array.isArray(out) ? out[0] : out).output.find(o => o.type === 'chunk');
-const kf = await import(`data:text/javascript;base64,${Buffer.from(chunk.code).toString('base64')}`);
+import { test } from 'vitest';
+import * as kf from '../src/utils/kitchenFlow';
 
 const S = { NEW: 'Yangi', COOKING: 'Tayyorlanmoqda', READY: 'Tayyor', DELIVERED: 'Yetkazildi', PAID: "To'langan", CANCELLED: 'Bekor qilindi' };
 const NOW = 1_800_000_000_000;
@@ -30,16 +14,6 @@ const order = (items, extra = {}) => ({
 });
 const find = (o, id) => o.items.find(it => it.cartItemId === id);
 
-let passed = 0;
-const test = (name, fn) => {
-  try {
-    fn();
-    passed += 1;
-  } catch (e) {
-    console.error(`❌ ${name}`);
-    throw e;
-  }
-};
 
 test("faqat belgilangan taomlar tayyor bo'ladi (asosiy xato)", () => {
   const o = order([line('a', 'Osh', 2), line('b', 'Salat', 1), line('c', 'Choy', 1)]);
@@ -226,5 +200,3 @@ test("VIP vaqt va yetkazish narxi oshxonaga chiqmaydi", () => {
   assert.equal(kf.kitchenSummary(o).kitchenQty, 1);
   assert.equal(kf.markLinesReady(o, null, NOW).order.status, S.READY);
 });
-
-console.log(`✅ kitchenFlow: ${passed} ta tekshiruv o'tdi`);

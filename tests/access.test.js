@@ -1,35 +1,9 @@
 // Ega, admin huquqlari (src/utils/adminRights.ts) va PIN himoyasi (src/utils/pinRules.ts) tekshiruvlari.
-// Ishga tushirish: npm run test:access. Kutubxonasiz: TypeScript'ni Vite yig'adi, node:assert tekshiradi.
+// Ishga tushirish: npm test (yoki npm run test:access)
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { build } from 'vite';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const load = async (rel) => {
-  const out = await build({
-    configFile: false,
-    root,
-    logLevel: 'silent',
-    build: { write: false, minify: false, lib: { entry: path.join(root, rel), formats: ['es'], fileName: 'm' } }
-  });
-  const chunk = (Array.isArray(out) ? out[0] : out).output.find(o => o.type === 'chunk');
-  return import(`data:text/javascript;base64,${Buffer.from(chunk.code).toString('base64')}`);
-};
-
-const ar = await load('src/utils/adminRights.ts');
-const pr = await load('src/utils/pinRules.ts');
-
-let passed = 0;
-const test = (name, fn) => {
-  try {
-    fn();
-    passed += 1;
-  } catch (e) {
-    console.error(`❌ ${name}`);
-    throw e;
-  }
-};
+import { test } from 'vitest';
+import * as ar from '../src/utils/adminRights';
+import * as pr from '../src/utils/pinRules';
 
 // Namuna: birinchi admin (id 1, dastlabki), u tayinlagan admin B, oddiy xodimlar
 const A = { id: 1, name: 'Admin', role: 'admin' };
@@ -178,5 +152,3 @@ test("Guruhni o'zgartirish faqat shu amallarni o'zgartiradi", () => {
   assert.equal('nimadir' in next, false);
   assert.deepEqual(pr.countPinRules(next, ['cashierDiscount', 'cashierDebt']), { on: 1, total: 2 });
 });
-
-console.log(`✅ Ega, huquqlar va PIN himoyasi: ${passed} ta tekshiruv o'tdi`);

@@ -1,34 +1,9 @@
 // Ikki qurilma bir chekni bir vaqtda o'zgartirsa (src/sync/mergeOrder.ts): ikkala o'zgarish saqlanadi.
-// Ishga tushirish: npm run test:merge. Kutubxonasiz: Vite yig'adi, node:assert tekshiradi.
+// Ishga tushirish: npm test (yoki npm run test:merge)
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { build } from 'vite';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const load = async (rel) => {
-  const out = await build({
-    configFile: false,
-    root,
-    logLevel: 'silent',
-    build: { write: false, minify: false, lib: { entry: path.join(root, rel), formats: ['es'], fileName: 'm' } }
-  });
-  const chunk = (Array.isArray(out) ? out[0] : out).output.find(o => o.type === 'chunk');
-  return import(`data:text/javascript;base64,${Buffer.from(chunk.code).toString('base64')}`);
-};
-const mo = await load('src/sync/mergeOrder.ts');
-const kf = await load('src/utils/kitchenFlow.ts');
-
-let passed = 0;
-const test = (name, fn) => {
-  try {
-    fn();
-    passed += 1;
-  } catch (e) {
-    console.error(`❌ ${name}`);
-    throw e;
-  }
-};
+import { test } from 'vitest';
+import * as mo from '../src/sync/mergeOrder';
+import * as kf from '../src/utils/kitchenFlow';
 
 const NOW = 1_800_000_000_000;
 const S = { NEW: 'Yangi', COOKING: 'Tayyorlanmoqda', READY: 'Tayyor', DELIVERED: 'Yetkazildi', PAID: "To'langan", CANCELLED: 'Bekor qilindi' };
@@ -149,5 +124,3 @@ test('Versiya kelib chiqishi: yangi, eski, bir vaqtda', () => {
   assert.equal(mo.relationOf(w1, m), 'newer');
   assert.equal(mo.sameContent({ a: 1, _rev: 'x' }, { a: 1, _rev: 'y', _revs: ['x'] }), true);
 });
-
-console.log(`✅ Chekni birlashtirish (ikki qurilma bir vaqtda): ${passed} ta tekshiruv o'tdi`);

@@ -1,30 +1,8 @@
 // "Olib ketish": bir vaqtda bir nechta ochiq chek (src/utils/takeaway.ts).
-// Ishga tushirish: npm run test:takeaway. Kutubxonasiz: Vite yig'adi, node:assert tekshiradi.
+// Ishga tushirish: npm test (yoki npm run test:takeaway)
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { build } from 'vite';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const out = await build({
-  configFile: false,
-  root,
-  logLevel: 'silent',
-  build: { write: false, minify: false, lib: { entry: path.join(root, 'src/utils/takeaway.ts'), formats: ['es'], fileName: 'm' } }
-});
-const chunk = (Array.isArray(out) ? out[0] : out).output.find(o => o.type === 'chunk');
-const tk = await import(`data:text/javascript;base64,${Buffer.from(chunk.code).toString('base64')}`);
-
-let passed = 0;
-const test = (name, fn) => {
-  try {
-    fn();
-    passed += 1;
-  } catch (e) {
-    console.error(`❌ ${name}`);
-    throw e;
-  }
-};
+import { test } from 'vitest';
+import * as tk from '../src/utils/takeaway';
 
 const now = new Date(2026, 10, 28, 14, 0).getTime();
 const yesterday = now - 24 * 3600000;
@@ -51,5 +29,3 @@ test('Ekrandagi nom', () => {
   assert.equal(tk.orderLabel(orders[4]), '3-Stol');
   assert.equal(tk.orderLabel({ table: 'Olib ketish' }), 'Olib ketish');
 });
-
-console.log(`✅ Olib ketish (bir nechta ochiq chek): ${passed} ta tekshiruv o'tdi`);

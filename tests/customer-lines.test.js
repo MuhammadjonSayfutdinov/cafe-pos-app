@@ -1,30 +1,9 @@
 // Mijoz ekranidagi taom holati (src/qr/customerLines.ts): telefonda oshxona rad etgan taom alohida.
-// Ishga tushirish: npm run test:qr. Kutubxonasiz: TypeScript'ni Vite yig'adi, node:assert tekshiradi.
+// Ishga tushirish: npm test (yoki npm run test:qr)
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { build } from 'vite';
+import { test } from 'vitest';
+import * as cl from '../src/qr/customerLines';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const out = await build({
-  configFile: false,
-  root,
-  logLevel: 'silent',
-  build: { write: false, minify: false, lib: { entry: path.join(root, 'src/qr/customerLines.ts'), formats: ['es'], fileName: 'm' } }
-});
-const chunk = (Array.isArray(out) ? out[0] : out).output.find(o => o.type === 'chunk');
-const cl = await import(`data:text/javascript;base64,${Buffer.from(chunk.code).toString('base64')}`);
-
-let passed = 0;
-const test = (name, fn) => {
-  try {
-    fn();
-    passed += 1;
-  } catch (e) {
-    console.error(`❌ ${name}`);
-    throw e;
-  }
-};
 const pick = (lines) => lines.map(l => `${l.name}:${l.qty}:${l.state}${l.reason ? `:${l.reason}` : ''}`);
 
 // Telefon so'rovi: Osh x2 (1 tayyor), Lag'mon x2 (oshxona hammasini rad etdi), Somsa x3 (1 rad, 1 ofitsiant olib tashladi)
@@ -98,5 +77,3 @@ test("Oshxona belgisisiz taom: holat chek statusidan (Tayyor / kutilmoqda)", () 
   assert.deepEqual(pick(cl.buildOrderLines(req, 'Tayyor')), ['Non:1:ready']);
   assert.deepEqual(pick(cl.buildOrderLines(req, 'pending')), ['Non:1:waiting']);
 });
-
-console.log(`✅ Mijoz ekrani (taom holati, rad etilgan taom): ${passed} ta tekshiruv o'tdi`);

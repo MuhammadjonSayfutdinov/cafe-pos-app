@@ -1,30 +1,8 @@
 // Oshxona sexlari, taom taymeri va oshxona cheki (src/utils/kitchenStations.ts).
-// Ishga tushirish: npm run test:stations. Kutubxonasiz: Vite yig'adi, node:assert tekshiradi.
+// Ishga tushirish: npm test (yoki npm run test:stations)
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { build } from 'vite';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const out = await build({
-  configFile: false,
-  root,
-  logLevel: 'silent',
-  build: { write: false, minify: false, lib: { entry: path.join(root, 'src/utils/kitchenStations.ts'), formats: ['es'], fileName: 'm' } }
-});
-const chunk = (Array.isArray(out) ? out[0] : out).output.find(o => o.type === 'chunk');
-const ks = await import(`data:text/javascript;base64,${Buffer.from(chunk.code).toString('base64')}`);
-
-let passed = 0;
-const test = (name, fn) => {
-  try {
-    fn();
-    passed += 1;
-  } catch (e) {
-    console.error(`❌ ${name}`);
-    throw e;
-  }
-};
+import { test } from 'vitest';
+import * as ks from '../src/utils/kitchenStations';
 
 const stations = ks.normalizeStations([
   { id: 'bar', name: 'Bar', icon: '🍹', categories: ['Ichimlik', 'Shirinlik'] },
@@ -104,5 +82,3 @@ test('Oshxona cheki: stol, sex, taom soni, izoh; bir nechta chek - alohida qog\'
   assert.match(html, /DOZAKAZ/);
   assert.equal((html.match(/class="kot"/g) || []).length, 2);
 });
-
-console.log(`✅ Oshxona sexlari, taymer va oshxona cheki: ${passed} ta tekshiruv o'tdi`);

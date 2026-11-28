@@ -1,34 +1,9 @@
 // "Rad etilgan va bekor qilingan taomlar" hisoboti (src/utils/lossReport.ts) va chekdagi voids yozuvi
-// (src/utils/kitchenFlow.ts). Ishga tushirish: npm run test:loss. Kutubxonasiz: Vite yig'adi, node:assert.
+// (src/utils/kitchenFlow.ts). Ishga tushirish: npm test (yoki npm run test:loss)
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { build } from 'vite';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const load = async (rel) => {
-  const out = await build({
-    configFile: false,
-    root,
-    logLevel: 'silent',
-    build: { write: false, minify: false, lib: { entry: path.join(root, rel), formats: ['es'], fileName: 'm' } }
-  });
-  const chunk = (Array.isArray(out) ? out[0] : out).output.find(o => o.type === 'chunk');
-  return import(`data:text/javascript;base64,${Buffer.from(chunk.code).toString('base64')}`);
-};
-const lr = await load('src/utils/lossReport.ts');
-const kf = await load('src/utils/kitchenFlow.ts');
-
-let passed = 0;
-const test = (name, fn) => {
-  try {
-    fn();
-    passed += 1;
-  } catch (e) {
-    console.error(`❌ ${name}`);
-    throw e;
-  }
-};
+import { test } from 'vitest';
+import * as lr from '../src/utils/lossReport';
+import * as kf from '../src/utils/kitchenFlow';
 
 const NOW = 1_800_000_000_000;
 const line = (id, name, quantity, extra = {}) => ({
@@ -104,5 +79,3 @@ test('Telegram xabari: yig\'indi va guruhlar', () => {
   assert.match(text, /Masalliq tugadi/);
   assert.match(lr.lossTelegramLines(lr.summarizeLosses([]), 'Bugun', 'Kafe').join('\n'), /yo'q/);
 });
-
-console.log(`✅ Rad etilgan va bekor qilingan taomlar hisoboti: ${passed} ta tekshiruv o'tdi`);
